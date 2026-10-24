@@ -52,6 +52,16 @@ CI runs the same checks on this folder for every push and pull request. Commit `
 
 The SVG flips the building Y axis for screen coordinates. The current viewer is deliberately limited to the sample ground floor. Routing, AI chat, floor-plan upload, multi-floor views, edits, persistence, and voice are not implemented yet.
 
+## Chat + 3D viewer
+
+The home page is a full-screen 3D model of the building with an "Ask me anything" chat. Each answer flies the camera to the relevant floor(s) and highlights the result.
+
+- `src/lib/chat/contract.ts`: **the contract between the backend and the viewer.** `POST /api/chat` returns a `ChatResponse`: `reply` text, a headline `answer`, and a `scene` (focus floor/stack/building, highlighted space ids, markers, routes, links, closures).
+- `docs/answer-types.md`: every question kind grouped into five output types, with the headline and 3D view each one gets.
+- `src/lib/chat/demo-resolver.ts`: a keyword-matching **placeholder** so the UI can be demoed. Replace the `resolveDemo` call in `src/app/api/chat/route.ts` with the real agent and return the same shape.
+- `src/components/experience/`: the viewer (`building-scene.tsx`, `scene-model.ts`) and the chat shell (`building-experience.tsx`).
+- `src/lib/buildings/catalog.ts` + `src/data/buildings/`: the buildings offered in the UI (N3 and Fertigung Ost 27, geometry only; see `ATTRIBUTION.md` there).
+
 ## Challenge understanding and implementation order
 
 Source: https://github.com/Synera-GmbH/industrial-agents-hackathon-2026
