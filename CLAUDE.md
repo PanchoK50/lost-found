@@ -8,7 +8,7 @@ Industrial Agents Hackathon 2026, Track 01 "Talk to Your Building", Sat 24 to Su
 
 | Path | What |
 |---|---|
-| `website/` | Next.js 16 app (React 19, Tailwind 4, Node 24). Run `npm run dev`, `lint`, `typecheck`, `build` inside `website/`. CI runs lint, typecheck and build. |
+| `website/` | Next.js 16 app (React 19, Tailwind 4, Node 24). Run `npm run dev`, `lint`, `typecheck`, `build` inside `website/`. CI runs lint, typecheck and build. Contains Andy's viewer (merged from `andy-ui`): three.js scene in `src/components/experience/`, chat contract `src/lib/chat/contract.ts`, walking model `src/lib/buildings/walk.ts`, turn-by-turn `turns.ts`, demo resolver `src/lib/chat/demo-resolver.ts`, answer types in `website/docs/answer-types.md`. |
 | `data/` | Challenge dataset: `train/`, `dev/` (with answers), `test/` (without). One `building.json` per building. |
 | `benchmark/` | Official scorer (`score.py`) and evaluator (`evaluate.py`). |
 | `starter_agent/` | Reference Python agent. `building_map.py` implements the dataset's route model. |

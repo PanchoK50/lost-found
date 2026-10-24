@@ -273,7 +273,7 @@ const closed = [...(response.scene.closed ?? []), ...worldClosed];
 const graph = new WalkGraph(building, { closed });
 ```
 
-- Pass the same `closed` list into the resolver or agent, so that answers ("take the west lift") and drawn routes agree.
+- Pass the same `closed` list into the resolver or agent, so that answers ("take the west lift") and drawn routes agree. Today `resolveDemo(building, message)` computes its routes without any world closures. Extend it to `resolveDemo(building, message, { closed, playerId })` and hand `closed` to every `WalkGraph` it builds.
 - Return `worldClosed` in `scene.closed`. The scene already draws the "Closed" label.
 - Skills with `skipBroken` ignore assets and spaces with an active `broken` pin. "Coffee" never sends you to the broken machine.
 
@@ -329,7 +329,7 @@ On a single floor (`focus.mode === 'floor'`) show only that floor's world anchor
 
 **Inbox toasts** (new, under `hud-top`): a glass card slides in for every new ping addressed to me.
 `Mia · Come to me · Kitchen 1.14 · 2 min   [Go] [Later]`
-"Go" sets `directive` to a route from my presence to the ping's space, and marks the ping `accepted`. Toasts stack to 2 at most and the rest go into the people sheet.
+"Go" sets `directive` to a route from my presence to the ping's space (as `routes: [{ spacePath }]`, so `withRoutePoints` fills in `points` and the turn-by-turn `steps` from `lib/buildings/turns.ts`), and marks the ping `accepted`. Toasts stack to 2 at most and the rest go into the people sheet.
 
 **Console (`console`)**
 - **Passer-by chip** above `.ask`: "East lift still broken? [Still broken] [Fixed]".
