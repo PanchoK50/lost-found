@@ -35,12 +35,8 @@ CI runs the same checks on this folder for every push and pull request. Commit `
 
 ## What's included
 
-- **3D building explorer** (`/`): every building in `../data/` rendered as extruded floors with walls (door gaps cut out), equipment as instanced boxes, and stair/lift shafts. Pick a building, isolate or explode floors, switch between 3D and plan view, search rooms and equipment, click anything for details. Keys: ↑/↓ floors, P plan view, F reframe, Esc clear. `?b=<building_id>` deep-links a building.
-- `GET /api/buildings`, `GET /api/buildings/<id>`, `GET /api/buildings/<id>/plan?level=0`: the dataset served from `../data` (override with `BUILDINGS_DATA_DIR`).
-- The original single-floor starter view lives at `/starter`.
-- **Voice input**: the microphone in the search box records speech and `/api/transcribe` turns it into text with ElevenLabs Scribe. Needs `ELEVENLABS_API_KEY` in `website/.env.local`.
-- **Generated art** in `public/art/`: an icon (`icons/`) and a 3D model (`models/`) for each of the 96 asset types in the dataset, plus floor and wall textures (`textures/`). The viewer uses whatever exists there and falls back to plain boxes. The generators live in `../tools/art/`: `generate_icons.py` and `generate_textures.py` (Nano Banana on Vertex AI; pass the GCP project), and `generate_models.py` (TRELLIS.2 on the team GPU box, see `~/trellis2/install.sh` there). Each one skips work that's already done.
-
+- **Voice input**: the microphone in the chat box records speech and `/api/transcribe` turns it into text with ElevenLabs Scribe. Needs `ELEVENLABS_API_KEY` in `website/.env.local`.
+- **Generated art** in `public/art/` (not wired into the UI yet): an icon (`icons/`) and a 3D model (`models/`) for each of the 96 asset types in the dataset, plus floor and wall textures (`textures/`). The generators live in `../tools/art/`: `generate_icons.py` and `generate_textures.py` (Nano Banana on Vertex AI; pass the GCP project), and `generate_models.py` (TRELLIS.2 on the team GPU box, see `~/trellis2/install.sh` there). Each one skips work that's already done.
 - Next.js App Router, TypeScript in strict mode, Tailwind CSS, ESLint, npm lockfile.
 - Responsive SVG floor viewer with room highlighting, equipment details, and accessible form controls.
 - `GET /api/search?q=printer`: validated deterministic search over sample rooms and assets.
@@ -57,6 +53,16 @@ CI runs the same checks on this folder for every push and pull request. Commit `
 | `src/app/globals.css` | Visual styling and responsive layouts |
 
 The SVG flips the building Y axis for screen coordinates. The current viewer is deliberately limited to the sample ground floor. Routing, AI chat, floor-plan upload, multi-floor views, edits, persistence, and voice are not implemented yet.
+
+## Chat + 3D viewer
+
+The home page is a full-screen 3D model of the building with an "Ask me anything" chat. Each answer flies the camera to the relevant floor(s) and highlights the result.
+
+- `src/lib/chat/contract.ts`: **the contract between the backend and the viewer.** `POST /api/chat` returns a `ChatResponse`: `reply` text, a headline `answer`, and a `scene` (focus floor/stack/building, highlighted space ids, markers, routes, links, closures).
+- `docs/answer-types.md`: every question kind grouped into five output types, with the headline and 3D view each one gets.
+- `src/lib/chat/demo-resolver.ts`: a keyword-matching **placeholder** so the UI can be demoed. Replace the `resolveDemo` call in `src/app/api/chat/route.ts` with the real agent and return the same shape.
+- `src/components/experience/`: the viewer (`building-scene.tsx`, `scene-model.ts`) and the chat shell (`building-experience.tsx`).
+- `src/lib/buildings/catalog.ts` + `src/data/buildings/`: the buildings offered in the UI (N3 and Fertigung Ost 27, geometry only; see `ATTRIBUTION.md` there).
 
 ## Challenge understanding and implementation order
 

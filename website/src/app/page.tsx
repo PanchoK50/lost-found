@@ -1,9 +1,8 @@
-import { Explorer } from '@/components/explorer/explorer';
-import { listArt } from '@/lib/art';
-import { listBuildings } from '@/lib/buildings/catalog';
+import { BuildingExperience } from '@/components/experience/building-experience';
+import { defaultBuildingId, getCatalogEntry, listBuildings } from '@/lib/buildings/catalog';
 
 export default async function Home({ searchParams }: PageProps<'/'>) {
-  const { b } = await searchParams;
-  const [catalog, art] = await Promise.all([listBuildings(), listArt()]);
-  return <Explorer catalog={catalog} art={art} initialId={typeof b === 'string' ? b : undefined} />;
+  const { building } = await searchParams;
+  const entry = getCatalogEntry(typeof building === 'string' ? building : undefined) ?? getCatalogEntry(defaultBuildingId)!;
+  return <BuildingExperience key={entry.id} building={entry.building} buildings={listBuildings()} suggestions={entry.suggestions} />;
 }

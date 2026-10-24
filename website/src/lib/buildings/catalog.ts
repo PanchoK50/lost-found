@@ -1,71 +1,60 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import type { Building, CatalogEntry } from './types';
+// Server-side only: importing this from a client component would ship every building to the browser.
+import type { Building } from './types';
+import n3 from '@/data/buildings/osm-way22744230.json';
+import factory from '@/data/buildings/proc-factory-dev-003.json';
 
-// Server-only: reads the challenge dataset from the repo's data/ folder (website/../data by default).
-const DATA_DIR = process.env.BUILDINGS_DATA_DIR ?? path.join(process.cwd(), '..', 'data');
+/** A suggestion chip: short label, full question sent when tapped. */
+export interface Suggestion { label: string; question: string }
 
-type Row = { entry: CatalogEntry; path: string };
-let manifest: Promise<Map<string, Row>> | undefined;
+export interface CatalogEntry { id: string; name: string; suggestions: Suggestion[]; building: Building }
 
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [], field = '', quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (quoted) {
-      if (char === '"' && text[i + 1] === '"') { field += '"'; i++; }
-      else if (char === '"') quoted = false;
-      else field += char;
-    } else if (char === '"') quoted = true;
-    else if (char === ',') { row.push(field); field = ''; }
-    else if (char === '\n' || char === '\r') {
-      if (char === '\r' && text[i + 1] === '\n') i++;
-      row.push(field); field = '';
-      if (row.some(Boolean)) rows.push(row);
-      row = [];
-    } else field += char;
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  return rows;
+/** Buildings the UI can show. Swap for real storage once plan ingestion lands. */
+const catalog: CatalogEntry[] = [
+  {
+    id: 'osm-way22744230',
+    name: 'N3',
+    building: n3 as unknown as Building,
+    // The two everyday questions first, then one example per benchmark kind (docs/answer-types.md).
+    suggestions: [
+      { label: 'Find something', question: 'Where is the projector?' },
+      { label: 'Directions', question: 'How do I get from N2301 to N5325?' },
+      { label: 'Largest room', question: 'Which is the largest generic room on floor 5, and how big is it in m²?' },
+      { label: 'Total area', question: 'What is the total area of all generic rooms on floor 4?' },
+      { label: 'Shared walls', question: 'We\'re soundproofing Generic room -1364. How many rooms share a wall with it?' },
+      { label: 'Wide delivery', question: 'A 0.8 m wide trolley arrives through the entrance into Corridor -1328. Into how many rooms on floor 2 can it be delivered?' },
+      { label: 'Step-free reach', question: 'Lift 1 is out of service. A wheelchair user comes in through the entrance into Stairwell N0320A. How many rooms on floor 2 can they still reach?' },
+      { label: 'What-if door', question: 'What if we add a door between Corridor -1328 and Corridor -1351? How many rooms on basement 1 get a shorter walk out?' },
+      { label: 'Room below', question: 'Which room is directly below N2324?' },
+      { label: 'Errand', question: 'I\'m in N2301. I need to grab a coat rack from the room that has one closest to me, then carry it to the largest generic room on floor 5.' },
+      { label: '3D distance', question: 'What is the straight-line distance between N0304 and N2323?' },
+    ],
+  },
+  {
+    id: 'proc-factory-dev-003',
+    name: 'Fertigung Ost 27',
+    building: factory as unknown as Building,
+    suggestions: [
+      { label: 'Find something', question: 'Where is the coordinate measuring machine?' },
+      { label: 'Directions', question: 'How do I get from Office 0.23 to Kitchen 1.08?' },
+      { label: 'Largest room', question: 'Which is the largest kitchen on floor 1, and how big is it?' },
+      { label: 'Total area', question: 'What is the total area of all meeting rooms on the ground floor?' },
+      { label: 'Shared walls', question: 'We\'re soundproofing Assembly zone H-A2. How many rooms share a wall with it?' },
+      { label: 'Wide delivery', question: 'A 1.1 m wide cleaning machine arrives through the entrance into Warehouse zone H-C3. Into how many rooms on floor 1 can it be delivered?' },
+      { label: 'Step-free reach', question: 'A wheelchair user comes in through the entrance into Office corridor 0.16. How many rooms on floor 1 can they reach?' },
+      { label: 'What-if door', question: 'What if we add a door between Production zone H-A1 and Meeting room 0.20? How many rooms on the ground floor get a shorter walk out?' },
+      { label: 'Room above', question: 'Which room is directly above Office 0.23?' },
+      { label: 'Errand', question: 'I\'m in Office 0.38. I need to grab a stove from the room that has one closest to me, then carry it to the largest kitchen on floor 1.' },
+      { label: '3D distance', question: 'What is the straight-line distance between Office 0.23 and Kitchen 1.14?' },
+    ],
+  },
+];
+
+export const defaultBuildingId = catalog[0].id;
+
+export function listBuildings() {
+  return catalog.map(({ id, name }) => ({ id, name }));
 }
 
-async function loadManifest(): Promise<Map<string, Row>> {
-  const [header, ...rows] = parseCsv(await readFile(path.join(DATA_DIR, 'manifest.csv'), 'utf8'));
-  const col = (name: string) => header.indexOf(name);
-  return new Map(rows.map(cells => {
-    const get = (name: string) => cells[col(name)] ?? '';
-    const entry: CatalogEntry = {
-      id: get('building_id'),
-      split: get('split') as CatalogEntry['split'],
-      source: get('source'),
-      name: get('name'),
-      floors: Number(get('floors')),
-      levels: get('levels').split(';').map(Number),
-      rooms: Number(get('rooms')),
-      assets: Number(get('assets')),
-      hasLift: get('has_lift') === 'True',
-    };
-    return [entry.id, { entry, path: get('path') }];
-  }));
-}
-
-function getManifest() {
-  manifest ??= loadManifest().catch(error => { manifest = undefined; throw error; });
-  return manifest;
-}
-
-export async function listBuildings(): Promise<CatalogEntry[]> {
-  return [...(await getManifest()).values()].map(row => row.entry);
-}
-
-/** Directory of a known building, or null. Ids are only ever looked up, never joined into paths directly. */
-export async function buildingDir(id: string): Promise<string | null> {
-  const row = (await getManifest()).get(id);
-  return row ? path.join(DATA_DIR, row.path) : null;
-}
-
-export async function loadBuilding(id: string): Promise<Building | null> {
-  const dir = await buildingDir(id);
-  return dir ? JSON.parse(await readFile(path.join(dir, 'building.json'), 'utf8')) : null;
+export function getCatalogEntry(id: string | undefined): CatalogEntry | undefined {
+  return catalog.find(entry => entry.id === id);
 }
