@@ -2,6 +2,7 @@ import type { Building } from '@/lib/buildings/types';
 import { representativePoint } from '@/lib/buildings/graph';
 import { CLOSING_KINDS, detectCategory, modeFor, PIN_TTL, type MultiplayerMode } from './mode';
 import type { Audience, Pin, PinKind, Ping, PingKind, Player, Presence, Role, Skill, WorldAction, WorldState } from './types';
+import type { DemoTimer } from './demo-players';
 
 /**
  * The truth rules of docs/MULTIPLAYER.md §4, as pure functions: no I/O, so any store (memory, Redis)
@@ -21,6 +22,8 @@ export interface StoredWorld {
   skills: Skill[];
   /** When each player created pins, for the rate limit. */
   created: { playerId: string; at: number }[];
+  /** Scripted demo players' pending reactions (§9); undefined until they are seeded. */
+  demo?: { timers: DemoTimer[] };
 }
 
 /** A rejected action; the API answers 400 with its message. */
@@ -32,7 +35,7 @@ const CONFIRM_WINDOW = 30 * MINUTE;
 const MAX_PRESENCE = 30 * 24 * 60 * MINUTE;
 const ROLES: Role[] = ['member', 'facility', 'first_aider', 'visitor', 'exhibitor'];
 const PIN_KINDS: PinKind[] = ['blocked', 'broken', 'item', 'event', 'info', 'meet'];
-const PING_KINDS: PingKind[] = ['come_to_me', 'meet_halfway', 'pick_up', 'help', 'ask_crowd'];
+const PING_KINDS: PingKind[] = ['come_to_me', 'meet_halfway', 'pick_up', 'help', 'ask', 'ask_crowd'];
 
 export function createWorld(building: Building): StoredWorld {
   return { buildingId: building.building.id, detected: modeFor[detectCategory(building)], version: 1, players: [], presence: [], pins: [], pings: [], skills: [], created: [] };
@@ -265,7 +268,10 @@ export function viewFor(world: StoredWorld, playerId?: string): WorldState {
   const pings = world.pings.filter(p => p.fromId === playerId || (p.to !== 'nearby' && reaches(world, p.to, me)));
   const skills = world.skills.filter(s => s.authorId === playerId || reaches(world, s.audience, me));
   // Only name the people this player can already see something of.
-  const named = new Set([playerId, ...presence.map(p => p.playerId), ...pins.map(p => p.authorId), ...pings.map(p => p.fromId)]);
+  const named = new Set([
+    playerId, ...presence.map(p => p.playerId), ...pins.map(p => p.authorId), ...pings.map(p => p.fromId),
+    ...pings.flatMap(p => [...(p.answers ?? []).map(a => a.playerId), p.to.startsWith('player:') ? p.to.slice(7) : undefined]),
+  ]);
   return {
     buildingId: world.buildingId,
     mode: modeOf(world),

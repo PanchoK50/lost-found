@@ -15,7 +15,7 @@ export function worldAnchors(
   poses: Map<string, FloorPose>,
   focus: SceneFocus,
   world: WorldState,
-  handlers: { onPin?(pinId: string): void; onFocusFloor(floorId: string): void },
+  handlers: { onPin?(pinId: string): void; onPerson?(playerId: string): void; onFocusFloor(floorId: string): void },
 ): Anchor[] {
   const shown = (floorId: string) => (poses.get(floorId)?.opacity ?? 0) > 0.5;
   const floorModel = new Map(model.floors.map(f => [f.floor.id, f]));
@@ -51,14 +51,20 @@ export function worldAnchors(
     const m = model.spaces.get(spaceId);
     if (!m || !shown(m.space.floor_id)) continue;
     const people = here.map(p => players.get(p.playerId)).filter((p): p is Player => !!p);
+    const moving = new Set(here.filter(p => p.moving).map(p => p.playerId));
     if (!people.length) continue;
     anchors.push({
       key: `w-people-${spaceId}`,
       position: [m.centre[0], top(m.space.floor_id, 0.4), m.centre[1]],
       content: (
         <div className="scene-label scene-label--person">
-          {people.slice(0, 3).map(p => <span key={p.id} className={`person-dot${p.demo ? ' person-dot--demo' : ''}`} title={p.name}>{p.initials}</span>)}
-          <span>{people.length === 1 ? people[0].name : people.length > 3 ? `+${people.length - 3}` : ''}</span>
+          {people.slice(0, 3).map(p => (
+            <button type="button" key={p.id} className="person-tap" onClick={() => handlers.onPerson?.(p.id)} aria-label={`${p.name}: room and info`}>
+              <span className={`person-dot${p.demo ? ' person-dot--demo' : ''}${moving.has(p.id) ? ' person-dot--moving' : ''}`}>{p.initials}</span>
+              {people.length === 1 && <span>{p.name}</span>}
+            </button>
+          ))}
+          <span>{people.length > 3 ? `+${people.length - 3}` : ''}</span>
         </div>
       ),
     });

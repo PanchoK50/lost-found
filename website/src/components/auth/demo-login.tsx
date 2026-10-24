@@ -42,7 +42,10 @@ export function DemoLoginSheet({ profile, onClose }: { profile: Profile | null; 
       if (sessionError) throw sessionError;
       // The world identifies players by profile id: make it the account's id, keep local settings.
       const { id, displayName, role, groups } = data.profile;
-      saveProfile({ settings: {}, rooms: {}, ...(profile ?? {}), id, name: displayName, role, groups });
+      // Same account again: keep its local state. Another person: start fresh, keeping only display settings.
+      const fresh: Omit<Profile, 'id' | 'name' | 'role' | 'groups'> = { settings: profile?.settings ?? {}, rooms: {}, asked: [], sent: [], messagesSeenAt: 0 };
+      const keep = profile && profile.id === id ? profile : fresh;
+      saveProfile({ ...keep, id, name: displayName, role, groups });
       onClose?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');

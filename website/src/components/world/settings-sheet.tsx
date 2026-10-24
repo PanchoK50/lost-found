@@ -88,7 +88,6 @@ export function SettingsSheet({ building, profile, world, category, act, onClose
         <p className="field-label">Demo players</p>
         <Segmented<'on' | 'off'> label="Show demo players" value={settings.demoPlayers ? 'on' : 'off'} onChange={v => set('demoPlayers', v === 'on')}
           options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]} />
-        <p className="hint">Pings and demo players arrive in a later step; these choices are already saved.</p>
       </section>
 
       <section>

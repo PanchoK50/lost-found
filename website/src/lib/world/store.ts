@@ -1,6 +1,7 @@
 // Server-side only: holds every player's world state (Supabase when configured, else in memory).
 import type { Building } from '@/lib/buildings/types';
 import { supabaseAdmin } from '@/lib/supabase/server';
+import { runDemo, scheduleDemo } from './demo-players';
 import { applyAction, createWorld, prune, type StoredWorld } from './rules';
 import type { WorldAction } from './types';
 
@@ -23,13 +24,14 @@ class MemoryStore implements WorldStore {
     this.worlds = g.__lostFoundWorlds ??= new Map();
   }
   async get(building: Building, now: number) {
-    let world = this.worlds.get(building.building.id);
-    if (!world) { world = createWorld(building); this.worlds.set(world.buildingId, world); }
+    // Demo players are seeded on first use and their due reactions run on every read (§9).
+    const world = runDemo(this.worlds.get(building.building.id) ?? createWorld(building), building, now);
     prune(world, now);
+    this.worlds.set(world.buildingId, world);
     return world;
   }
   async apply(building: Building, action: WorldAction, now: number) {
-    const next = applyAction(await this.get(building, now), action, building, now);
+    const next = scheduleDemo(applyAction(await this.get(building, now), action, building, now), action, now);
     this.worlds.set(next.buildingId, next);
     return next;
   }
@@ -55,9 +57,12 @@ class SupabaseStore implements WorldStore {
   }
 
   async get(building: Building, now: number) {
-    const { world, version } = await this.load(building);
-    if (prune(world, now)) {
-      // Expiry bumped the version: save it (if someone else saved first, their state is just as fresh).
+    const { world: loaded, version } = await this.load(building);
+    // Demo players are seeded on first use and their due reactions run on every read (§9), like in memory.
+    const world = runDemo(loaded, building, now);
+    const pruned = prune(world, now);
+    if (world !== loaded || pruned) {
+      // Demo reactions or expiry changed the world: save it (if someone else saved first, theirs is as fresh).
       await this.db.from('worlds').update({ state: world, version: world.version, updated_at: new Date(now).toISOString() })
         .eq('building_id', world.buildingId).eq('version', version);
     }
@@ -66,9 +71,10 @@ class SupabaseStore implements WorldStore {
 
   async apply(building: Building, action: WorldAction, now: number) {
     for (let attempt = 0; attempt < SupabaseStore.RETRIES; attempt++) {
-      const { world, version } = await this.load(building);
+      const { world: loaded, version } = await this.load(building);
+      const world = runDemo(loaded, building, now);
       prune(world, now);
-      const next = applyAction(world, action, building, now);
+      const next = scheduleDemo(applyAction(world, action, building, now), action, now);
       const { data, error } = await this.db
         .from('worlds')
         .update({ state: next, version: next.version, updated_at: new Date(now).toISOString() })
