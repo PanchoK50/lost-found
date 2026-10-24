@@ -1,4 +1,5 @@
 import type { Point } from '@/lib/buildings/types';
+import type { WorldAction } from '@/lib/world/types';
 
 /**
  * Contract between the chat backend (agent / deterministic tools) and the 3D viewer.
@@ -14,7 +15,9 @@ export type QuestionKind =
   | 'route' | 'route_step_free' | 'route_with_closure' | 'tour' | 'errand'
   | 'largest_room' | 'floor_area_total' | 'shared_walls_count' | 'room_stacked' | 'straight_line_3d'
   | 'wide_delivery_count' | 'step_free_reachable_count' | 'what_if_door'
-  | 'show' | 'unknown';
+  | 'show' | 'unknown'
+  /** Multiplayer: reports, pings, people and skills (docs/MULTIPLAYER.md §7). */
+  | 'world';
 
 export interface ChatRequest {
   buildingId: string;
@@ -22,6 +25,18 @@ export interface ChatRequest {
   history?: { role: 'user' | 'assistant'; content: string }[];
   /** Backend conversation id from the previous response; keeps follow-ups and edits in one session. */
   sessionId?: string;
+  /** Lets the backend read the player's world: presence, groups, pins and closures. */
+  playerId?: string;
+  /** A skill chip was tapped: resolve this skill relative to the player's presence. */
+  skillId?: string;
+}
+
+/** A world change the agent suggests. Shown as a preview card; nothing is written until the user taps Confirm (U8). */
+export interface Proposal {
+  label: string;
+  /** Where it applies, e.g. "Office lift · Ground floor". */
+  detail?: string;
+  action: WorldAction;
 }
 
 export interface ChatResponse {
@@ -35,8 +50,10 @@ export interface ChatResponse {
   actions?: { label: string; message: string; send?: boolean }[];
   /** Backend conversation id; send it back with the next message. */
   sessionId?: string;
-  /** Who answered: the Python agent, or the offline demo resolver when the agent is not running. */
-  source?: 'agent' | 'demo';
+  /** Who answered: the Python agent, the world layer (people, reports, skills), or the offline demo resolver. */
+  source?: 'agent' | 'world' | 'demo';
+  /** World changes the agent proposes (docs/MULTIPLAYER.md §7). */
+  proposals?: Proposal[];
 }
 
 /** A point on a specific floor, in building metres (Y up). */

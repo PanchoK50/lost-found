@@ -154,6 +154,7 @@ class UIChatRequest(BaseModel):
     buildingId: str
     message: str
     sessionId: str | None = None
+    closed: list[str] = []  # openings, stairs, lifts or rooms reported closed in the world layer
     model: str = DEFAULT_CHAT_MODEL
     effort: str = "low"
 
@@ -168,6 +169,7 @@ def ui_chat(request: UIChatRequest) -> dict:
     session = SESSIONS[session_id]
     if session.building.id != request.buildingId:
         raise HTTPException(400, "Session belongs to another building.")
+    session.set_world_closures(request.closed)
     turn = session.ask(request.message)
     ui = turn["ui"]
     return {

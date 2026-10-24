@@ -187,6 +187,15 @@ class ChatSession:
         self.system = system_blocks(CHAT_INSTRUCTIONS, building)
         self.usage: Counter = Counter()
         self.last_scene: dict = {"focus": {"mode": "building"}}
+        self.world_closed: set[str] = set()  # closures reported by people in the building (web world layer)
+
+    def set_world_closures(self, element_ids: list[str]) -> None:
+        """Replace last turn's reported closures with this turn's; closures the agent made itself stay."""
+        b = self.building
+        valid = {e for e in element_ids if e in b.connectors or e in b.openings or e in b.spaces}
+        agent_closed = b.closed - self.world_closed
+        self.world_closed = valid
+        b.closed = agent_closed | valid
 
     def ask(self, text: str) -> dict:
         outcome = Outcome(reply="", path="chat")

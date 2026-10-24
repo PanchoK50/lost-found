@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Building } from '@/lib/buildings/types';
@@ -8,6 +8,15 @@ import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
+import { detectCategory } from '@/lib/world/mode';
+import { useProfile } from '@/lib/world/profile';
+import { useWorld } from '@/lib/world/use-world';
+import { WorldHud } from '@/components/world/world-hud';
+import { SettingsSheet } from '@/components/world/settings-sheet';
+import { ReportSheet, type ReportDraft } from '@/components/world/report-sheet';
+import { ProposalCards } from '@/components/world/proposal-cards';
+import { SkillChips } from '@/components/world/skill-chips';
+import { PinCard } from '@/components/world/pin-card';
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
 
@@ -43,6 +52,17 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const [activeStep, setActiveStep] = useState<string>();
   const [insets, setInsets] = useState<SceneInsets>({ top: 0, left: 0, bottom: 0 });
   const wide = useWide();
+  // Multiplayer: the shared world of this building (docs/MULTIPLAYER.md).
+  const profile = useProfile();
+  const { world, act } = useWorld(building, profile);
+  const category = useMemo(() => detectCategory(building), [building]);
+  const [sheet, setSheet] = useState<'settings' | 'report'>();
+  const closeSheet = useCallback(() => setSheet(undefined), []);
+  // A pin proposed in chat that the user wants to edit before posting.
+  const [reportDraft, setReportDraft] = useState<ReportDraft>();
+  const [pinId, setPinId] = useState<string>();
+  const closePin = useCallback(() => setPinId(undefined), []);
+  const openPin = world?.pins.find(p => p.id === pinId);
   const nextId = useRef(0);
   const transcriptEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -101,7 +121,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     return () => window.removeEventListener('keydown', onKey);
   }, [showOverview, startOver, directive.focus.mode]);
 
-  async function ask(text: string) {
+  async function ask(text: string, skillId?: string) {
     const message = text.trim();
     if (!message || busy) return;
     const history = messages.map(({ role, content }) => ({ role, content }));
@@ -112,7 +132,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, playerId: profile?.id, skillId }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
@@ -135,10 +155,20 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     setDraft(current => (current.trim() ? `${current.trimEnd()} ${text}` : text));
     requestAnimationFrame(() => { const el = input.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
   };
+  // "Route here" on a tapped room: walk from the room set under "Where are you?", or ask for it first.
+  const askRef = useRef(ask);
+  useEffect(() => { askRef.current = ask; });
+  const myRoom = profile?.rooms[building.building.id];
+  const routeTo = useCallback((spaceId: string) => {
+    const from = building.spaces.find(s => s.id === myRoom), to = building.spaces.find(s => s.id === spaceId);
+    if (!to) return;
+    if (!from) { setSheet('settings'); return; }
+    void askRef.current(from.id === to.id ? `Show ${to.name}` : `How do I get from ${from.name} to ${to.name}?`);
+  }, [building, myRoom]);
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} /></div>
+      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onRoute={routeTo} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
@@ -147,6 +177,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           <nav className="building-switch" aria-label="Building">
             {buildings.map(b => <Link key={b.id} href={`/?building=${b.id}`} className={b.id === building.building.id ? 'active' : ''} aria-current={b.id === building.building.id ? 'page' : undefined}>{b.name}</Link>)}
           </nav>
+          <WorldHud world={world} playerId={profile?.id} onOpen={() => setSheet('settings')} />
         </header>
         <nav className="floor-rail" aria-label="Floors">
           <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
@@ -204,6 +235,14 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                         onOverview={() => { setDirective(message.response!.scene); setActiveStep(undefined); }}
                       />
                     )}
+                    {message.response?.proposals?.length ? (
+                      <ProposalCards
+                        proposals={message.response.proposals}
+                        act={act}
+                        onEditPin={pin => { setReportDraft(pin); setSheet('report'); }}
+                        onEditText={() => { setDraft(messages.findLast(m => m.role === 'user' && m.id < message.id)?.content ?? ''); input.current?.focus(); }}
+                      />
+                    ) : null}
                   </article>)}
               {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
               <div ref={transcriptEnd} />
@@ -217,7 +256,9 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             <h1>Ask me anything.</h1>
           </div>}
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
+          {world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />}
           <form className="ask" onSubmit={submit}>
+            <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>
             <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
             <MicButton onTranscript={addTranscript} onError={setVoiceError} />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
@@ -225,6 +266,10 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           {voiceError && <p className="voice-error" role="alert">{voiceError}</p>}
         </section>
       </div>
+
+      {sheet === 'report' && profile && <ReportSheet key={JSON.stringify(reportDraft ?? null)} initial={reportDraft} building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
+      {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
+      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>

@@ -8,6 +8,8 @@ import type { Line2 } from 'three-stdlib';
 import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
 import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
+import type { WorldState } from '@/lib/world/types';
+import { worldAnchors } from '@/components/world/world-anchors';
 
 const palette = {
   background: '#f2f2ee',
@@ -33,20 +35,25 @@ interface Props {
   directive: SceneDirective;
   insets: SceneInsets;
   onFocusFloor(floorId: string): void;
+  /** People and pins from the shared world; they stay when the answer changes (docs/MULTIPLAYER.md §11). */
+  world?: WorldState;
+  onPin?(pinId: string): void;
+  /** Offered on a tapped room: walk there from where the player is. */
+  onRoute?(spaceId: string): void;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
-interface Anchor {
+export interface Anchor {
   key: string;
   position: [number, number, number];
   content: ReactNode;
   /** `above`: a callout that floats over its point with a tail, so the point itself stays visible. */
   placement?: 'above' | 'center';
   /** Anchors in a group are spread out so they never overlap (e.g. floor tags 3 m apart). */
-  group?: 'floors';
+  group?: 'floors' | 'counts';
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onRoute }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
@@ -54,39 +61,49 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   const overview = directive.focus.mode === 'building';
   const directiveKey = useMemo(() => JSON.stringify(directive), [directive]);
   const [hovered, setHovered] = useState<string | null>(null);
+  // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
+  const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
+  const picked = selected && selected.directive === directiveKey && !overview ? selected.id : null;
   const anchors = useMemo(() => [
     ...answerAnchors(model, poses, directive),
     ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
-    ...(hovered && !overview ? hoverAnchor(model, poses, hovered) : []),
-  ], [model, poses, directive, overview, onFocusFloor, hovered]);
+    ...(hovered && !overview && hovered !== picked ? hoverAnchor(model, poses, hovered) : []),
+    ...(picked ? hoverAnchor(model, poses, picked, onRoute) : []),
+  ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute]);
+  const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onFocusFloor]);
+  const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const elements = useRef(new Map<string, HTMLDivElement>());
   const register = useCallback((key: string) => (el: HTMLDivElement | null) => {
     if (el) elements.current.set(key, el); else elements.current.delete(key);
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
+  const select = useCallback((id: string) => setSelected({ id, directive: directiveKey }), [directiveKey]);
   // Phones get a lighter GPU budget: lower pixel ratio and smaller shadow maps.
   const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
 
   return (
     <div className="scene-root">
-      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => inspect(null)} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
+      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
         <fog attach="fog" args={[palette.background, 400, 1400]} />
         <hemisphereLight args={['#ffffff', '#d9dbd3', 1.6]} />
         <directionalLight position={[60, 120, 40]} intensity={1.5} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} onPick={onFocusFloor} onInspect={inspect} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
         {directive.focus.mode === 'floor' && directive.focus.around && (
           <Cursor key={`cursor-${directiveKey}`} position={worldAt(model, poses, { floorId: directive.focus.floorId, position: directive.focus.around }, 1.7)} />
         )}
-        <Projector anchors={anchors} elements={elements} />
+        <Projector anchors={projected} elements={elements} />
       </Canvas>
       <div className="scene-anchors" key={directiveKey}>
         {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
+      </div>
+      <div className="scene-anchors">
+        {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
     </div>
   );
@@ -104,14 +121,16 @@ function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObje
       const p = v.set(...anchor.position).project(camera);
       placed.push({ anchor, el, x: ((p.x + 1) / 2) * size.width, y: ((1 - p.y) / 2) * size.height, visible: p.z < 1 });
     }
-    // Floor tags: one evenly spaced column in floor order, centred where the floors are.
-    const floors = placed.filter(a => a.anchor.group === 'floors');
-    if (floors.length > 1) {
-      const order = [...floors].sort((a, b) => b.y - a.y); // lowest floor (largest y) first
-      const column = Math.max(...floors.map(a => a.x));
-      const mean = floors.reduce((sum, a) => sum + a.y, 0) / floors.length;
-      const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
-      order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
+    // Floor tags (and the world's per-floor counts): one evenly spaced column in floor order, centred where the floors are.
+    for (const group of ['floors', 'counts'] as const) {
+      const floors = placed.filter(a => a.anchor.group === group);
+      if (floors.length > 1) {
+        const order = [...floors].sort((a, b) => b.y - a.y); // lowest floor (largest y) first
+        const column = Math.max(...floors.map(a => a.x));
+        const mean = floors.reduce((sum, a) => sum + a.y, 0) / floors.length;
+        const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
+        order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
+      }
     }
     for (const { anchor, el, x, y, visible } of placed) {
       // Keep labels fully on screen; narrow phone screens otherwise clip long room names.
@@ -179,9 +198,11 @@ interface FloorViewProps {
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
+  /** A tap on a room of the shown floor. */
+  onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, onInspect }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, onInspect, onSelect }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -217,7 +238,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
   const plain = model.spaces.filter(m => !tones.has(m.space.id));
   const tap = (id: string) => (event: ThreeEvent<MouseEvent>) => {
     if (overview) { event.stopPropagation(); onPick(model.floor.id); return; }
-    if (pose.interactive) { event.stopPropagation(); onInspect(id); }
+    if (pose.interactive) { event.stopPropagation(); onSelect(id); }
   };
   const hover = (id: string | null) => (event: ThreeEvent<PointerEvent>) => {
     if (!pose.interactive || overview || event.pointerType !== 'mouse') return;
@@ -363,12 +384,12 @@ function floorAnchors(model: BuildingModel, poses: Map<string, FloorPose>, onFoc
   }));
 }
 
-function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: string): Anchor[] {
+function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: string, onRoute?: (spaceId: string) => void): Anchor[] {
   const m = model.spaces.get(spaceId);
   const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
   if (!m || !f) return [];
   const pose = poses.get(f.floor.id)!;
-  return [{ key: `hv-${spaceId}`, placement: 'above', position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div> }];
+  return [{ key: `hv-${spaceId}`, placement: 'above', position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className={`scene-tip${onRoute ? ' scene-tip--actions' : ''}`}><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span>{onRoute && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}</div> }];
 }
 
 /** Routes, link lines and markers, positioned against the target floor poses. */

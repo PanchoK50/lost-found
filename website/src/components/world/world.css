@@ -1,0 +1,114 @@
+/* Multiplayer layer (docs/MULTIPLAYER.md §11), in the viewer's look: glass panels, lime accent, phone first. */
+
+/* People and pins in the scene */
+.scene-label.scene-label--person { display: flex; align-items: center; gap: 4px; padding: 3px 10px 3px 3px; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line); color: var(--ink); font-weight: 600; animation-delay: 0s; }
+.scene-label.scene-label--person span:last-child:empty { display: none; }
+.scene-label.scene-label--person:has(span:last-child:empty) { padding-right: 3px; }
+.person-dot { display: grid; place-items: center; width: 24px; height: 24px; margin-left: -6px; border-radius: 50%; background: var(--accent); color: var(--ink); font-size: 10px; font-weight: 700; letter-spacing: -.02em; box-shadow: 0 0 0 2px #fff; }
+.person-dot:first-child { margin-left: 0; }
+.person-dot--demo { outline: 1.5px dashed var(--ink); outline-offset: 1px; }
+.person-dot--me { box-shadow: 0 0 0 2px var(--ink); }
+
+.scene-label.scene-label--pin-alert, .scene-label.scene-label--pin-item, .scene-label.scene-label--pin-info { display: flex; align-items: center; gap: 6px; padding: 4px 11px 4px 4px; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line); color: var(--ink); font-weight: 600; animation-delay: 0s; }
+.scene-label.scene-label--pin-alert { border-color: #f1b7b9; }
+.scene-label.scene-label--pin-alert .pin-ring i, .preview-card--alert .pin-ring i { background: #e5484d; color: #fff; }
+.scene-label.scene-label--pin-alert .pin-ring circle, .preview-card--alert .pin-ring circle { stroke: #e5484d; }
+.scene-label--pin-info .pin-ring i::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px #9dbd22; }
+.scene-label.is-unconfirmed { border-style: dashed; border-color: #e5484d; }
+.scene-label small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.scene-anchor--above .scene-label--pin-alert::after, .scene-anchor--above .scene-label--pin-item::after, .scene-anchor--above .scene-label--pin-info::after { background: #fff; }
+
+.pin-ring { position: relative; display: grid; place-items: center; flex: none; }
+.pin-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pin-ring circle { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; }
+.pin-ring i, .pin-ring b { display: grid; place-items: center; width: calc(100% - 6px); height: calc(100% - 6px); border-radius: 50%; background: #eef3df; font-style: normal; font-size: 10px; font-weight: 800; }
+.pin-ring b { background-size: cover; background-position: center; }
+
+.world-count { display: block; white-space: nowrap; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--ink); box-shadow: var(--shadow); }
+.world-count strong { font-weight: 600; color: var(--muted); margin-right: 2px; }
+.world-count--alert { border-color: #f1b7b9; }
+.world-count--alert::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #e5484d; vertical-align: 1px; }
+
+/* HUD: mode badge and the people sharing their location */
+/* The extra HUD items take room from the building switch (it scrolls), never from the brand. */
+.hud-bar .brand { flex: none; white-space: nowrap; }
+.world-hud { display: flex; align-items: center; gap: 6px; flex: none; }
+.mode-badge { display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); font-size: 12px; font-weight: 600; color: var(--ink); }
+.mode-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px #9dbd22; }
+.avatar-stack { display: flex; align-items: center; min-height: 36px; padding: 0 4px 0 8px; border: 0; background: transparent; }
+.avatar-stack .person-dot { width: 28px; height: 28px; font-size: 11px; }
+.avatar-stack .more { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+
+/* "+" in the ask bar */
+.ask .ask-plus { width: 36px; height: 36px; margin-left: -10px; background: #eef3df; color: var(--ink); font-size: 20px; line-height: 1; }
+
+/* Sheets: from the bottom on phones, a floating panel on desktop */
+.sheet-backdrop { position: absolute; inset: 0; background: rgba(31, 42, 27, 0.18); z-index: 20; animation: fade .2s ease both; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 21; max-height: 86dvh; overflow-y: auto; overscroll-behavior: contain; padding: 8px calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left)); background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid var(--line); border-radius: 22px 22px 0 0; box-shadow: var(--shadow); animation: rise .25s ease both; }
+.sheet header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; }
+.sheet h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.sheet-close { width: 40px; height: 40px; border: 0; border-radius: 50%; background: #eef0ea; font-size: 18px; }
+.sheet section { padding: 10px 0; border-top: 1px solid var(--line); }
+.sheet section:first-of-type { border-top: 0; }
+.sheet h3 { margin: 0 0 8px; color: var(--muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; }
+.sheet label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+.sheet input, .sheet select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-size: 16px; color: var(--ink); }
+.sheet .hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.segmented { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 14px; background: #eef0ea; }
+.segmented button { flex: 1 0 auto; min-height: 38px; padding: 0 10px; border: 0; border-radius: 11px; background: transparent; font-size: 13px; font-weight: 600; color: var(--muted); }
+.segmented button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(31, 42, 27, 0.12); }
+.segmented--kinds button[aria-pressed="true"] { background: var(--accent); }
+.sheet-actions { display: flex; gap: 8px; padding-top: 12px; }
+.button { flex: 1; min-height: 46px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-weight: 600; font-size: 14px; color: var(--ink); }
+.button--primary { border-color: var(--ink); background: var(--ink); color: #fff; }
+.button--danger { border-color: #e5484d; color: #b4232a; }
+.button:disabled { opacity: .35; }
+.sheet-error { margin: 8px 0 0; color: #b4232a; font-size: 13px; }
+
+/* Preview of what will be posted (U8: nothing is posted before Confirm) */
+.preview-card { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-left: 4px solid #e5484d; border-radius: 12px; }
+.preview-card--item, .preview-card--info { border-left-color: var(--accent); }
+.preview-card strong { display: block; font-size: 15px; }
+.preview-card small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+@keyframes fade { from { opacity: 0; } }
+
+@media (min-width: 900px) {
+  .sheet-backdrop { background: transparent; }
+  .sheet { left: auto; right: 20px; top: 76px; bottom: auto; width: 380px; max-height: calc(100dvh - 120px); border-radius: 20px; padding: 8px 18px 18px; }
+  .ask .ask-plus { width: 32px; height: 32px; }
+}
+
+.sheet .field-label { margin: 12px 0 6px; font-size: 13px; color: var(--muted); }
+.sheet .field-label:first-of-type { margin-top: 0; }
+.person-row { display: flex; align-items: center; gap: 10px; margin: 0; padding: 6px 0; }
+.person-row .person-dot { width: 32px; height: 32px; margin: 0; font-size: 12px; }
+.person-row strong { display: block; font-size: 14px; }
+.person-row small { display: block; font-size: 12px; color: var(--muted); }
+
+/* Proposal cards in the transcript */
+.proposals { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.proposal { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; animation: rise .35s ease both; }
+.proposal--posted { border-left-color: var(--ink); }
+.proposal-text strong { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.proposal-text small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.proposal-text .proposal-error { color: #b4232a; }
+.proposal-actions { display: flex; gap: 8px; }
+.proposal-actions .button { min-height: 40px; }
+.proposal-done { font-size: 13px; font-weight: 600; color: #2f6f2a; }
+
+/* Skill chips above the ask bar */
+.skill-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.skill-chips::-webkit-scrollbar { display: none; }
+.skill-chips button { flex: none; min-height: 40px; padding: 0 14px; border: 1px solid #c9e07a; border-radius: 999px; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 13px; font-weight: 600; color: var(--ink); }
+.skill-chips--match button { background: var(--accent); border-color: var(--accent); }
+@media (min-width: 900px) {
+  .skill-chips { justify-content: center; }
+  .skill-chips button { min-height: 34px; font-size: 12px; }
+  .skill-chips button:hover { background: #fff; }
+}
+
+/* Tapped room: the tip gets a "Route here" action */
+.scene-tip.scene-tip--actions button { margin-top: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; }
+/* The tapped room's tip stays above people and pins so its button can be tapped. */
+.scene-anchor:has(.scene-tip--actions) { z-index: 3; }
