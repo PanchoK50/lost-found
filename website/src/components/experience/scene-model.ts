@@ -129,54 +129,48 @@ export function blockHeight(storey: number, flat: number, lift = 0) {
 }
 
 /**
- * World box the camera should frame. On a single floor, `frame` (the answer's spaces) narrows the view to
- * those spaces, but never tighter than 45% of the floor or 30 m, so the surroundings stay readable.
+ * World box the camera should frame. With an answer (`frame` = its spaces, `points` = its route), the camera
+ * frames the answer rather than whole floors, never tighter than `minSize` metres across.
  */
-export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, focus: SceneFocus, frame: string[] = []) {
+export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, focus: SceneFocus, frame: string[] = [], points: FloorPoint[] = []) {
   if (focus.mode === 'floor' && focus.around) {
     // A single point, e.g. a route step: frame about 18 m around it.
     const [x, z] = model.toWorld(focus.around);
     const y = poses.get(focus.floorId)?.y ?? 0;
     return new THREE.Box3(new THREE.Vector3(x - 9, y, z - 9), new THREE.Vector3(x + 9, y + 1, z + 9));
   }
-  if (focus.mode === 'stack' && focus.spacing === 'true' && frame.length) {
-    // Real-height stacks (3D distances): frame the answer's spaces across their floors, at least 30 m wide.
-    const box = new THREE.Box3();
-    for (const id of frame) {
-      const m = model.spaces.get(id);
-      if (!m) continue;
-      const y = poses.get(m.space.floor_id)?.y ?? 0;
-      m.geometry.computeBoundingBox();
-      box.union(m.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, y, 0)));
-    }
-    if (!box.isEmpty()) {
-      const c = box.getCenter(new THREE.Vector3());
-      const half = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 30) / 2;
-      return new THREE.Box3(new THREE.Vector3(c.x - half, box.min.y, c.z - half), new THREE.Vector3(c.x + half, box.max.y, c.z + half));
-    }
-  }
-  if (focus.mode === 'floor') {
-    const floor = model.floors.find(f => f.floor.id === focus.floorId);
-    const spaces = frame.map(id => model.spaces.get(id)).filter(m => m && m.space.floor_id === focus.floorId);
-    if (floor && spaces.length) {
-      const y = poses.get(floor.floor.id)!.y;
-      const box = new THREE.Box3();
-      for (const m of spaces) {
-        m!.geometry.computeBoundingBox();
-        box.union(m!.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, y, 0)));
-      }
-      const centre = box.getCenter(new THREE.Vector3());
-      const span = Math.max(floor.box.maxX - floor.box.minX, floor.box.maxZ - floor.box.minZ);
-      const half = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, span * 0.45, 30) / 2;
-      return new THREE.Box3(new THREE.Vector3(centre.x - half, y, centre.z - half), new THREE.Vector3(centre.x + half, y + 1, centre.z + half));
-    }
-  }
+  const onView = (floorId: string) => (focus.mode === 'floor' ? floorId === focus.floorId : focus.mode === 'stack' && focus.floorIds.includes(floorId));
   const box = new THREE.Box3();
+  for (const id of frame) {
+    const m = model.spaces.get(id);
+    if (!m || !onView(m.space.floor_id)) continue;
+    m.geometry.computeBoundingBox();
+    box.union(m.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, poses.get(m.space.floor_id)?.y ?? 0, 0)));
+  }
+  for (const p of points) {
+    if (!onView(p.floorId)) continue;
+    const [x, z] = model.toWorld(p.position);
+    box.expandByPoint(new THREE.Vector3(x, poses.get(p.floorId)?.y ?? 0, z));
+  }
+  if (focus.mode !== 'building' && !box.isEmpty()) {
+    const c = box.getCenter(new THREE.Vector3());
+    let minSize = 26; // routes and stacks: close enough to follow the path
+    if (focus.mode === 'floor' && !points.length) {
+      // Rooms on one floor: keep enough of the floor around them to read where they are.
+      const floor = model.floors.find(f => f.floor.id === focus.floorId)!;
+      minSize = Math.max(floor.box.maxX - floor.box.minX, floor.box.maxZ - floor.box.minZ) * 0.45;
+    }
+    const half = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, minSize, 30 * (points.length ? 0.8 : 1)) / 2;
+    const floorsOnView = model.floors.filter(f => onView(f.floor.id));
+    const top = Math.max(box.max.y, ...floorsOnView.map(f => (poses.get(f.floor.id)?.y ?? 0) + 1));
+    return new THREE.Box3(new THREE.Vector3(c.x - half, box.min.y, c.z - half), new THREE.Vector3(c.x + half, top, c.z + half));
+  }
+  const all = new THREE.Box3();
   const visible = model.floors.filter(f => focus.mode === 'building' || (poses.get(f.floor.id)?.opacity ?? 0) > 0.5);
   for (const f of visible.length ? visible : model.floors) {
     const pose = poses.get(f.floor.id)!;
-    box.expandByPoint(new THREE.Vector3(f.box.minX, pose.y, f.box.minZ));
-    box.expandByPoint(new THREE.Vector3(f.box.maxX, pose.y + blockHeight(f.storey, pose.flat), f.box.maxZ));
+    all.expandByPoint(new THREE.Vector3(f.box.minX, pose.y, f.box.minZ));
+    all.expandByPoint(new THREE.Vector3(f.box.maxX, pose.y + blockHeight(f.storey, pose.flat), f.box.maxZ));
   }
-  return box;
+  return all;
 }

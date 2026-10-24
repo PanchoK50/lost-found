@@ -52,6 +52,8 @@ interface Anchor {
   placement?: 'above' | 'center';
   /** Anchors in a group are spread out so they never overlap (e.g. floor tags 3 m apart). */
   group?: 'floors';
+  /** Higher wins when callouts collide: the loser flips below its point, or hides if it still overlaps. */
+  priority?: number;
 }
 
 export default function BuildingScene({ building, directive, insets, onFocusFloor }: Props) {
@@ -93,18 +95,23 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         {directive.focus.mode === 'floor' && directive.focus.around && (
           <Cursor key={`cursor-${directiveKey}`} position={worldAt(model, poses, { floorId: directive.focus.floorId, position: directive.focus.around }, 1.7)} />
         )}
-        <Projector anchors={anchors} elements={elements} />
+        <Projector anchors={anchors} elements={elements} topInset={insets.top} />
       </Canvas>
       <div className="scene-anchors" key={directiveKey}>
-        {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
+        {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className="scene-anchor">{anchor.content}</div>)}
       </div>
     </div>
   );
 }
 
 const FLOOR_TAG_GAP_PX = 30;
+const EDGE_MARGIN_PX = 14;
+const TAIL_PX = 12;
 
-function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObject<Map<string, HTMLDivElement>> }) {
+type Rect = { l: number; t: number; r: number; b: number };
+const overlaps = (a: Rect, b: Rect) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+
+function Projector({ anchors, elements, topInset }: { anchors: Anchor[]; elements: RefObject<Map<string, HTMLDivElement>>; topInset: number }) {
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
     const placed: { anchor: Anchor; el: HTMLDivElement; x: number; y: number; visible: boolean }[] = [];
@@ -114,25 +121,41 @@ function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObje
       const p = v.set(...anchor.position).project(camera);
       placed.push({ anchor, el, x: ((p.x + 1) / 2) * size.width, y: ((1 - p.y) / 2) * size.height, visible: p.z < 1 });
     }
-    // Floor tags: one evenly spaced column in floor order, centred where the floors are.
+    // Floor tags: one evenly spaced column in floor order, centred where the floors are, clear of the floor rail.
     const floors = placed.filter(a => a.anchor.group === 'floors');
     if (floors.length > 1) {
       const order = [...floors].sort((a, b) => b.y - a.y); // lowest floor (largest y) first
-      const column = Math.max(...floors.map(a => a.x));
+      const column = Math.min(Math.max(...floors.map(a => a.x)), size.width - 160);
       const mean = floors.reduce((sum, a) => sum + a.y, 0) / floors.length;
       const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
       order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
     }
-    for (const { anchor, el, x, y, visible } of placed) {
-      // Keep labels fully on screen; narrow phone screens otherwise clip long room names.
-      const half = el.offsetWidth / 2, margin = 8;
-      const cx = THREE.MathUtils.clamp(x, half + margin, Math.max(half + margin, size.width - half - margin));
-      el.style.transform = anchor.placement === 'above'
-        ? `translate(${cx}px, ${y}px) translate(-50%, calc(-100% - 12px))`
+    // Callouts: highest priority first; each tries above its point, then below, else hides.
+    const taken: Rect[] = [];
+    const callouts = placed.filter(a => a.anchor.group !== 'floors').sort((a, b) => (b.anchor.priority ?? 1) - (a.anchor.priority ?? 1));
+    for (const item of [...placed.filter(a => a.anchor.group === 'floors'), ...callouts]) {
+      const { anchor, el, x, y, visible } = item;
+      const w = el.offsetWidth, h = el.offsetHeight, half = w / 2;
+      const cx = THREE.MathUtils.clamp(x, half + EDGE_MARGIN_PX, Math.max(half + EDGE_MARGIN_PX, size.width - half - EDGE_MARGIN_PX));
+      let side: 'above' | 'below' | 'center' = anchor.placement === 'above' ? 'above' : 'center';
+      const rect = (s: typeof side): Rect => s === 'above' ? { l: cx - half, r: cx + half, t: y - h - TAIL_PX, b: y - TAIL_PX }
+        : s === 'below' ? { l: cx - half, r: cx + half, t: y + TAIL_PX, b: y + h + TAIL_PX }
+        : { l: cx - half, r: cx + half, t: y - h / 2, b: y + h / 2 };
+      let show = visible;
+      // Labels never go under the header or floor strip: flip below their point instead.
+      const blocked = (r: Rect) => r.t < topInset + 4 || taken.some(t => overlaps(t, r));
+      if (show && side === 'above' && blocked(rect('above'))) {
+        if (!blocked(rect('below'))) side = 'below';
+        else show = (anchor.priority ?? 1) >= 3; // keep the answer itself even if crowded
+      }
+      if (show) taken.push(rect(side));
+      el.dataset.side = side;
+      el.style.transform = side === 'above' ? `translate(${cx}px, ${y}px) translate(-50%, calc(-100% - ${TAIL_PX}px))`
+        : side === 'below' ? `translate(${cx}px, ${y}px) translate(-50%, ${TAIL_PX}px)`
         : `translate(${cx}px, ${y}px) translate(-50%, -50%)`;
       // The tail keeps pointing at the real spot when the label is pushed back on screen.
-      if (anchor.placement === 'above') el.style.setProperty('--tail-shift', `${x - cx}px`);
-      el.style.visibility = visible ? 'visible' : 'hidden';
+      if (side !== 'center') el.style.setProperty('--tail-shift', `${x - cx}px`);
+      el.style.visibility = show ? 'visible' : 'hidden';
     }
   });
   return null;
@@ -143,18 +166,19 @@ function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; 
   const { size, camera } = useThree();
   // Frame the answer: the spaces it names or counts and its reference room, not the background candidates.
   const frame = useMemo(() => (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId), [directive.highlights]);
-  const focusKey = JSON.stringify([directive.focus, frame]);
+  const routePoints = useMemo(() => [...(directive.routes ?? []).flatMap(r => r.points ?? []), ...(directive.links ?? []).flatMap(l => [l.from, l.to])], [directive.routes, directive.links]);
+  const focusKey = JSON.stringify([directive.focus, frame, routePoints.length]);
   const first = useRef(true);
   useEffect(() => {
     const c = controls.current;
     if (!c || !(camera instanceof THREE.PerspectiveCamera)) return;
-    const box = focusBox(model, poses, directive.focus, frame);
+    const box = focusBox(model, poses, directive.focus, frame, routePoints);
     const centre = box.getCenter(new THREE.Vector3());
     const extent = box.getSize(new THREE.Vector3());
     const radius = Math.max(4, 0.5 * Math.hypot(extent.x, extent.z, directive.focus.mode === 'floor' ? 0 : extent.y));
     // Fit the bounding sphere into the part of the viewport not covered by the chat UI.
-    const freeW = Math.max(0.3, (size.width - insets.left) / size.width);
-    const freeH = Math.max(0.3, (size.height - insets.top - insets.bottom) / size.height);
+    const freeW = Math.max(0.2, (size.width - insets.left) / size.width);
+    const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
     const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.8 : 0.9);
@@ -183,7 +207,7 @@ interface FloorViewProps {
   toWorld: BuildingModel['toWorld'];
   pose: FloorPose;
   tones: Map<string, Tone>;
-  /** Assets whose boxes turn lime (the answer to "where is …"). */
+  /** Assets whose boxes turn orange (the answer to "where is …"). */
   litAssets: Set<string>;
   overview: boolean;
   onPick(floorId: string): void;
@@ -268,7 +292,7 @@ function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null
   materials.asset.opacity = s.opacity * s.flat;
   if (assets) {
     assets.visible = s.flat > 0.3 && s.opacity > 0.5;
-    // Items stand on top of the room blocks (plain, muted or sage); only raised lime rooms rise above them.
+    // Items stand on top of the room blocks (plain, muted or light blue); only raised orange rooms rise above them.
     assets.position.y = assetBase;
   }
 }
@@ -285,7 +309,7 @@ const assetHeight: Record<string, number> = { furniture: 0.75, fixture: 0.9, mac
 /** One instanced mesh per floor: a small box per asset footprint. */
 function buildAssets(model: FloorModel, toWorld: BuildingModel['toWorld']) {
   if (!model.assets.length) return null;
-  // White base material: each instance gets its own colour (grey, or lime when it's the answer).
+  // White base material: each instance gets its own colour (grey, or orange when it's the answer).
   const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, transparent: true }), model.assets.length);
   const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   model.assets.forEach((asset, i) => {
@@ -350,16 +374,16 @@ function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, dire
     const pose = poses.get(f.floor.id)!;
     const end = routeEnds.get(h.spaceId);
     const position: [number, number, number] = end ? worldAt(model, poses, end, ROUTE_HEIGHT) : [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]];
-    anchors.push({ key: `hl-${h.spaceId}`, position, placement: 'above', content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
+    anchors.push({ key: `hl-${h.spaceId}`, position, placement: 'above', priority: h.tone === 'primary' ? 3 : end ? 2.5 : 2, content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
   }
   const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId) && marker.tone !== 'muted' && marker.label);
-  if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 2.9), placement: 'above', content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
+  if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 2.9), placement: 'above', priority: marker.tone === 'primary' ? 3 : 2, content: <div className={`scene-label ${marker.tone === 'primary' ? 'scene-label--primary' : 'scene-label--marker'}`}>{marker.label}</div> }));
   (directive.links ?? []).forEach((link, i) => {
     if (!shown(poses, link.from.floorId) || !shown(poses, link.to.floorId)) return;
     const a = worldAt(model, poses, link.from, 1.2), b = worldAt(model, poses, link.to, 1.2);
-    if (link.label) anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.6, (a[2] + b[2]) / 2], placement: 'above', content: <div className="scene-label scene-label--primary">{link.label}</div> });
+    if (link.label) anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.6, (a[2] + b[2]) / 2], placement: 'above', priority: 3.5, content: <div className="scene-label scene-label--primary">{link.label}</div> });
   });
-  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), placement: 'above', content: <div className="scene-label scene-label--closed">Closed</div> }));
+  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), placement: 'above', priority: 1.5, content: <div className="scene-label scene-label--closed">Closed</div> }));
   return anchors;
 }
 
@@ -378,7 +402,7 @@ function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceI
   const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
   if (!m || !f) return [];
   const pose = poses.get(f.floor.id)!;
-  return [{ key: `hv-${spaceId}`, placement: 'above', position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div> }];
+  return [{ key: `hv-${spaceId}`, placement: 'above', priority: 4, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div> }];
 }
 
 /** Routes, link lines and markers, positioned against the target floor poses. */
@@ -390,7 +414,7 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
       <mesh key={i} position={at(marker, 1.15)}><cylinderGeometry args={[0.45, 0.45, 0.12, 20]} /><meshStandardMaterial color={palette.warning} /></mesh>
     ) : (
       <group key={i} position={at(marker, 0)}>
-        <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={palette.ink} /></mesh>
+        <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={marker.tone === 'primary' ? palette.primary : palette.ink} /></mesh>
         <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.ink} /></mesh>
       </group>
     ))}
@@ -417,7 +441,7 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
 
 const ROUTE_HEIGHT = 1.6;
 
-/** Route ends, styled like the directions panel: hollow ring = start, lime dot = destination. Constant size on screen. */
+/** Route ends, styled like the directions panel: hollow ring = start, orange ring = destination. Constant size on screen. */
 function RouteEnd({ kind, position }: { kind: 'origin' | 'stop' | 'destination'; position: [number, number, number] }) {
   const group = useRef<THREE.Group>(null);
   const at = useMemo(() => new THREE.Vector3(...position), [position]);
@@ -462,7 +486,7 @@ function Cursor({ position }: { position: [number, number, number] }) {
   return (
     <group position={position}>
       <mesh rotation-x={-Math.PI / 2} renderOrder={7}><circleGeometry args={[0.55, 32]} /><meshBasicMaterial color={palette.ink} transparent depthTest={false} depthWrite={false} /></mesh>
-      <mesh ref={ring} rotation-x={-Math.PI / 2} renderOrder={7}><ringGeometry args={[0.7, 0.95, 40]} /><meshBasicMaterial color={palette.primary} transparent depthTest={false} /></mesh>
+      <mesh ref={ring} rotation-x={-Math.PI / 2} renderOrder={7}><ringGeometry args={[0.7, 0.95, 40]} /><meshBasicMaterial color="#004fab" transparent depthTest={false} /></mesh>
     </group>
   );
 }

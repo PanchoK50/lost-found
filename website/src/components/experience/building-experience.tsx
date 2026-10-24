@@ -47,6 +47,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const transcript = useRef<HTMLElement>(null);
   const dock = useRef<HTMLElement>(null);
   const floorList = useRef<HTMLDivElement>(null);
+  const latestQuestion = useRef<HTMLParagraphElement>(null);
   const started = messages.length > 0;
   const floors = [...building.floors].sort((a, b) => a.level - b.level);
   const focusedFloor = directive.focus.mode === 'floor' ? directive.focus.floorId : undefined;
@@ -74,10 +75,21 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     window.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
   }, [wide, started]);
-  useEffect(() => { floorList.current?.querySelector('.active')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, [focusedFloor]);
-  useEffect(() => { transcriptEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, busy, expanded]);
+  useEffect(() => {
+    const list = floorList.current;
+    if (!list) return;
+    const active = list.querySelector('.active');
+    if (active) active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    else list.scrollTo({ left: 0, behavior: 'smooth' });
+  }, [focusedFloor]);
+  // Show the latest question with its answer card at the top, not the end of a long step list.
+  useEffect(() => {
+    const target = busy ? transcriptEnd.current : latestQuestion.current ?? transcriptEnd.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: busy ? 'end' : 'start' });
+  }, [messages, busy, expanded]);
 
-  const showOverview = useCallback(() => setDirective(overview), []);
+  // Whole building, keeping the current answer's highlights and route.
+  const showOverview = useCallback(() => setDirective(current => ({ ...current, focus: { mode: 'building' } })), []);
   /** Back to the start screen: whole building, "Ask me anything", suggestions. */
   const startOver = useCallback(() => {
     setMessages([]);
@@ -156,11 +168,11 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             )}
             <div className="transcript-scroll">
               {visible.map(message => message.role === 'user'
-                ? <p key={message.id} className="bubble bubble--user">{message.content}</p>
+                ? <p key={message.id} ref={message.id === messages[lastUser]?.id ? latestQuestion : undefined} className="bubble bubble--user">{message.content}</p>
                 : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
                     <AgentAvatar />
                     {message.response?.answer && (
-                      <button type="button" className="answer-card" onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
+                      <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
                         <span className="answer-title">{message.response.answer.title}</span>
                         {message.response.answer.value && <span className="answer-value">{message.response.answer.value}</span>}
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
