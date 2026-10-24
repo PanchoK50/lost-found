@@ -12,6 +12,8 @@ import { useProfile } from '@/lib/world/profile';
 import { useWorld } from '@/lib/world/use-world';
 import { WorldHud } from '@/components/world/world-hud';
 import { SettingsSheet } from '@/components/world/settings-sheet';
+import { ReportSheet } from '@/components/world/report-sheet';
+import { PinCard } from '@/components/world/pin-card';
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
 
@@ -49,8 +51,11 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const profile = useProfile();
   const { world, act } = useWorld(building, profile);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings'>();
+  const [sheet, setSheet] = useState<'settings' | 'report'>();
   const closeSheet = useCallback(() => setSheet(undefined), []);
+  const [pinId, setPinId] = useState<string>();
+  const closePin = useCallback(() => setPinId(undefined), []);
+  const openPin = world?.pins.find(p => p.id === pinId);
   const nextId = useRef(0);
   const transcriptEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -125,7 +130,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} /></div>
+      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
@@ -193,12 +198,15 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           </div>}
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s} onClick={() => void ask(s)}>{s}</button>)}</div>}
           <form className="ask" onSubmit={submit}>
+            <button type="button" className="ask-plus" onClick={() => setSheet('report')} disabled={!profile} aria-label="Report something">+</button>
             <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
           </form>
         </section>
       </div>
 
+      {sheet === 'report' && profile && <ReportSheet building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
+      {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>

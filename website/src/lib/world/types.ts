@@ -97,7 +97,8 @@ export type WorldAction =
   | { type: 'player.upsert'; buildingId: string; player: Player }
   | { type: 'presence.set'; buildingId: string; presence: Omit<Presence, 'updatedAt'> }
   | { type: 'presence.clear'; buildingId: string; playerId: string }
-  | { type: 'pin.create'; buildingId: string; pin: Omit<Pin, 'id' | 'createdAt' | 'votes' | 'status'> }
+  /** The server fills in what is left out: position (space centroid), floorId (from the space), expiresAt (by kind). */
+  | { type: 'pin.create'; buildingId: string; pin: Omit<Pin, 'id' | 'createdAt' | 'votes' | 'status' | 'position' | 'floorId' | 'expiresAt'> & Partial<Pick<Pin, 'position' | 'floorId' | 'expiresAt'>> }
   | { type: 'pin.vote'; buildingId: string; pinId: string; playerId: string; vote: 'still' | 'fixed' }
   | { type: 'pin.resolve'; buildingId: string; pinId: string; playerId: string }
   | { type: 'ping.send'; buildingId: string; ping: Omit<Ping, 'id' | 'createdAt' | 'status'> }

@@ -37,7 +37,7 @@ export function worldAnchors(
         key: `w-count-${f.floor.id}`,
         group: 'counts' as const,
         position: [model.box.minX - 4, poses.get(f.floor.id)!.y + f.storey * 0.45, model.box.minZ] as [number, number, number],
-        content: <button type="button" className={`world-count${alerts ? ' world-count--alert' : ''}`} onClick={() => handlers.onFocusFloor(f.floor.id)} aria-label={`${f.floor.name}: ${parts.join(', ')}`}>{parts.join(' · ')}</button>,
+        content: <button type="button" className={`world-count${alerts ? ' world-count--alert' : ''}`} onClick={() => handlers.onFocusFloor(f.floor.id)} aria-label={`${f.floor.name}: ${parts.join(', ')}`}><strong>{f.floor.name}</strong> {parts.join(' · ')}</button>,
       }];
     });
   }
