@@ -321,7 +321,7 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
         <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.route} /></mesh>
       </group>
     ))}
-    {(directive.routes ?? []).filter(route => visible(route.points)).map((route, i) => <RouteLine key={i} points={route.points.map(p => at(p, 1.6))} />)}
+    {(directive.routes ?? []).map(route => (route.points ?? []).filter(p => shown(poses, p.floorId))).filter(points => points.length >= 2).map((points, i) => <RouteLine key={i} points={points.map(p => at(p, 1.6))} />)}
     {(directive.links ?? []).filter(link => visible([link.from, link.to])).map((link, i) => {
       const a = at(link.from, 1.2), b = at(link.to, 1.2);
       return <group key={i}>

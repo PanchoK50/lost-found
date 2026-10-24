@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Building } from '@/lib/buildings/types';
+import { directions } from '@/lib/buildings/directions';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
 
@@ -149,6 +150,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                       </button>
                     )}
                     <p>{withoutAnswerLine(message.content)}</p>
+                    {message.response && <RouteSteps building={building} response={message.response} open={wide} />}
                   </article>)}
               {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
               <div ref={transcriptEnd} />
@@ -171,6 +173,22 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
+  );
+}
+
+/** Numbered, followable steps for each route leg. Collapsed on phones to keep the model in view. */
+function RouteSteps({ building, response, open }: { building: Building; response: ChatResponse; open: boolean }) {
+  const legs = (response.scene.routes ?? []).filter(r => r.spacePath && r.spacePath.length > 1);
+  if (!legs.length) return null;
+  const steps = legs.flatMap((leg, i) => {
+    const list = directions(building, leg.spacePath!);
+    return i === 0 ? list : list.slice(1); // a leg starts where the previous one arrived
+  });
+  return (
+    <details className="steps" open={open || undefined}>
+      <summary>{steps.length} steps</summary>
+      <ol>{steps.map((step, i) => <li key={i} className={`step step--${step.kind}`}>{step.text}</li>)}</ol>
+    </details>
   );
 }
 

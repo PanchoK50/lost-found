@@ -54,8 +54,12 @@ export interface SceneDirective {
   highlights?: { spaceId: string; tone: Tone; label?: string }[];
   /** Pins for assets or points. `muted` markers draw as small flat warnings (e.g. doors that are too narrow). */
   markers?: (FloorPoint & { label: string; tone?: Tone })[];
-  /** Polylines through the building. Consecutive points on different floors draw a vertical hop. */
-  routes?: { points: FloorPoint[]; label?: string }[];
+  /**
+   * Routes, one entry per leg. `spacePath` is the ordered list of spaces walked through (what the route check
+   * scores) and drives the step list. `points` is the drawn polyline; if omitted, the API fills it in from
+   * `spacePath` with the walking model (lib/buildings/walk.ts). Points on different floors draw a vertical hop.
+   */
+  routes?: { spacePath?: string[]; points?: FloorPoint[]; label?: string }[];
   /** Straight 3D lines, e.g. sensor links between room centroids. */
   links?: { from: FloorPoint; to: FloorPoint; label?: string }[];
   /** Opening or vertical-connector ids to mark as closed. */

@@ -73,6 +73,16 @@ button:disabled { cursor: default; }
 .answer-title { font-size: 13px; color: var(--muted); }
 .answer-value { font-size: 26px; font-weight: 600; letter-spacing: -.03em; }
 .answer-detail { font-size: 12px; color: var(--muted); }
+.steps { margin-top: 8px; font-size: 13px; }
+.steps summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: 8px 0; min-height: 36px; list-style: none; display: flex; align-items: center; gap: 6px; }
+.steps summary::before { content: "▸"; transition: transform .2s; }
+.steps[open] summary::before { transform: rotate(90deg); }
+.steps ol { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 2px; }
+.step { counter-increment: step; position: relative; padding: 6px 0 6px 30px; color: #3d4638; line-height: 1.35; }
+.step::before { content: counter(step); position: absolute; left: 0; top: 5px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid var(--line); font-size: 11px; display: grid; place-items: center; color: var(--muted); }
+.step--start::before, .step--arrive::before { background: var(--ink); border-color: var(--ink); color: #fff; }
+.step--arrive::before { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+.step--floor { font-weight: 600; color: var(--ink); }
 .bubble--thinking { display: flex; gap: 4px; padding: 6px 2px; }
 .bubble--thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
 .bubble--thinking i:nth-child(2) { animation-delay: .15s; }

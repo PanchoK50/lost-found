@@ -1,6 +1,7 @@
 import type { Asset, Building, Floor, Opening, Space } from '@/lib/buildings/types';
 import { bounds, pointInPolygon, polygonArea, polygonCentroid, sharedWall } from '@/lib/buildings/geometry';
-import { buildGraph, doorOf, isDoorNode, OUTSIDE, pathTo, representativePoint, shortestPaths, type GraphOptions } from '@/lib/buildings/graph';
+import { buildGraph, OUTSIDE, shortestPaths, type GraphOptions } from '@/lib/buildings/graph';
+import { WalkGraph, type WalkLeg, type WalkRules } from '@/lib/buildings/walk';
 import type { ChatResponse, FloorPoint } from './contract';
 
 /**
@@ -20,7 +21,16 @@ export function resolveDemo(building: Building, message: string): ChatResponse {
   if (rooms.length >= 1 && /\b(wheelchair|step[- ]free)\b/.test(text) && /\bhow many\b/.test(text)) return stepFreeReachable(ctx, ctx.spaceAfter('into') ?? rooms[0]);
   if (rooms.length >= 1 && /\b(share|shares|sharing|shared)\b[^.?]*\bwalls?\b|\bneighbou?r(s|ing)?\b|\badjacent\b/.test(text)) return sharedWalls(ctx, rooms[0]);
 
-  if (rooms.length >= 2 && /\b(get|route|way|go|walk|directions?|path)\b/.test(text)) return route(ctx, rooms);
+  // Type 3: routes. The start must be named in the question for now.
+  const routeWords = /\b(get|route|way|go|walk|directions?|path|visit|take me|bring)\b/.test(text);
+  if (/\b(grab|pick up|fetch|collect)\b/.test(text) && /\bcarry\b/.test(text)) return errand(ctx);
+  if (routeWords) {
+    const { stops, closed } = ctx.routeStops();
+    const assetType = ctx.mentionedAssetType();
+    if (stops.length >= 2) return route(ctx, stops, closed);
+    if (stops.length === 1 && assetType) return route(ctx, stops, closed, assetType);
+    if (/\bfrom\b|\bto\b/.test(text) && (stops.length || assetType)) return notFound('Where are you starting from? Name the room you are in, for example "from Office 0.23".', stops[0] && ctx.floorOf(stops[0]));
+  }
   if (rooms.length >= 1 && /\b(below|beneath|under(neath)?|above|over)\b/.test(text)) return stacked(ctx, rooms[0]);
   if (rooms.length >= 2 && /\b(distance|straight[- ]line|far apart)\b/.test(text)) return straightLine(ctx, rooms[0], rooms[1]);
   if (/\b(largest|biggest|smallest)\b/.test(text)) return largestRoom(ctx);
@@ -77,6 +87,25 @@ class Context {
     return at < 0 ? undefined : this.mentions().find(hit => hit.index > at)?.space;
   }
 
+  /**
+   * Route stops in order, plus what is closed. A sentence that says something is closed or blocked
+   * ("Staircase 2 is closed for maintenance.") closes the stairs, lifts and spaces it names; stops come
+   * from the other sentences.
+   */
+  routeStops(): { stops: Space[]; closed: { id: string; name: string }[] } {
+    const closure = /\b(closed|out of service|out of order|maintenance|blocked|broken|not working)\b/;
+    const closed: { id: string; name: string }[] = [];
+    const closedSpaces = new Set<string>();
+    for (const sentence of this.text.split(/(?<=[.!?;])\s+/)) {
+      if (!closure.test(sentence) || /\b(from|how do i|route)\b/.test(sentence)) continue;
+      for (const c of this.building.vertical_connectors) if (new RegExp(`\\b${escape(c.name.toLowerCase())}\\b`).test(sentence)) closed.push({ id: c.id, name: c.name });
+      for (const space of new Context(this.building, sentence).mentionedSpaces()) { closed.push({ id: space.id, name: space.name }); closedSpaces.add(space.id); }
+    }
+    const closedNames = new Set(closed.map(c => c.name.toLowerCase()));
+    const stops = this.mentionedSpaces().filter(space => !closedSpaces.has(space.id) && !closedNames.has(space.name.toLowerCase()));
+    return { stops, closed };
+  }
+
   /** Stairs or lifts named in the message, e.g. "Lift 1 is out of service". */
   mentionedConnectors() {
     return this.building.vertical_connectors.filter(c => new RegExp(`\\b${escape(c.name.toLowerCase())}\\b`).test(this.text));
@@ -102,12 +131,18 @@ class Context {
     return result;
   }
 
+  /** Room type the question is about: prefer the phrase after "largest", "every", "all", … over room names like "Office 1.09". */
   mentionedRoomType(): string | undefined {
+    const phrase = this.text.match(/\b(?:largest|biggest|smallest|every|all(?: the)?|each)\s+([a-z ]+?)(?:\s+(?:on|in|at)\b|[?.,]|$)/)?.[1];
+    return (phrase && this.roomTypeIn(phrase)) ?? this.roomTypeIn(this.text);
+  }
+
+  private roomTypeIn(text: string): string | undefined {
     const types = [...new Set(this.building.spaces.map(space => space.room_type))];
     return types
       .map(type => ({ type, label: type.replaceAll('_', ' ') }))
       .sort((a, b) => b.label.length - a.label.length)
-      .find(({ label }) => new RegExp(`\\b${escape(label)}(s|es)?\\b`).test(this.text))?.type;
+      .find(({ label }) => new RegExp(`\\b${escape(label)}(s|es)?\\b`).test(text))?.type;
   }
 
   mentionedAssetType(): string | undefined {
@@ -266,49 +301,178 @@ function straightLine(ctx: Context, a: Space, b: Space): ChatResponse {
   };
 }
 
-function route(ctx: Context, rooms: Space[]): ChatResponse {
-  const stepFree = /\b(step[- ]free|wheelchair|no stairs|without stairs|accessible)\b/.test(ctx.text);
-  const closed = /\b(closed|out of service|maintenance|blocked|broken)\b/.test(ctx.text) ? ctx.mentionedConnectors().map(c => c.id) : [];
-  const graph = buildGraph(ctx.building, { stepFree, closed });
-  const openings = new Map(ctx.building.openings.map(o => [o.id, o]));
-  const spaces = new Map(ctx.building.spaces.map(sp => [sp.id, sp]));
-  const kind = closed.length ? 'route_with_closure' : stepFree ? 'route_step_free' : rooms.length > 2 ? 'tour' : 'route';
-  const legs: { path: FloorPoint[]; length: number }[] = [];
-  for (let i = 0; i < rooms.length - 1; i++) {
-    const { dist, prev } = shortestPaths(graph, [rooms[i].id]);
-    const nodes = pathTo(prev, [rooms[i].id], rooms[i + 1].id);
-    if (!nodes) {
-      const why = closed.length ? ` with ${ctx.mentionedConnectors().map(c => c.name).join(' and ')} closed` : stepFree ? ' without stairs or steps' : '';
-      return {
-        kind,
-        reply: `There is no${stepFree ? ' step-free' : ''} route from ${rooms[i].name} to ${rooms[i + 1].name}${why}.`,
-        answer: { title: `${rooms[i].ref} → ${rooms[i + 1].ref}`, value: stepFree ? 'No step-free route' : 'No route', detail: why.trim() || undefined },
-        scene: {
-          focus: rooms[i].floor_id === rooms[i + 1].floor_id ? { mode: 'floor', floorId: rooms[i].floor_id } : { mode: 'stack', floorIds: [rooms[i].floor_id, rooms[i + 1].floor_id] },
-          highlights: [{ spaceId: rooms[i].id, tone: 'secondary', label: rooms[i].name }, { spaceId: rooms[i + 1].id, tone: 'primary', label: rooms[i + 1].name }],
-          closed,
-        },
-      };
-    }
-    const path = nodes.filter(node => node !== OUTSIDE).map((node): FloorPoint => {
-      if (isDoorNode(node)) { const o = openings.get(doorOf(node))!; return { floorId: o.floor_id, position: o.position }; }
-      const space = spaces.get(node)!;
-      return { floorId: space.floor_id, position: representativePoint(space.polygon) };
-    });
-    legs.push({ path, length: dist.get(rooms[i + 1].id)! });
+// ---------- Type 3: routes ----------
+
+const walkGraphs = new Map<string, WalkGraph>();
+
+/** Walk graphs are expensive to build for big buildings; cache one per building and rule set. */
+function walkGraph(building: Building, rules: WalkRules): WalkGraph {
+  const key = JSON.stringify([building.building.id, !!rules.stepFree, !!rules.forklift, [...(rules.closed ?? [])].sort()]);
+  let graph = walkGraphs.get(key);
+  if (!graph) { graph = new WalkGraph(building, rules); walkGraphs.set(key, graph); }
+  return graph;
+}
+
+function routeRules(ctx: Context, closed: { id: string }[]): WalkRules {
+  return {
+    stepFree: /\b(step[- ]free|wheelchair|without (stairs|steps)|no stairs|can'?t (use|take|climb) (the )?stairs|accessible|pram|stroller|walker)\b/.test(ctx.text),
+    forklift: /\bforklift\b/.test(ctx.text),
+    closed: closed.map(c => c.id),
+  };
+}
+
+function ruleNotes(rules: WalkRules) {
+  return [rules.stepFree && 'step-free', rules.forklift && 'forklift aisles only', (rules.closed && [...rules.closed].length) && 'avoiding closures'].filter(Boolean) as string[];
+}
+
+/** Nearest room (by walking) that holds an item of this type. */
+function nearestWithAsset(ctx: Context, graph: WalkGraph, from: Space, type: string, exclude?: string) {
+  const dist = graph.distancesFrom(from.id);
+  const rooms = [...new Set(ctx.building.assets.filter(a => a.type === type).map(a => a.space_id))].filter(id => id !== exclude && dist.has(id));
+  rooms.sort((a, b) => dist.get(a)! - dist.get(b)!);
+  return rooms.length ? ctx.building.spaces.find(sp => sp.id === rooms[0]) : undefined;
+}
+
+function route(ctx: Context, stops: Space[], closed: { id: string; name: string }[], assetType?: string): ChatResponse {
+  const rules = routeRules(ctx, closed);
+  const graph = walkGraph(ctx.building, rules);
+  const labels = new Map<string, string>();
+  if (assetType) {
+    // A route to an item ends in the room or bay that holds it.
+    const target = nearestWithAsset(ctx, graph, stops[0], assetType);
+    if (!target) return noRoute(ctx, stops[0], undefined, rules, closed, `I couldn't reach any ${assetType.replaceAll('_', ' ')} from ${stops[0].name}${ruleNotes(rules).length ? ` (${ruleNotes(rules).join(', ')})` : ''}.`);
+    stops = [stops[0], target];
+    const item = assetType.replaceAll('_', ' ');
+    labels.set(target.id, `${item[0].toUpperCase()}${item.slice(1)} · ${target.name}`);
   }
-  const total = legs.reduce((sum, leg) => sum + leg.length, 0);
-  const floorIds = [...new Set(legs.flatMap(leg => leg.path.map(point => point.floorId)))];
-  const value = `${total.toFixed(2)} m`;
+  const legs: WalkLeg[] = [];
+  for (let i = 0; i + 1 < stops.length; i++) {
+    const leg = graph.route(stops[i].id, stops[i + 1].id);
+    if (!leg) return noRoute(ctx, stops[i], stops[i + 1], rules, closed);
+    legs.push(leg);
+  }
+  const kind = stops.length > 2 ? 'tour' : closed.length ? 'route_with_closure' : rules.stepFree ? 'route_step_free' : 'route';
+  return routeResponse(ctx, kind, stops, legs, rules, closed, labels);
+}
+
+function errand(ctx: Context): ChatResponse {
+  const { stops, closed } = ctx.routeStops();
+  const start = stops[0];
+  const assetType = ctx.mentionedAssetType();
+  if (!start || !assetType) return notFound('Tell me where you are and what to pick up, for example "I\'m in Office 0.38. I need to grab a stove, then carry it to the largest kitchen on floor 1."');
+  const rules = routeRules(ctx, closed);
+  const graph = walkGraph(ctx.building, rules);
+  // Errands are scored as one distance in the kit's route model (README section 3), so "closest" and the
+  // total use that model; the drawn path still comes from the walking model.
+  const kit = buildGraph(ctx.building, { stepFree: rules.stepFree, closed: rules.closed });
+  const fromStart = shortestPaths(kit, [start.id]).dist;
+  const holders = [...new Set(ctx.building.assets.filter(a => a.type === assetType).map(a => a.space_id))].filter(id => fromStart.has(id));
+  holders.sort((a, b) => fromStart.get(a)! - fromStart.get(b)!);
+  const pickup = ctx.building.spaces.find(sp => sp.id === holders[0]);
+  if (!pickup) return noRoute(ctx, start, undefined, rules, closed, `I couldn't reach any ${assetType.replaceAll('_', ' ')} from ${start.name}.`);
+  // Destination: a named room, or "the largest <room type> on <floor>".
+  const named = stops.find(sp => sp.id !== start.id);
+  const floor = ctx.mentionedFloor();
+  const roomType = ctx.mentionedRoomType();
+  const destination = named ?? ctx.building.spaces
+    .filter(sp => (!floor || sp.floor_id === floor.id) && (!roomType || sp.room_type === roomType))
+    .sort((a, b) => ctx.area(b) - ctx.area(a))[0];
+  if (!destination) return notFound(`I couldn't find where to take the ${assetType.replaceAll('_', ' ')}.`, floor);
+  const first = graph.route(start.id, pickup.id);
+  const second = graph.route(pickup.id, destination.id);
+  if (!first) return noRoute(ctx, start, pickup, rules, closed);
+  if (!second) return noRoute(ctx, pickup, destination, rules, closed);
+  const labels = new Map([[pickup.id, `Pick up ${assetType.replaceAll('_', ' ')} · ${pickup.name}`]]);
+  const total = fromStart.get(pickup.id)! + (shortestPaths(kit, [pickup.id]).dist.get(destination.id) ?? NaN);
+  return routeResponse(ctx, 'errand', [start, pickup, destination], [first, second], rules, closed, labels, total);
+}
+
+function describeVia(ctx: Context, legs: WalkLeg[], stops: Space[]) {
+  const spaces = new Map(ctx.building.spaces.map(sp => [sp.id, sp]));
+  const stopIds = new Set(stops.map(sp => sp.id));
+  const via: string[] = [];
+  for (const leg of legs) for (let i = 1; i < leg.spacePath.length; i++) {
+    const [a, b] = [spaces.get(leg.spacePath[i - 1]), spaces.get(leg.spacePath[i])];
+    if (a && b && a.floor_id !== b.floor_id) {
+      const connector = ctx.building.vertical_connectors.find(c => c.space_ids.includes(a.id) && c.space_ids.includes(b.id));
+      const name = `${connector?.name ?? 'the stairs'} to ${ctx.floorOf(b).name}`;
+      if (connector && via.at(-1)?.startsWith(connector.name)) via[via.length - 1] = name; else via.push(name);
+    } else if (b && !stopIds.has(b.id) && (b.type === 'corridor' || b.type === 'hall') && via.length < 3 && !via.includes(b.name)) via.push(b.name);
+    else if (leg.spacePath[i] === OUTSIDE) via.push('outside');
+  }
+  return via;
+}
+
+function routeResponse(ctx: Context, kind: ChatResponse['kind'], stops: Space[], legs: WalkLeg[], rules: WalkRules, closed: { id: string; name: string }[], labels = new Map<string, string>(), distance?: number): ChatResponse {
+  const total = distance ?? legs.reduce((sum, leg) => sum + leg.length, 0);
+  const minutes = Math.max(1, Math.round(total / 1.3 / 60));
+  const start = stops[0], end = stops.at(-1)!;
+  // Floors where something happens: the stops and wherever the route walks.
+  const walked = new Map<string, number>();
+  legs.forEach(leg => leg.points.forEach(p => walked.set(p.floorId, (walked.get(p.floorId) ?? 0) + 1)));
+  const floorIds = [...new Set([...stops.map(sp => sp.floor_id), ...[...walked].filter(([, n]) => n >= 2).map(([id]) => id)])];
+  const stopIds = new Set(stops.map(sp => sp.id));
+  const passed = [...new Set(legs.flatMap(leg => leg.spacePath))].filter(id => id !== OUTSIDE && !stopIds.has(id));
+  const via = describeVia(ctx, legs, stops);
+  const notes = ruleNotes(rules);
+  const value = distance === undefined ? `≈ ${total.toFixed(0)} m` : `${total.toFixed(2)} m`;
+  const label = (sp: Space, i: number) => labels.get(sp.id) ?? (i === 0 ? `Start · ${sp.name}` : i === stops.length - 1 ? sp.name : `Stop ${i} · ${sp.name}`);
   return {
     kind,
-    reply: `From ${rooms[0].name} to ${rooms.at(-1)!.name} is ${value}${stepFree ? ', step-free' : ''}${floorIds.length > 1 ? `, across ${floorIds.length} floors` : ''}.${closed.length ? ' I avoided the closed connector.' : ''}`,
-    answer: { title: `${rooms[0].ref} → ${rooms.at(-1)!.ref}`, value, detail: `${stepFree ? 'Step-free · ' : ''}${floorIds.length} floor${floorIds.length === 1 ? '' : 's'}` },
+    reply: `${kind === 'errand' ? 'In total it' : `From ${start.name} to ${end.name} it`} is about ${total.toFixed(0)} m, roughly ${minutes} min on foot${via.length ? `, via ${via.join(', ')}` : ''}.${closed.length ? ` I avoided ${closed.map(c => c.name).join(' and ')}.` : ''}${rules.stepFree ? ' No stairs or steps on the way.' : ''}`,
+    answer: { title: kind === 'errand' ? `${start.ref} → pick up → ${end.ref}` : stops.map(sp => sp.ref).join(' → '), value, detail: [`${floorIds.length} floor${floorIds.length === 1 ? '' : 's'}`, `about ${minutes} min`, ...notes].join(' · ') },
     scene: {
       focus: floorIds.length === 1 ? { mode: 'floor', floorId: floorIds[0] } : { mode: 'stack', floorIds },
-      highlights: rooms.map((space, i) => ({ spaceId: space.id, tone: i === rooms.length - 1 ? 'primary' as const : 'secondary' as const, label: space.name })),
-      routes: legs.map(leg => ({ points: leg.path })),
-      closed,
+      highlights: [
+        ...stops.map((sp, i) => ({ spaceId: sp.id, tone: i === 0 ? 'secondary' as const : 'primary' as const, label: label(sp, i) })),
+        ...passed.map(id => ({ spaceId: id, tone: 'muted' as const })),
+      ],
+      // Draw only the floors on view: rides through intermediate floors become one vertical hop.
+      routes: legs.map(leg => ({ spacePath: leg.spacePath, points: leg.points.filter(p => floorIds.includes(p.floorId)) })),
+      closed: closed.map(c => c.id),
+    },
+  };
+}
+
+/** Explain why there is no route under the rules, by checking which rule blocks it. */
+function noRoute(ctx: Context, from: Space, to: Space | undefined, rules: WalkRules, closed: { id: string; name: string }[], message?: string): ChatResponse {
+  let why = '';
+  const blockers: { floorId: string; position: [number, number]; label: string }[] = [];
+  if (to) {
+    const without = (r: WalkRules) => walkGraph(ctx.building, r).route(from.id, to.id);
+    if (closed.length && without({ ...rules, closed: [] })) why = `The only way is through ${closed.map(c => c.name).join(' and ')}, which ${closed.length === 1 ? 'is' : 'are'} closed.`;
+    else if (rules.forklift && without({ ...rules, forklift: false })) why = 'The only way uses doors narrower than 3 m, pedestrian walkways or stairs and lifts, which a forklift can\'t use.';
+    else if (rules.stepFree) {
+      const relaxed = without({ ...rules, stepFree: false });
+      if (relaxed) {
+        const needed = ctx.building.vertical_connectors.filter(c => !c.step_free || c.kind === 'stairs').filter(c => relaxed.spacePath.some((id, i) => i > 0 && c.space_ids.includes(id) && c.space_ids.includes(relaxed.spacePath[i - 1])));
+        why = needed.length ? `Every way there needs ${needed.map(c => c.name).join(' or ')}, and there is no working lift on the way.` : 'Every way there has steps.';
+        for (const c of needed) {
+          const sp = ctx.building.spaces.find(x => x.id === c.space_ids[0]);
+          if (sp) blockers.push({ floorId: sp.floor_id, position: polygonCentroid(sp.polygon), label: `${c.name} · stairs` });
+        }
+      }
+    }
+  }
+  const constraint = rules.stepFree ? ' step-free' : rules.forklift ? ' forklift' : '';
+  const reply = message ?? `There is no${constraint} route from ${from.name} to ${to!.name}. ${why}`.trim();
+  // Show how far you can get under the rules from the start, on its floor.
+  const reach = walkGraph(ctx.building, rules).distancesFrom(from.id);
+  const reachable = ctx.spacesOn(ctx.floorOf(from)).filter(sp => sp.id !== from.id && reach.has(sp.id)).map(sp => sp.id);
+  const floors = [...new Set([from.floor_id, ...(to ? [to.floor_id] : [])])];
+  return {
+    kind: rules.stepFree ? 'route_step_free' : closed.length ? 'route_with_closure' : 'route',
+    reply,
+    answer: { title: to ? `${from.ref} → ${to.ref}` : from.name, value: `No${constraint} route`, detail: why || undefined },
+    scene: {
+      focus: floors.length === 1 ? { mode: 'floor', floorId: floors[0] } : { mode: 'stack', floorIds: floors },
+      highlights: [
+        { spaceId: from.id, tone: 'secondary', label: `Start · ${from.name}` },
+        ...(to ? [{ spaceId: to.id, tone: 'primary' as const, label: to.name }] : []),
+        ...reachable.map(id => ({ spaceId: id, tone: 'muted' as const })),
+      ],
+      markers: blockers,
+      closed: closed.map(c => c.id),
     },
   };
 }

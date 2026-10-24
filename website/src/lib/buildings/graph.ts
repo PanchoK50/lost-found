@@ -119,7 +119,8 @@ function dist(a: Point, b: Point) {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
-class MinHeap {
+/** Binary min-heap of string keys by priority. */
+export class MinHeap {
   private items: [number, string][] = [];
   get size() { return this.items.length; }
   push(priority: number, value: string) {

@@ -47,17 +47,33 @@ These rules were checked against every train and dev question: shared walls 142/
 
 ## 3. A route
 
-The answer is a path. Show the distance and draw the way. For now the start comes from the question; later the request can carry the user's current location.
+The answer is a path. Show the distance, draw the way and list the steps. For now the start comes from the question; later the request can carry the user's current location.
 
 | Kind | Test | Headline | Scene |
 |---|---|---|---|
-| `route` (warm-up) | — | `≈ 55 m` | `routes` (one leg); start `secondary`, destination `primary` |
-| `route_step_free` (warm-up) | — | `≈ 26 m, step-free` **or** `No step-free route` | Same; no stairs |
-| `route_with_closure` (warm-up) | — | `≈ 121 m` **or** `No route` | Same, plus `closed: [connector id]` |
-| `tour` (warm-up) | — | `≈ 276 m` · `3 stops` | `routes` with one entry per leg; numbered stop `markers` |
-| `errand` | 20 | `132.35 m` | Two legs: start → pick-up room (`marker` "Pick up the stove") → destination |
+| `route` (warm-up) | — | `≈ 55 m` · `1 floor · about 1 min` | `routes: [{ spacePath, points }]`; start `secondary` ("Start · …"), destination `primary`; spaces passed through `muted` |
+| `route_step_free` (warm-up) | — | `≈ 26 m` · `step-free` **or** `No step-free route` | Same, no stairs or steps |
+| `route_with_closure` (warm-up) | — | `≈ 121 m` **or** `No route` | Same, plus `closed: [ids]` |
+| `tour` (warm-up) | — | `≈ 276 m` · `3 floors` | One `routes` entry per leg; stops labelled "Stop 1 · …" |
+| `errand` | 20 | `132.35 m` | Two legs; pick-up room labelled "Pick up stove · …" |
+| route to an item | — | `≈ 36 m` | "How do I get from X to the projector?" ends in the room that holds the nearest one |
 
-- **"No route" is common:** 63 of 240 step-free and 58 of 138 closure answers are unreachable. Show both rooms, mark the blocker, and say why. Don't show it as an error.
+**How routes are scored (challenge partner):**
+- The scored output is the **ordered list of spaces** (`spacePath`). Every step must go through a real door, opening, stair or lift that the rules allow; an invalid route scores 0.
+- Their checker measures the sequence itself: walking inside each space door to door, about 15 cm off the walls, around corners. Stairs cost 2 m per metre climbed; a lift 15 m plus 1 m per metre of height. Furniture is ignored.
+- Score = best length ÷ your length; within 1% counts as full marks. The distance you print doesn't matter.
+- Rules: **without stairs**: lifts, ramps and doors only. **Forklift**: aisles and openings ≥ 3 m wide only (no pedestrian walkways, stairs or lifts). **Closed** elements are avoided. **Factory production bays** (production, assembly, additive, warehouse, logistics zones) are destinations only, never shortcuts. If no route exists, say so.
+
+`src/lib/buildings/walk.ts` implements this model (`WalkGraph.route`, `.measure` to check and measure a given space list, `.distancesFrom`). Checked on all 1,098 train/dev warm-up routes: reachability matches every time (including all 121 "no route" cases), every expected sequence is valid, and ours is never longer under this model. 861 are identical; the rest are equal or shorter.
+
+**Contract:** a backend may return only `spacePath` per leg; the API (`src/app/api/chat/route.ts`) fills in `points` with the walking model. The UI turns `spacePath` into numbered steps (`src/lib/buildings/directions.ts`).
+
+**No route:** shown as a result, not an error. The resolver re-checks without each rule to explain why ("The only way is through Office lift, which is closed", "Every way there needs Stairs 2"), marks the blockers, highlights start and destination, and tints how far you can get from the start.
+
+Open points:
+- **Errands use the kit's distance model**, not the partner's: "the room that has one closest to me" and the total match the expected answers in 93/93 cases only with the kit model (README section 3). The path is still drawn with the walking model.
+- **Outside:** the kit lets routes go out one entrance and in another for free. The walking model charges the straight line between the two entrances, so outside is only used when really needed. Confirm with the partner how their checker treats outside.
+- **Forklift** questions don't appear in the data yet; the rule is implemented from the note (aisles and openings ≥ 3 m, single floor).
 
 ## 4. Distance between two points
 

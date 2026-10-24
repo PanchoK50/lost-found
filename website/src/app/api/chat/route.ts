@@ -1,4 +1,6 @@
 import { getCatalogEntry } from '@/lib/buildings/catalog';
+import type { Building } from '@/lib/buildings/types';
+import { WalkGraph } from '@/lib/buildings/walk';
 import type { ChatRequest, ChatResponse } from '@/lib/chat/contract';
 import { resolveDemo } from '@/lib/chat/demo-resolver';
 
@@ -11,5 +13,16 @@ export async function POST(request: Request) {
   const entry = getCatalogEntry(body.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   const response: ChatResponse = resolveDemo(entry.building, message);
-  return Response.json(response);
+  return Response.json(withRoutePoints(entry.building, response));
+}
+
+/** Backends may return routes as a space list only (what the route check scores); draw them with the walking model. */
+function withRoutePoints(building: Building, response: ChatResponse): ChatResponse {
+  const routes = response.scene.routes;
+  if (!routes?.some(r => r.spacePath && !r.points)) return response;
+  const graph = new WalkGraph(building, { closed: response.scene.closed });
+  return {
+    ...response,
+    scene: { ...response.scene, routes: routes.map(r => (r.points || !r.spacePath ? r : { ...r, points: graph.measure(r.spacePath)?.points ?? [] })) },
+  };
 }
