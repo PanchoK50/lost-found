@@ -8,6 +8,7 @@ import type { Role, WorldState } from '@/lib/world/types';
 import type { WorldActions } from './world-hud';
 import { Segmented } from './segmented';
 import { Sheet } from './sheet';
+import { inboxToasts } from './inbox';
 import { SpaceSelect } from './space-select';
 
 const roles: { value: Role; label: string }[] = [
@@ -16,12 +17,14 @@ const roles: { value: Role; label: string }[] = [
 ];
 
 /** Profile, mode and privacy (docs/MULTIPLAYER.md §2, §3). Choices apply at once; text fields when they lose focus. */
-export function SettingsSheet({ building, profile, world, category, act, onClose }: {
+export function SettingsSheet({ building, profile, world, category, act, onGo, onClose }: {
   building: Building;
   profile: Profile;
   world?: WorldState;
   category: BuildingCategory;
   act: WorldActions['act'];
+  /** Go to where a ping asks me to be. */
+  onGo(spaceId: string): void;
   onClose(): void;
 }) {
   const buildingId = building.building.id;
@@ -42,10 +45,23 @@ export function SettingsSheet({ building, profile, world, category, act, onClose
   };
   const spaces = new Map(building.spaces.map(s => [s.id, s]));
   const floors = new Map(building.floors.map(f => [f.id, f]));
+  const incoming = world ? inboxToasts(world, profile.id, settings.pingFrom, profile.groups).filter(t => t.type === 'incoming' && t.ping.kind !== 'ask_crowd') : [];
   const people = (world?.presence ?? []).map(p => ({ presence: p, player: world?.players.find(x => x.id === p.playerId) })).filter(p => p.player);
 
   return (
     <Sheet title="Settings" onClose={() => { saveText(); onClose(); }}>
+      {incoming.length > 0 && <section>
+        <h3>Inbox</h3>
+        {incoming.map(t => {
+          const from = world?.players.find(p => p.id === t.ping.fromId);
+          return <p key={t.key} className="person-row">
+            <span className={`person-dot${from?.demo ? ' person-dot--demo' : ''}`}>{from?.initials ?? '?'}</span>
+            <span style={{ flex: 1 }}><strong>{from?.name ?? 'Someone'}</strong><small>{spaces.get(t.ping.spaceId)?.name}{t.ping.message ? ` · ${t.ping.message}` : ''}</small></span>
+            <button type="button" className="button button--primary" style={{ flex: 'none', minHeight: 36 }} onClick={() => { void act({ type: 'ping.update', pingId: t.ping.id, playerId: profile.id, status: 'accepted' }); onGo(t.ping.spaceId); onClose(); }}>Go</button>
+          </p>;
+        })}
+      </section>}
+
       <section>
         <h3>You</h3>
         <label>Name<input value={name} maxLength={40} onChange={e => setName(e.target.value)} onBlur={saveText} autoComplete="nickname" /></label>

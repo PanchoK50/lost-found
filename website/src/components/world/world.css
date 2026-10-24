@@ -112,3 +112,34 @@
 .scene-tip.scene-tip--actions button { margin-top: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; }
 /* The tapped room's tip stays above people and pins so its button can be tapped. */
 .scene-anchor:has(.scene-tip--actions) { z-index: 3; }
+
+/* Inbox toasts under the HUD */
+.inbox { position: absolute; left: calc(12px + var(--safe-left)); right: calc(12px + var(--safe-right)); z-index: 15; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; box-shadow: var(--shadow); animation: toast-in .35s cubic-bezier(.2, .9, .3, 1.2) both; }
+.toast--update { align-items: center; border-left-color: var(--ink); }
+.toast .person-dot { flex: none; margin: 0; width: 32px; height: 32px; font-size: 12px; }
+.toast-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.toast-body strong { font-size: 14px; font-weight: 600; }
+.toast-body small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.toast-actions { display: flex; gap: 6px; margin-top: 8px; }
+.toast-actions .button { flex: 0 0 auto; min-height: 36px; padding: 0 16px; font-size: 13px; }
+.toast-actions input { flex: 1; min-width: 0; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 16px; }
+.toast .sheet-close { width: 32px; height: 32px; font-size: 13px; flex: none; }
+.toast-more { pointer-events: auto; align-self: flex-start; border: 1px solid var(--line); background: var(--glass); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-12px); } }
+
+/* Passer-by check above the ask bar */
+.passer-by { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 6px 6px 12px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid #f1b7b9; border-radius: 18px; box-shadow: var(--shadow); font-size: 13px; animation: rise .3s ease both; }
+.passer-by span { flex: 1 1 160px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.passer-by i { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: #e5484d; color: #fff; font-style: normal; font-size: 11px; font-weight: 800; }
+.passer-by button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13px; font-weight: 600; }
+.passer-by button:nth-of-type(2) { background: var(--ink); border-color: var(--ink); color: #fff; }
+.passer-by .passer-by-close { width: 36px; padding: 0; background: transparent; border: 0; color: var(--muted); }
+
+/* Someone walking somewhere */
+.person-dot--moving { animation: walk-pulse 1.4s ease-in-out infinite; }
+@keyframes walk-pulse { 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 7px rgba(195, 239, 45, .45); } }
+
+@media (min-width: 900px) {
+  .inbox { left: auto; right: 24px; width: 360px; }
+}

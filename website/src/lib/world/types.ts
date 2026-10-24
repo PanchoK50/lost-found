@@ -27,6 +27,8 @@ export interface Presence {
   audience: Audience;
   until: number;               // epoch ms
   updatedAt: number;
+  /** Walking somewhere right now (demo players answering a ping); drawn with a soft pulse. */
+  moving?: boolean;
 }
 
 export type PinKind = 'blocked' | 'broken' | 'item' | 'event' | 'info' | 'meet';

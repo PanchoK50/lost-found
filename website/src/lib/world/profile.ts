@@ -21,6 +21,8 @@ export interface Profile {
   settings: Partial<Settings>;
   /** "Where am I?" per building id. */
   rooms: Record<string, string>;
+  /** Pins the passer-by chip already asked about (§4.2: once per pin). */
+  asked: string[];
 }
 
 export const defaultSettings: Record<MultiplayerMode, Settings> = {
@@ -40,7 +42,7 @@ const listeners = new Set<() => void>();
 let cached: { raw: string | null; profile: Profile } | undefined;
 
 function create(): Profile {
-  return { id: crypto.randomUUID(), name: `Guest ${Math.floor(1000 + Math.random() * 9000)}`, role: 'member', groups: [], settings: {}, rooms: {} };
+  return { id: crypto.randomUUID(), name: `Guest ${Math.floor(1000 + Math.random() * 9000)}`, role: 'member', groups: [], settings: {}, rooms: {}, asked: [] };
 }
 
 function read(): Profile {

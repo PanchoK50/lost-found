@@ -15,6 +15,10 @@ import { SettingsSheet } from '@/components/world/settings-sheet';
 import { ReportSheet, type ReportDraft } from '@/components/world/report-sheet';
 import { ProposalCards } from '@/components/world/proposal-cards';
 import { SkillChips } from '@/components/world/skill-chips';
+import { Inbox } from '@/components/world/inbox';
+import { PasserBy } from '@/components/world/passer-by';
+import { settingsFor } from '@/lib/world/profile';
+import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
@@ -51,7 +55,11 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const wide = useWide();
   // Multiplayer: the shared world of this building (docs/MULTIPLAYER.md).
   const profile = useProfile();
-  const { world, act } = useWorld(building, profile);
+  const { world: fullWorld, act } = useWorld(building, profile);
+  const settings = profile && fullWorld ? settingsFor(profile, fullWorld.mode) : undefined;
+  // "Show demo players" off: hide the scripted people (docs/MULTIPLAYER.md §9).
+  const hideDemo = settings?.demoPlayers === false;
+  const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
   const [sheet, setSheet] = useState<'settings' | 'report'>();
   const closeSheet = useCallback(() => setSheet(undefined), []);
@@ -219,6 +227,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             <h1>Ask me anything.</h1>
           </div>}
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s} onClick={() => void ask(s)}>{s}</button>)}</div>}
+          {profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
           {world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />}
           <form className="ask" onSubmit={submit}>
             <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>
@@ -228,13 +237,19 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
         </section>
       </div>
 
+      {profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('settings')} />}
       {sheet === 'report' && profile && <ReportSheet key={JSON.stringify(reportDraft ?? null)} initial={reportDraft} building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
       {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
-      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
+      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onGo={routeTo} onClose={closeSheet} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
   );
+}
+
+function withoutDemo(world: WorldState): WorldState {
+  const demo = new Set(world.players.filter(p => p.demo).map(p => p.id));
+  return { ...world, players: world.players.filter(p => !demo.has(p.id)), presence: world.presence.filter(p => !demo.has(p.playerId)), pings: world.pings.filter(p => !demo.has(p.fromId)) };
 }
 
 /** Benchmark replies end with an "Answer: …" line; the headline card already shows it. */
