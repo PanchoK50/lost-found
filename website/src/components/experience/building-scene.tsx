@@ -54,6 +54,10 @@ interface Props {
   onSetLocation?(spaceId: string): void;
   /** The room the player said they are in, if any. */
   myRoom?: string;
+  /** No hover or tap tips with room names, e.g. for the GeoGuessr game (docs/GEOGUESSR.md §6). */
+  hideLabels?: boolean;
+  /** A room of the shown floor was tapped. */
+  onSelect?(spaceId: string): void;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -69,7 +73,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, hideLabels = false, onSelect }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
@@ -83,9 +87,9 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   const anchors = useMemo(() => [
     ...answerAnchors(model, poses, directive),
     ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
-    ...(hovered && !overview && hovered !== picked ? hoverAnchor(model, poses, hovered) : []),
-    ...(picked ? hoverAnchor(model, poses, picked, onRoute, onSetLocation, myRoom) : []),
-  ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute, onSetLocation, myRoom]);
+    ...(hovered && !overview && hovered !== picked && !hideLabels ? hoverAnchor(model, poses, hovered) : []),
+    ...(picked && !hideLabels ? hoverAnchor(model, poses, picked, onRoute, onSetLocation, myRoom) : []),
+  ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute, onSetLocation, myRoom, hideLabels]);
   const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onPerson, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onPerson, onFocusFloor]);
   const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const routePaths = useMemo(() => (directive.routes ?? []).map(r => (r.points ?? []).filter(p => shown(poses, p.floorId)).map(p => worldAt(model, poses, p, ROUTE_HEIGHT))), [directive.routes, model, poses]);
@@ -94,7 +98,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     if (el) elements.current.set(key, el); else elements.current.delete(key);
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
-  const select = useCallback((id: string) => setSelected({ id, directive: directiveKey }), [directiveKey]);
+  const select = useCallback((id: string) => { setSelected({ id, directive: directiveKey }); onSelect?.(id); }, [directiveKey, onSelect]);
   // Phones get a lighter GPU budget: lower pixel ratio and smaller shadow maps.
   const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
 
