@@ -24,7 +24,12 @@ MARKER_COLOURS = {"#8b4513": "door", "#d32f2f": "entrance", "#9e9e9e": "opening"
 PATCH = re.compile(r'<g id="patch_\d+">\s*<path d="([^"]+)"(?: clip-path="[^"]*")? style="([^"]*)"')
 POINT = re.compile(r"([MLC]) ([-\d.]+) ([-\d.]+)")
 MARKER = re.compile(r'<use xlink:href="#[^"]+" x="([-\d.]+)" y="([-\d.]+)" style="([^"]*)"')
-TEXT = re.compile(r'<g id="text_\d+">\s*<!-- (.*?) -->\s*<g[^>]*transform="translate\(([-\d.]+) ([-\d.]+)\)')
+TEXT = re.compile(
+    r'<g id="text_\d+">\s*<!-- (.*?) -->\s*<g[^>]*transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+) [-\d.]+\)">(.*?)</g>',
+    re.S,
+)
+GLYPH_OFFSET = re.compile(r'<use xlink:href="#[^"]+"(?: transform="translate\(([-\d.]+) 0\)")?')
+GLYPH_ADVANCE = 63.6  # DejaVu Sans digit advance in font units; good enough for the last glyph
 FILL = re.compile(r"fill: (#[0-9a-f]{6})")
 
 
@@ -35,7 +40,7 @@ class Drawing:
     spaces: list[dict] = field(default_factory=list)  # {"type", "points"}
     assets: list[dict] = field(default_factory=list)  # {"category", "points"}
     markers: list[dict] = field(default_factory=list)  # {"kind", "x", "y"}
-    labels: list[dict] = field(default_factory=list)  # {"text", "x", "y"}
+    labels: list[dict] = field(default_factory=list)  # {"text", "x", "y", "width"} (x, y = text start)
 
 
 def _points(path_data: str) -> list[tuple[float, float]]:
@@ -63,10 +68,12 @@ def parse(path: Path) -> Drawing:
         fill = FILL.search(style)
         if fill and fill.group(1) in MARKER_COLOURS:
             drawing.markers.append({"kind": MARKER_COLOURS[fill.group(1)], "x": float(x), "y": float(y)})
-    for label, x, y in TEXT.findall(text):
+    for label, x, y, size, glyphs in TEXT.findall(text):
         label = label.replace("&amp;", "&").strip()
         if " — " in label and not drawing.title:
             drawing.title = label
             continue
-        drawing.labels.append({"text": label, "x": float(x), "y": float(y)})
+        offsets = [float(offset or 0) for offset in GLYPH_OFFSET.findall(glyphs)]
+        width = (max(offsets, default=0.0) + GLYPH_ADVANCE) * float(size) if offsets else 0.0
+        drawing.labels.append({"text": label, "x": float(x), "y": float(y), "width": width})
     return drawing

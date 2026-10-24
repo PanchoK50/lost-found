@@ -9,7 +9,8 @@ import statistics
 from pathlib import Path
 
 from lostfound.ingest.assemble import assemble
-from lostfound.ingest.evaluate import evaluate
+from lostfound.ingest.evaluate import evaluate, verifier_counts
+from lostfound.ingest.verify import verify
 
 SUMMARY_KEYS = (
     "space_recall",
@@ -22,6 +23,7 @@ SUMMARY_KEYS = (
     "door_recall",
     "door_precision",
     "connector_link_recall",
+    "floor_registration",
     "qa_parity",
 )
 
@@ -49,6 +51,7 @@ def main() -> None:
         return
 
     rows = []
+    verifier_totals: dict[str, dict[str, int]] = {}
     for directory in sorted(p for p in arguments.source.iterdir() if (p / "building.json").exists()):
         building = assemble(directory)
         if arguments.label:
@@ -56,12 +59,25 @@ def main() -> None:
 
             label_rooms(building, directory)
         scores = evaluate(directory, building)
+        issues = verify(building)
+        scores["issues"] = len(issues)
+        for field, counts in verifier_counts(directory, building, issues).items():
+            totals = verifier_totals.setdefault(field, {"errors": 0, "flagged": 0, "caught": 0})
+            for key, value in counts.items():
+                totals[key] += value
         rows.append((directory.name, scores))
-        print(f"{directory.name:24s} " + " ".join(f"{key.split('_')[0][:5]}={scores[key]:.2f}" for key in SUMMARY_KEYS),
-              scores["qa_by_kind"], flush=True)
-    print("\nmean over", len(rows), "buildings:")
+        cells = " ".join(f"{key[:8]}={'n/a' if scores[key] is None else format(scores[key], '.2f')}" for key in SUMMARY_KEYS)
+        print(f"{directory.name:24s} {cells}", scores["qa_by_kind"], flush=True)
+    print("\nmean over", len(rows), "buildings (n/a excluded):")
     for key in SUMMARY_KEYS:
-        print(f"  {key:24s} {statistics.mean(score[key] for _, score in rows):.3f}")
+        values = [score[key] for name, score in rows if score.get(key) is not None]
+        print(f"  {key:24s} {statistics.mean(values):.3f}   (n={len(values)})")
+    print("\nverifier (dev ground truth): field  errors  flagged  caught  recall  precision")
+    for field, totals in verifier_totals.items():
+        recall = totals["caught"] / totals["errors"] if totals["errors"] else float("nan")
+        precision = totals["caught"] / totals["flagged"] if totals["flagged"] else float("nan")
+        print(f"  {field:10s} {totals['errors']:6d} {totals['flagged']:8d} {totals['caught']:7d}  {recall:6.1%}  {precision:6.1%}")
+    rows.append(("_verifier", verifier_totals))
     results = Path("evals") / "results" / f"ingest__{arguments.source.name}{'__labelled' if arguments.label else ''}.json"
     results.write_text(json.dumps(dict(rows), indent=1, default=str), encoding="utf-8")
     print(f"details: {results}")

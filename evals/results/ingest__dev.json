@@ -2,16 +2,17 @@
  "osm-way22744230": {
   "spaces_true": 325,
   "spaces_rebuilt": 325,
-  "space_recall": 0.9723076923076923,
-  "space_precision": 0.9723076923076923,
-  "mean_iou": 0.8297,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
-  "ref_accuracy": 0.8386075949367089,
-  "room_type_accuracy": 0.9208860759493671,
-  "door_recall": 0.9326424870466321,
-  "door_precision": 0.967741935483871,
-  "connector_link_recall": 0.76,
+  "ref_accuracy": 0.8676923076923077,
+  "room_type_accuracy": 0.9053497942386831,
+  "floor_registration": 0.5714285714285714,
+  "door_recall": 0.961139896373057,
+  "door_precision": 0.9973118279569892,
+  "connector_link_recall": 0.96,
   "qa_parity": 0.8888888888888888,
   "qa_by_kind": {
    "largest_room": "1/1",
@@ -21,74 +22,81 @@
    "room_stacked": "3/3",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 167
  },
  "osm-way27326387": {
   "spaces_true": 61,
   "spaces_rebuilt": 61,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.9376,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.8688524590163934,
-  "room_type_accuracy": 1.0,
+  "room_type_accuracy": 0.9807692307692307,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.75,
+  "qa_parity": 0.875,
   "qa_by_kind": {
    "largest_room": "1/1",
    "floor_area_total": "1/1",
-   "errand": "0/1",
+   "errand": "1/1",
    "room_stacked": "2/3",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 24
  },
  "osm-way27917482": {
   "spaces_true": 1623,
   "spaces_rebuilt": 1623,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.9409,
+  "mean_iou": 0.9999,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.9162045594577942,
-  "room_type_accuracy": 0.9784349969192853,
+  "room_type_accuracy": 0.9923780487804879,
+  "floor_registration": 1.0,
   "door_recall": 0.9972206781545303,
   "door_precision": 0.9988864142538976,
   "connector_link_recall": 0.9797979797979798,
-  "qa_parity": 0.8888888888888888,
+  "qa_parity": 1.0,
   "qa_by_kind": {
    "largest_room": "1/1",
-   "floor_area_total": "0/1",
+   "floor_area_total": "1/1",
    "room_stacked": "3/3",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1",
    "what_if_door": "2/2"
-  }
+  },
+  "issues": 570
  },
  "osm-way360544293": {
   "spaces_true": 46,
   "spaces_rebuilt": 46,
-  "space_recall": 0.8478260869565217,
-  "space_precision": 0.8478260869565217,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
   "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
-  "ref_accuracy": 0.5897435897435898,
-  "room_type_accuracy": 0.9743589743589743,
-  "door_recall": 0.36065573770491804,
-  "door_precision": 0.7857142857142857,
+  "ref_accuracy": 0.9130434782608695,
+  "room_type_accuracy": 0.5,
+  "floor_registration": 0.5,
+  "door_recall": 0.3770491803278688,
+  "door_precision": 0.8214285714285714,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.5,
+  "qa_parity": 0.25,
   "qa_by_kind": {
    "largest_room": "1/1",
-   "floor_area_total": "1/1",
+   "floor_area_total": "0/1",
    "errand": "0/1",
    "straight_line_3d": "0/1"
-  }
+  },
+  "issues": 74
  },
  "proc-campus-dev-000": {
   "spaces_true": 152,
@@ -99,18 +107,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.23684210526315788,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 64
  },
  "proc-campus-dev-001": {
   "spaces_true": 97,
@@ -121,18 +131,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.21649484536082475,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 43
  },
  "proc-campus-dev-002": {
   "spaces_true": 89,
@@ -143,16 +155,18 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.23595505617977527,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.3333333333333333,
+  "qa_parity": 0.6666666666666666,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
+   "floor_area_total": "1/1",
    "wide_delivery_count": "0/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 44
  },
  "proc-campus-dev-006": {
   "spaces_true": 85,
@@ -163,16 +177,18 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.15294117647058825,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.0,
+  "qa_parity": 0.3333333333333333,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
+   "floor_area_total": "1/1",
    "wide_delivery_count": "0/1",
    "straight_line_3d": "0/1"
-  }
+  },
+  "issues": 32
  },
  "proc-campus-dev-009": {
   "spaces_true": 207,
@@ -183,18 +199,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.20772946859903382,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 0.8,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
    "errand": "0/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 88
  },
  "proc-campus-dev-013": {
   "spaces_true": 63,
@@ -205,16 +223,18 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.25396825396825395,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.0,
+  "qa_parity": 0.6666666666666666,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
    "straight_line_3d": "0/1"
-  }
+  },
+  "issues": 31
  },
  "proc-factory-dev-003": {
   "spaces_true": 79,
@@ -225,18 +245,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.16455696202531644,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 43
  },
  "proc-factory-dev-004": {
   "spaces_true": 50,
@@ -247,16 +269,18 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.24,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.3333333333333333,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 34
  },
  "proc-factory-dev-005": {
   "spaces_true": 132,
@@ -267,19 +291,21 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.12878787878787878,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.3333333333333333,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 61
  },
  "proc-factory-dev-007": {
   "spaces_true": 45,
@@ -290,18 +316,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.24444444444444444,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 22
  },
  "proc-factory-dev-008": {
   "spaces_true": 82,
@@ -312,18 +340,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.17073170731707318,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 69
  },
  "proc-factory-dev-010": {
   "spaces_true": 52,
@@ -334,18 +364,20 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.23076923076923078,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.2,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 34
  },
  "proc-factory-dev-011": {
   "spaces_true": 140,
@@ -356,19 +388,21 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.11428571428571428,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.3333333333333333,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 72
  },
  "proc-factory-dev-012": {
   "spaces_true": 129,
@@ -379,19 +413,21 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.13178294573643412,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 0.3333333333333333,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "wide_delivery_count": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "wide_delivery_count": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
-  }
+  },
+  "issues": 78
  },
  "resplan-14509": {
   "spaces_true": 6,
@@ -402,15 +438,17 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.6666666666666666,
-  "room_type_accuracy": 0.0,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 0.5,
   "qa_by_kind": {
    "wide_delivery_count": "0/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 9
  },
  "resplan-1465": {
   "spaces_true": 10,
@@ -421,12 +459,14 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.8,
-  "room_type_accuracy": 0.4,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 0.0,
-  "qa_by_kind": {}
+  "qa_by_kind": {},
+  "issues": 16
  },
  "resplan-15179": {
   "spaces_true": 12,
@@ -437,16 +477,18 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.8333333333333334,
-  "room_type_accuracy": 0.25,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.3333333333333333,
+  "connector_link_recall": null,
+  "qa_parity": 0.6666666666666666,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
+   "floor_area_total": "1/1",
    "wide_delivery_count": "0/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 14
  },
  "resplan-16154": {
   "spaces_true": 7,
@@ -457,15 +499,17 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.7142857142857143,
-  "room_type_accuracy": 0.14285714285714285,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 0.5,
   "qa_by_kind": {
    "wide_delivery_count": "0/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 9
  },
  "resplan-1677": {
   "spaces_true": 10,
@@ -476,17 +520,19 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.9,
-  "room_type_accuracy": 0.2,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.25,
+  "connector_link_recall": null,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "errand": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "errand": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 10
  },
  "resplan-3832": {
   "spaces_true": 8,
@@ -497,15 +543,17 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.875,
-  "room_type_accuracy": 0.125,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 0.5,
   "qa_by_kind": {
    "wide_delivery_count": "0/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 9
  },
  "resplan-439": {
   "spaces_true": 8,
@@ -516,14 +564,16 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.875,
-  "room_type_accuracy": 0.25,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 1.0,
   "qa_by_kind": {
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 9
  },
  "resplan-7336": {
   "spaces_true": 9,
@@ -534,14 +584,16 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.3333333333333333,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 1.0,
   "qa_by_kind": {
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 9
  },
  "resplan-8169": {
   "spaces_true": 6,
@@ -552,14 +604,16 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.0,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 1.0,
   "qa_by_kind": {
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 6
  },
  "resplan-8269": {
   "spaces_true": 5,
@@ -570,53 +624,59 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 1.0,
-  "room_type_accuracy": 0.0,
+  "room_type_accuracy": 1.0,
+  "floor_registration": null,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": null,
   "qa_parity": 0.5,
   "qa_by_kind": {
    "wide_delivery_count": "0/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 5
  },
  "swiss-1689": {
   "spaces_true": 362,
   "spaces_rebuilt": 362,
-  "space_recall": 0.9419889502762431,
-  "space_precision": 0.9419889502762431,
-  "mean_iou": 0.8231,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
-  "ref_accuracy": 0.7214076246334311,
-  "room_type_accuracy": 0.25219941348973607,
-  "door_recall": 0.9133858267716536,
-  "door_precision": 0.928,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "ref_accuracy": 0.6795580110497238,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
+  "door_recall": 0.968503937007874,
+  "door_precision": 0.984,
+  "connector_link_recall": 0.7333333333333333,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1"
-  }
+   "floor_area_total": "1/1"
+  },
+  "issues": 457
  },
  "swiss-1785": {
   "spaces_true": 100,
   "spaces_rebuilt": 100,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.9754,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.88,
-  "room_type_accuracy": 0.24,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 1.0,
   "door_precision": 1.0,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "connector_link_recall": 0.5,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "errand": "0/1"
-  }
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "errand": "1/1"
+  },
+  "issues": 114
  },
  "swiss-203": {
   "spaces_true": 144,
@@ -627,185 +687,222 @@
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.6666666666666666,
-  "room_type_accuracy": 0.2222222222222222,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 0.9714285714285714,
   "door_precision": 0.9714285714285714,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.5,
+  "connector_link_recall": 1.0,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
+   "floor_area_total": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 159
  },
  "swiss-2074": {
   "spaces_true": 51,
   "spaces_rebuilt": 51,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.9952,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.803921568627451,
-  "room_type_accuracy": 0.23529411764705882,
+  "room_type_accuracy": 0.9696969696969697,
+  "floor_registration": 1.0,
   "door_recall": 0.96,
   "door_precision": 0.96,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "connector_link_recall": 1.0,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1"
-  }
+   "floor_area_total": "1/1"
+  },
+  "issues": 52
  },
  "swiss-2211": {
   "spaces_true": 199,
   "spaces_rebuilt": 199,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.8913,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.8291457286432161,
-  "room_type_accuracy": 0.19095477386934673,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 0.9558823529411765,
   "door_precision": 0.9558823529411765,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "connector_link_recall": 0.4166666666666667,
+  "qa_parity": 0.6666666666666666,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
    "errand": "0/1"
-  }
+  },
+  "issues": 274
  },
  "swiss-2325": {
   "spaces_true": 106,
   "spaces_rebuilt": 106,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.9818,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.7830188679245284,
-  "room_type_accuracy": 0.20754716981132076,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 0.9902912621359223,
   "door_precision": 0.9902912621359223,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "connector_link_recall": 1.0,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1"
-  }
+   "floor_area_total": "1/1"
+  },
+  "issues": 124
  },
  "swiss-31": {
   "spaces_true": 132,
   "spaces_rebuilt": 132,
-  "space_recall": 0.7727272727272727,
-  "space_precision": 0.7727272727272727,
-  "mean_iou": 0.7883,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
-  "ref_accuracy": 0.8725490196078431,
-  "room_type_accuracy": 0.19607843137254902,
-  "door_recall": 0.7016129032258065,
-  "door_precision": 0.7016129032258065,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "ref_accuracy": 0.7878787878787878,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 0.0,
+  "door_recall": 0.967741935483871,
+  "door_precision": 0.967741935483871,
+  "connector_link_recall": 0.6666666666666666,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1"
-  }
+   "floor_area_total": "1/1"
+  },
+  "issues": 135
  },
  "swiss-3254": {
   "spaces_true": 59,
   "spaces_rebuilt": 59,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.9942,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.7288135593220338,
-  "room_type_accuracy": 0.23728813559322035,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 1.0,
   "door_recall": 0.9655172413793104,
   "door_precision": 0.9655172413793104,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.5,
+  "connector_link_recall": 0.6666666666666666,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "floor_area_total": "0/1",
+   "floor_area_total": "1/1",
    "shared_walls_count": "1/1"
-  }
+  },
+  "issues": 71
  },
  "swiss-450": {
   "spaces_true": 60,
   "spaces_rebuilt": 60,
-  "space_recall": 0.16666666666666666,
-  "space_precision": 0.16666666666666666,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
   "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
-  "ref_accuracy": 0.6,
-  "room_type_accuracy": 0.3,
-  "door_recall": 0.1774193548387097,
-  "door_precision": 0.1774193548387097,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "ref_accuracy": 0.75,
+  "room_type_accuracy": 0.975609756097561,
+  "floor_registration": 0.0,
+  "door_recall": 1.0,
+  "door_precision": 1.0,
+  "connector_link_recall": 0.25,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "errand": "0/1",
-   "shared_walls_count": "0/1"
-  }
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "errand": "1/1",
+   "shared_walls_count": "1/1"
+  },
+  "issues": 110
  },
  "swiss-460": {
   "spaces_true": 69,
   "spaces_rebuilt": 69,
-  "space_recall": 0.7681159420289855,
-  "space_precision": 0.7681159420289855,
-  "mean_iou": 0.7793,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
-  "ref_accuracy": 0.8867924528301887,
-  "room_type_accuracy": 0.11320754716981132,
-  "door_recall": 0.6075949367088608,
-  "door_precision": 0.6075949367088608,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "ref_accuracy": 0.7391304347826086,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 0.0,
+  "door_recall": 0.9873417721518988,
+  "door_precision": 0.9873417721518988,
+  "connector_link_recall": 0.6666666666666666,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "errand": "0/1"
-  }
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "errand": "1/1"
+  },
+  "issues": 94
  },
  "swiss-5097": {
   "spaces_true": 302,
   "spaces_rebuilt": 302,
-  "space_recall": 0.2814569536423841,
-  "space_precision": 0.2814569536423841,
-  "mean_iou": 0.9631,
-  "area_within_5pct": 0.9176470588235294,
-  "type_accuracy": 0.9647058823529412,
-  "ref_accuracy": 0.6235294117647059,
-  "room_type_accuracy": 0.18823529411764706,
-  "door_recall": 0.22903225806451613,
-  "door_precision": 0.23127035830618892,
-  "connector_link_recall": 0.0,
-  "qa_parity": 0.0,
+  "space_recall": 1.0,
+  "space_precision": 1.0,
+  "mean_iou": 1.0,
+  "area_within_5pct": 1.0,
+  "type_accuracy": 1.0,
+  "ref_accuracy": 0.8178807947019867,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 0.0,
+  "door_recall": 0.9451612903225807,
+  "door_precision": 0.9543973941368078,
+  "connector_link_recall": 0.19047619047619047,
+  "qa_parity": 1.0,
   "qa_by_kind": {
-   "largest_room": "0/1",
-   "floor_area_total": "0/1",
-   "errand": "0/1",
-   "shared_walls_count": "0/1"
-  }
+   "largest_room": "1/1",
+   "floor_area_total": "1/1",
+   "errand": "1/1",
+   "shared_walls_count": "1/1"
+  },
+  "issues": 343
  },
  "swiss-5462": {
   "spaces_true": 22,
   "spaces_rebuilt": 22,
   "space_recall": 1.0,
   "space_precision": 1.0,
-  "mean_iou": 0.7534,
+  "mean_iou": 1.0,
   "area_within_5pct": 1.0,
   "type_accuracy": 1.0,
   "ref_accuracy": 0.9545454545454546,
-  "room_type_accuracy": 0.22727272727272727,
+  "room_type_accuracy": 1.0,
+  "floor_registration": 0.0,
   "door_recall": 0.9565217391304348,
   "door_precision": 0.9565217391304348,
-  "connector_link_recall": 0.0,
+  "connector_link_recall": 0.5,
   "qa_parity": 0.0,
-  "qa_by_kind": {}
+  "qa_by_kind": {},
+  "issues": 25
+ },
+ "_verifier": {
+  "room_type": {
+   "errors": 48,
+   "flagged": 267,
+   "caught": 14
+  },
+  "ref": {
+   "errors": 370,
+   "flagged": 377,
+   "caught": 370
+  },
+  "door": {
+   "errors": 1722,
+   "flagged": 2774,
+   "caught": 1709
+  }
  }
 }

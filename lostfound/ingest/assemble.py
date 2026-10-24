@@ -11,11 +11,12 @@ from pathlib import Path
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
+from lostfound.ingest import infer, svg
 from lostfound.ingest import scale as scale_module
-from lostfound.ingest import svg
 
 LABEL_CHAR_WIDTH_PT = 1.7  # labels are centred on the room; the SVG anchor is the text start
 LABEL_BASELINE_PT = 1.6
+LABEL_MAX_DISTANCE_M = 3.0
 DOOR_SNAP_M = 0.6
 DEFAULT_STOREY_HEIGHT_M = 3.0
 REGISTRATION_TOLERANCE_M = 0.6
@@ -170,13 +171,16 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
             )
 
     connectors = _connectors(building_id, per_floor_spaces, floors)
-    for space in spaces:
-        if not space["name"]:
-            space["name"] = f"{space['room_type'].replace('_', ' ').capitalize()} {space['ref']}".strip()
-    report["assumptions"].append("room types of plain rooms are unknown until labelled (generic_room)")
+    if len(levels) > 1 and not connectors:
+        connectors = _connectors(building_id, per_floor_spaces, floors, core_types=("corridor",))
+        if connectors:
+            report["assumptions"].append(
+                "no stairs or lifts drawn: linked overlapping corridors between floors as stairs (please confirm)"
+            )
+    report["assumptions"].append("asset types inferred from footprint sizes; room types predicted from contents and size")
     report["assumptions"].append(f"door widths from priors (default {DEFAULT_DOOR_WIDTH_M} m); storey height {DEFAULT_STOREY_HEIGHT_M} m")
     title = next((d.title for d in drawings if d.title), "")
-    return {
+    building = {
         "building": {
             "id": building_id,
             "name": name or (title.split(" — ")[0] if title else building_id),
@@ -193,23 +197,43 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
         "assets": assets,
         "ingest_report": report,
     }
+    infer.label_building(building)
+    for space in spaces:
+        space["name"] = f"{space['room_type'].replace('_', ' ').capitalize()} {space['ref']}".strip()
+    names: Counter = Counter()
+    for asset in assets:
+        container = next(s for s in spaces if s["id"] == asset["space_id"])
+        base = f"{asset['type'].replace('_', ' ').capitalize()} {container['ref'] or container['id'][-4:]}"
+        names[base] += 1
+        asset["name"] = f"{base}-{chr(64 + names[base])}" if names[base] <= 26 else f"{base}-{names[base]}"
+    report["low_confidence_rooms"] = [
+        {"id": s["id"], "ref": s["ref"], "guess": s["room_type"], "alternatives": s.get("room_type_alternatives", [])}
+        for s in spaces
+        if s.get("room_type_confidence", 1.0) < 0.6
+    ]
+    return building
 
 
 def _assign_labels(drawing: svg.Drawing, floor_spaces: list[dict], points_per_metre: float) -> None:
-    polygons = [Polygon(space["polygon"]) for space in floor_spaces]
-    taken: set[int] = set()
-    for label in drawing.labels:
-        centre_pt = (label["x"] + LABEL_CHAR_WIDTH_PT * len(label["text"]), label["y"] - LABEL_BASELINE_PT)
-        centre = Point(centre_pt[0] / points_per_metre, -centre_pt[1] / points_per_metre)
-        inside = [i for i, polygon in enumerate(polygons) if polygon.contains(centre) and i not in taken]
-        if not inside:
-            free = [i for i in range(len(polygons)) if i not in taken]
-            if not free:
-                continue
-            inside = [min(free, key=lambda i: polygons[i].distance(centre))]
-        index = min(inside, key=lambda i: polygons[i].area)
-        taken.add(index)
-        floor_spaces[index]["ref"] = label["text"]
+    """Labels are centred on each room's representative point: match label centres to representative
+    points, closest pairs first, one label per room."""
+    anchors = [Polygon(space["polygon"]).representative_point() for space in floor_spaces]
+    pairs = []
+    for label_index, label in enumerate(drawing.labels):
+        half_width = label["width"] / 2 if label.get("width") else LABEL_CHAR_WIDTH_PT * len(label["text"])
+        centre = Point((label["x"] + half_width) / points_per_metre, -(label["y"] - LABEL_BASELINE_PT) / points_per_metre)
+        for space_index, anchor in enumerate(anchors):
+            distance = anchor.distance(centre)
+            if distance <= LABEL_MAX_DISTANCE_M:
+                pairs.append((distance, label_index, space_index))
+    used_labels, used_spaces = set(), set()
+    for distance, label_index, space_index in sorted(pairs):
+        if label_index in used_labels or space_index in used_spaces:
+            continue
+        used_labels.add(label_index)
+        used_spaces.add(space_index)
+        floor_spaces[space_index]["ref"] = drawing.labels[label_index]["text"]
+        floor_spaces[space_index]["label_distance_m"] = round(distance, 3)
 
 
 def _openings(drawing, floor_spaces, points_per_metre, dx, dy, floor_id) -> list[dict]:
@@ -246,14 +270,16 @@ def _openings(drawing, floor_spaces, points_per_metre, dx, dy, floor_id) -> list
     return result
 
 
-def _connectors(building_id: str, per_floor_spaces: dict[int, list[dict]], floors: list[dict]) -> list[dict]:
+def _connectors(
+    building_id: str, per_floor_spaces: dict[int, list[dict]], floors: list[dict], core_types: tuple = ("stair", "lift")
+) -> list[dict]:
     """Chain stair/lift spaces that overlap on consecutive floors into vertical connectors."""
     levels = sorted(per_floor_spaces)
     chains: list[list[dict]] = []
     open_chains: dict[str, dict] = {}  # space id at the top of a chain -> chain
     for lower, upper in itertools.pairwise(levels):
         for space in per_floor_spaces[upper]:
-            if space["type"] not in ("stair", "lift"):
+            if space["type"] not in core_types:
                 continue
             polygon = Polygon(space["polygon"])
             best, best_iou = None, 0.3

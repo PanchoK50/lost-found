@@ -17,18 +17,23 @@ SEARCH_STEPS = 6000
 
 
 def build_catalogue(train_directory: Path = Path("data/train")) -> dict:
-    """{category: [[short_side_m, long_side_m, count], ...]} from train assets (run once, file is committed)."""
+    """{category: [[short_side_m, long_side_m, count, {asset_type: count}], ...]} from train assets
+    (run once; the file is committed)."""
     counts: Counter = Counter()
+    types: dict[tuple, Counter] = {}
     for path in train_directory.glob("*/building.json"):
         for asset in json.loads(path.read_text(encoding="utf-8"))["assets"]:
             footprint = asset.get("footprint") or {}
             if footprint.get("width_m") and footprint.get("depth_m"):
                 short, long = sorted((round(footprint["width_m"], 2), round(footprint["depth_m"], 2)))
-                counts[(asset["category"], short, long)] += 1
+                key = (asset["category"], short, long)
+                counts[key] += 1
+                types.setdefault(key, Counter())[asset["type"]] += 1
     catalogue: dict[str, list] = {}
-    for (category, short, long), count in counts.items():
+    for key, count in sorted(counts.items(), key=lambda item: -item[1]):
         if count >= MIN_EXAMPLES:
-            catalogue.setdefault(category, []).append([short, long, count])
+            category, short, long = key
+            catalogue.setdefault(category, []).append([short, long, count, dict(types[key].most_common(5))])
     CATALOGUE_PATH.write_text(json.dumps(catalogue, indent=1), encoding="utf-8")
     return catalogue
 
@@ -43,6 +48,11 @@ def catalogue() -> dict:
 def rectangle_sides(points: list[tuple[float, float]]) -> tuple[float, float]:
     first, second = math.dist(points[0], points[1]), math.dist(points[1], points[2])
     return (min(first, second), max(first, second))
+
+
+def match(short: float, long: float, category: str) -> list | None:
+    """The catalogue entry (most common first) a footprint in metres matches, if any."""
+    return _match(short, long, category)
 
 
 def _match(short: float, long: float, category: str) -> list | None:

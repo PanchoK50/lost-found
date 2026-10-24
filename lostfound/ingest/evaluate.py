@@ -39,12 +39,17 @@ def _offset(truth: dict, rebuilt: dict, level: int) -> tuple[float, float]:
 
 
 def match_spaces(truth: dict, rebuilt: dict) -> tuple[dict[str, str], dict]:
-    """GT space id -> rebuilt space id, plus per-match stats."""
+    """GT space id -> rebuilt space id, plus per-match stats. Each floor is matched with its own offset
+    (some sources do not align their floors), and the floor registration is scored separately: a floor is
+    registered correctly when its offset equals the reference floor's."""
     levels = sorted({f["level"] for f in truth["floors"]} & {f["level"] for f in rebuilt["floors"]})
     reference = 0 if 0 in levels else levels[0]
-    dx, dy = _offset(truth, rebuilt, reference)
-    mapping, ious = {}, []
+    reference_offset = _offset(truth, rebuilt, reference)
+    mapping, ious, registered = {}, [], []
     for level in levels:
+        dx, dy = _offset(truth, rebuilt, level)
+        if level != reference:
+            registered.append(abs(dx - reference_offset[0]) <= 0.3 and abs(dy - reference_offset[1]) <= 0.3)
         true_floor = next(f for f in truth["floors"] if f["level"] == level)["id"]
         floor = next(f for f in rebuilt["floors"] if f["level"] == level)["id"]
         candidates = [
@@ -66,7 +71,8 @@ def match_spaces(truth: dict, rebuilt: dict) -> tuple[dict[str, str], dict]:
                 mapping[space["id"]] = best
                 used.add(best)
                 ious.append(best_iou)
-    return mapping, {"mean_iou": statistics.mean(ious) if ious else 0.0, "offset": (dx, dy)}
+    registration = sum(registered) / len(registered) if registered else None
+    return mapping, {"mean_iou": statistics.mean(ious) if ious else 0.0, "registration": registration}
 
 
 def evaluate(truth_directory: Path, rebuilt: dict) -> dict:
@@ -88,7 +94,8 @@ def evaluate(truth_directory: Path, rebuilt: dict) -> dict:
         "area_within_5pct": sum(area_ok) / max(len(area_ok), 1),
         "type_accuracy": sum(spaces[r]["type"] == true_spaces[t]["type"] for t, r in matched) / max(len(matched), 1),
         "ref_accuracy": sum((spaces[r]["ref"] or "") == (true_spaces[t].get("ref") or "") for t, r in matched) / max(len(matched), 1),
-        "room_type_accuracy": sum(spaces[r]["room_type"] == true_spaces[t]["room_type"] for t, r in matched) / max(len(matched), 1),
+        "room_type_accuracy": _room_type_accuracy(true_spaces, spaces, matched),
+        "floor_registration": stats["registration"],
     }
     # doors: a true opening counts if a rebuilt opening joins the same (mapped) pair of spaces
     rebuilt_pairs = Counter(frozenset(o["space_ids"]) for o in rebuilt["openings"])
@@ -107,9 +114,17 @@ def evaluate(truth_directory: Path, rebuilt: dict) -> dict:
         for a, b in zip(c["space_ids"], c["space_ids"][1:])
     }
     rebuilt_links = {frozenset(pair) for c in rebuilt["vertical_connectors"] for pair in zip(c["space_ids"], c["space_ids"][1:])}
-    result["connector_link_recall"] = len({link for link in true_links if None not in link} & rebuilt_links) / max(len(true_links), 1)
+    result["connector_link_recall"] = (
+        len({link for link in true_links if None not in link} & rebuilt_links) / len(true_links) if true_links else None
+    )
     result.update(_question_parity(truth_directory, rebuilt, mapping))
     return result
+
+
+def _room_type_accuracy(true_spaces: dict, spaces: dict, matched: list) -> float:
+    """Room types of rooms and halls only (other space types are fixed by the drawing)."""
+    pairs = [(t, r) for t, r in matched if true_spaces[t]["type"] in ("room", "hall")]
+    return sum(spaces[r]["room_type"] == true_spaces[t]["room_type"] for t, r in pairs) / max(len(pairs), 1)
 
 
 def _question_parity(truth_directory: Path, rebuilt: dict, mapping: dict[str, str]) -> dict:
@@ -175,3 +190,37 @@ def _run(b: Building, kind: str, i: dict) -> dict:
         case "what_if_door":
             return skills.what_if_door(b, i["first"], i["second"], i["floor_id"])
     raise KeyError(kind)
+
+
+def verifier_counts(truth_directory: Path, rebuilt: dict, issues: list[dict]) -> dict:
+    """Per field: errors (true), flagged, flagged-and-wrong, for precision/recall of the verifier."""
+    truth = json.loads((truth_directory / "building.json").read_text(encoding="utf-8"))
+    mapping, _ = match_spaces(truth, rebuilt)
+    true_spaces = {s["id"]: s for s in truth["spaces"]}
+    spaces = {s["id"]: s for s in rebuilt["spaces"]}
+    flagged = {(issue["field"], issue["id"]) for issue in issues}
+    errors: set[tuple[str, str]] = set()
+    for true_id, rebuilt_id in mapping.items():
+        true_space, space = true_spaces[true_id], spaces[rebuilt_id]
+        if true_space["type"] in ("room", "hall") and true_space["room_type"] != space["room_type"]:
+            errors.add(("room_type", rebuilt_id))
+        if true_space["type"] in ("room", "hall") and (true_space.get("ref") or "") != space["ref"]:
+            errors.add(("ref", rebuilt_id))
+    reverse = {rebuilt_id: true_id for true_id, rebuilt_id in mapping.items()}
+    true_doors = {}
+    for opening in truth["openings"]:
+        true_doors[frozenset(opening["space_ids"])] = opening["width_m"]
+    for opening in rebuilt["openings"]:
+        pair = frozenset(reverse.get(s, s) for s in opening["space_ids"])
+        if pair in true_doors and abs(true_doors[pair] - opening["width_m"]) > 0.05:
+            errors.add(("door", opening["id"]))
+    counts = {}
+    for field in ("room_type", "ref", "door"):
+        field_errors = {item for item in errors if item[0] == field}
+        field_flags = {item for item in flagged if item[0] == field}
+        counts[field] = {
+            "errors": len(field_errors),
+            "flagged": len(field_flags),
+            "caught": len(field_errors & field_flags),
+        }
+    return counts
