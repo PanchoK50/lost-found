@@ -36,6 +36,16 @@ uv run python -m agent.replay data/dev        # tools + answer format under the 
 uv run python -m agent.replay data/train      # 517/517
 ```
 
+## Measured results
+
+- Full dev benchmark, `claude-sonnet-5-5` (2026-10-24): **138/138 = 100 %** —
+  every question kind, every dev building (`agent_output/benchmark/agent-sonnet-full.jsonl`,
+  independently re-scored with `benchmark/score.py`).
+- Full dev benchmark, `claude-opus-5-5` (2026-10-24): **138/138 = 100 %**
+  (`agent_output/benchmark/agent-opus-full.jsonl`, independently re-scored).
+- The untouched starter agent scores 0/17 on a dev sample by design
+  (`agent_output/benchmark/starter-baseline.jsonl`).
+
 ## Try it interactively
 
 ```sh
