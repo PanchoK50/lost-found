@@ -38,6 +38,8 @@ interface Props {
   /** People and pins from the shared world; they stay when the answer changes (docs/MULTIPLAYER.md §11). */
   world?: WorldState;
   onPin?(pinId: string): void;
+  /** A person on the map was tapped. */
+  onPerson?(playerId: string): void;
   /** Offered on a tapped room: walk there from where the player is. */
   onRoute?(spaceId: string): void;
 }
@@ -53,7 +55,7 @@ export interface Anchor {
   group?: 'floors' | 'counts';
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onRoute }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
@@ -69,7 +71,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     ...(hovered && !overview && hovered !== picked ? hoverAnchor(model, poses, hovered) : []),
     ...(picked ? hoverAnchor(model, poses, picked, onRoute) : []),
   ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute]);
-  const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onFocusFloor]);
+  const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onPerson, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onPerson, onFocusFloor]);
   const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const elements = useRef(new Map<string, HTMLDivElement>());
   const register = useCallback((key: string) => (el: HTMLDivElement | null) => {

@@ -33,7 +33,7 @@ export function resolveWorld(building: Building, message: string, input: WorldCh
   if (!me) return undefined;
   const chat = new WorldChat(building, message, input, me);
   if (input.skillId) return chat.useSkill(input.skillId);
-  const response = chat.saveSkill() ?? chat.itemDrop() ?? chat.people() ?? chat.lunch() ?? chat.report();
+  const response = chat.saveSkill() ?? chat.itemDrop() ?? chat.people() ?? chat.lunch() ?? chat.report() ?? chat.directAsk();
   return response && { response };
 }
 
@@ -89,6 +89,12 @@ class WorldChat {
   everyone(): Audience { return this.input.world.mode === 'public' ? 'everyone' : 'team'; }
   graph() { return walkGraph(this.building, this.input.closed); }
   mentions(text = this.message) { return mentionsIn(this.building, text); }
+
+  /** Players addressed with @, by full or first name ("@Tom", "@Mia Wagner"). Real people first. */
+  mentioned(): Player[] {
+    if (!this.text.includes('@')) return [];
+    return [...this.input.world.players].sort((a, b) => Number(!!a.demo) - Number(!!b.demo)).filter(p => p.id !== this.me.id && [p.name, p.name.split(/\s+/)[0]].some(n => n.length >= 2 && new RegExp(`@${escape(n.toLowerCase())}(?![\\w])`).test(this.text)));
+  }
 
   /** Other players named in the message, by full or first name. Real people win over demo players of the same name. */
   named(): Player[] {
@@ -195,12 +201,37 @@ class WorldChat {
   // ---------- "Where is Mia?", "Tell Mia to come here", "Where should Mia and I meet?" ----------
 
   people(): ChatResponse | undefined {
-    const player = this.named()[0];
+    const tagged = this.mentioned()[0];
+    const player = tagged ?? this.named()[0];
     if (!player) return undefined;
     if (/\b(meet|halfway|middle|half way)\b/.test(this.text)) return this.meetHalfway(player);
     if (/\b(tell|ask|send|share|ping|call|get)\b/.test(this.text) && /\b(come|location|where i am|find me|over|here|to me)\b/.test(this.text)) return this.comeToMe(player);
-    if (/\bwhere(?:'s| is| are)?\b/.test(this.text)) return this.whereIs(player);
+    if (tagged && /^\s*@\S+\s+(come|come here|come over)\s*[.!]*$/.test(this.text)) return this.comeToMe(player);
+    // "Where is @Tom?" asks about Tom; "@Tom where is the key?" is a question for Tom (directAsk).
+    if (tagged ? /\bwhere(?:'s| is| are)\s+@/.test(this.text) : /\bwhere(?:'s| is| are)?\b/.test(this.text)) return this.whereIs(player);
     return undefined;
+  }
+
+  // ---------- "@Tom where is the key for store 3?" ----------
+
+  directAsk(): ChatResponse | undefined {
+    const people = this.mentioned();
+    if (!people.length) return undefined;
+    let question = this.message;
+    for (const p of people) for (const n of [p.name, p.name.split(/\s+/)[0]]) question = question.replace(new RegExp(`@${escape(n)}(?![\\w])`, 'gi'), '');
+    question = question.replace(/^[\s,:;-]+|[\s,;-]+$/g, '').replace(/\s{2,}/g, ' ');
+    const names = people.map(p => p.name).join(' and ');
+    if (!question) return this.reply(`What do you want to ask ${names}? Write it after the name, for example "@${people[0].name.split(/\s+/)[0]} where is the key?".`, { focus: { mode: 'building' } });
+    const space = this.mySpace() ?? this.roomOf(people[0].id) ?? this.building.spaces[0];
+    return this.reply(
+      `Shall I send this to ${names}? The answer shows up as a message, and you can find it later under Messages.`,
+      { focus: { mode: 'building' } },
+      people.map(p => ({
+        label: `Ask ${p.name}`,
+        detail: `"${question.slice(0, 120)}"`,
+        action: { type: 'ping.send', buildingId: this.buildingId, ping: { kind: 'ask', fromId: this.me.id, to: `player:${p.id}`, spaceId: space.id, floorId: space.floor_id, message: question.slice(0, 300), expiresAt: Date.now() + 60 * MINUTE } },
+      })),
+    );
   }
 
   whereIs(player: Player): ChatResponse {

@@ -15,8 +15,13 @@ import { SettingsSheet } from '@/components/world/settings-sheet';
 import { ReportSheet, type ReportDraft } from '@/components/world/report-sheet';
 import { ProposalCards } from '@/components/world/proposal-cards';
 import { SkillChips } from '@/components/world/skill-chips';
-import { Inbox } from '@/components/world/inbox';
+import { Inbox, inboxToasts } from '@/components/world/inbox';
+import { mentionQuery } from '@/components/world/mention-picker';
 import { PasserBy } from '@/components/world/passer-by';
+import { MessagesSheet } from '@/components/world/messages-sheet';
+import { PersonCard } from '@/components/world/person-card';
+import { MentionPicker } from '@/components/world/mention-picker';
+import { unreadCount, useSentHistory } from '@/lib/world/history';
 import { settingsFor } from '@/lib/world/profile';
 import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
@@ -61,7 +66,12 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const hideDemo = settings?.demoPlayers === false;
   const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report'>();
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'messages'>();
+  const [personId, setPersonId] = useState<string>();
+  const closePerson = useCallback(() => setPersonId(undefined), []);
+  const openPerson = world?.players.find(p => p.id === personId);
+  useSentHistory(fullWorld, profile, building);
+  const unread = profile ? unreadCount(profile, building.building.id) + (world && settings ? inboxToasts(world, profile.id, settings.pingFrom, profile.groups).filter(t => t.type === 'incoming').length : 0) : 0;
   const closeSheet = useCallback(() => setSheet(undefined), []);
   // A pin proposed in chat that the user wants to edit before posting.
   const [reportDraft, setReportDraft] = useState<ReportDraft>();
@@ -152,7 +162,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onRoute={routeTo} /></div>
+      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
@@ -160,7 +170,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           <nav className="building-switch" aria-label="Building">
             {buildings.map(b => <Link key={b.id} href={`/?building=${b.id}`} className={b.id === building.building.id ? 'active' : ''} aria-current={b.id === building.building.id ? 'page' : undefined}>{b.name}</Link>)}
           </nav>
-          <WorldHud world={world} playerId={profile?.id} onOpen={() => setSheet('settings')} />
+          <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')} />
         </header>
         <nav className="floor-rail" aria-label="Floors">
           <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
@@ -228,7 +238,9 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           </div>}
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s} onClick={() => void ask(s)}>{s}</button>)}</div>}
           {profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
-          {world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />}
+          {world && profile && mentionQuery(draft) !== undefined
+            ? <MentionPicker players={world.players.filter(p => p.id !== profile.id)} draft={draft} onPick={text => { setDraft(text); input.current?.focus(); }} />
+            : world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />}
           <form className="ask" onSubmit={submit}>
             <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>
             <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
@@ -237,10 +249,12 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
         </section>
       </div>
 
-      {profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('settings')} />}
+      {profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('messages')} />}
+      {sheet === 'messages' && profile && settings && <MessagesSheet building={building} profile={profile} world={world} pingFrom={settings.pingFrom} act={act} onGo={routeTo} onClose={closeSheet} />}
+      {openPerson && profile && <PersonCard key={openPerson.id} player={openPerson} building={building} profile={profile} world={world} act={act} onRoute={routeTo} onAsk={name => { setDraft(`@${name} `); input.current?.focus(); }} onClose={closePerson} />}
       {sheet === 'report' && profile && <ReportSheet key={JSON.stringify(reportDraft ?? null)} initial={reportDraft} building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
       {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
-      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onGo={routeTo} onClose={closeSheet} />}
+      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>

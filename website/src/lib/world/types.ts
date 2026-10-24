@@ -51,7 +51,8 @@ export interface Pin {
   status: 'unconfirmed' | 'active' | 'resolved' | 'expired';
 }
 
-export type PingKind = 'come_to_me' | 'meet_halfway' | 'pick_up' | 'help' | 'ask_crowd';
+/** `ask`: a direct question to one person ("@Tom where is the key?"); `ask_crowd`: the same to everyone here. */
+export type PingKind = 'come_to_me' | 'meet_halfway' | 'pick_up' | 'help' | 'ask' | 'ask_crowd';
 export interface Ping {
   id: string;
   kind: PingKind;
@@ -64,7 +65,7 @@ export interface Ping {
   createdAt: number;
   expiresAt: number;
   status: 'sent' | 'accepted' | 'declined' | 'done';
-  answers?: { playerId: string; text: string; at: number }[];   // ask_crowd
+  answers?: { playerId: string; text: string; at: number }[];   // ask, ask_crowd
 }
 
 export interface Skill {

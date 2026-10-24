@@ -154,3 +154,36 @@
 @media (min-width: 900px) {
   .inbox { left: auto; right: 24px; width: 360px; }
 }
+
+/* People on the map are tappable */
+.scene-label--person .person-tap { display: flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; }
+.scene-label--person .person-tap + .person-tap { margin-left: -6px; }
+.person-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; }
+.person-head .person-dot { flex: none; width: 44px; height: 44px; margin: 0; font-size: 15px; }
+.person-head strong { display: block; font-size: 16px; }
+.person-head small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.person-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.person-facts dt { color: var(--muted); }
+.person-facts dd { margin: 0; }
+
+/* @ suggestions above the ask bar */
+.mention-picker { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.mention-picker::-webkit-scrollbar { display: none; }
+.mention-picker button { flex: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 5px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13px; font-weight: 600; box-shadow: var(--shadow); }
+.mention-picker .person-dot { margin: 0; width: 30px; height: 30px; font-size: 11px; }
+
+/* Messages */
+.messages-button { position: relative; display: grid; place-items: center; width: 36px; height: 36px; flex: none; border: 1px solid var(--line); border-radius: 50%; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); font-size: 15px; color: var(--ink); }
+.messages-button b { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+.message { padding: 10px 0; border-top: 1px solid var(--line); }
+.message:first-of-type { border-top: 0; }
+.message-head { display: flex; align-items: center; gap: 8px; margin: 0; }
+.message-head .person-dot { margin: 0; width: 26px; height: 26px; font-size: 10px; }
+.message-head strong { font-size: 14px; }
+.message-head small { color: var(--muted); font-size: 12px; }
+.message-status { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.message-status--wait { background: #eef0ea; color: var(--muted); }
+.message-status--ok { background: var(--accent); color: var(--ink); }
+.message-status--off { background: #fde8e8; color: #b4232a; }
+.message-text { margin: 6px 0 0; font-size: 14px; }
+.message-answer { margin: 6px 0 0; padding: 8px 10px; background: #f6f8f0; border-radius: 10px; font-size: 14px; }

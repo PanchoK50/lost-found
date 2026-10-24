@@ -52,6 +52,9 @@ export function scheduleDemo(world: StoredWorld, action: WorldAction, now: numbe
       if (ping.kind === 'ask_crowd') {
         const helper = demos.find(p => p.role === 'facility') ?? demos[0];
         if (helper) timers.push({ at: now + 5 * SECOND, type: 'answer', pingId: ping.id, playerId: helper.id });
+      } else if (ping.kind === 'ask') {
+        const asked = demos.find(p => ping.to === `player:${p.id}`);
+        if (asked) timers.push({ at: now + 5 * SECOND, type: 'answer', pingId: ping.id, playerId: asked.id });
       } else {
         const to = ping.to;
         const who = demos.find(p => to === `player:${p.id}` || (to.startsWith('group:') && p.groups.includes(to.slice(6))) || to === `role:${p.role}`);

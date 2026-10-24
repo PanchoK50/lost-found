@@ -7,7 +7,7 @@ import type { WorldState } from '@/lib/world/types';
 export type WorldActions = ReturnType<typeof useWorld>;
 
 /** Mode badge and the people sharing their location, at the right of the HUD bar. Both open settings. */
-export function WorldHud({ world, playerId, onOpen }: { world?: WorldState; playerId?: string; onOpen(): void }) {
+export function WorldHud({ world, playerId, unread, onOpen, onMessages }: { world?: WorldState; playerId?: string; unread: number; onOpen(): void; onMessages(): void }) {
   const sharing = (world?.presence ?? []).map(p => world!.players.find(x => x.id === p.playerId)).filter(p => p !== undefined);
   // Others first: the stack is about who else is here.
   sharing.sort((a, b) => Number(a.id === playerId) - Number(b.id === playerId));
@@ -19,6 +19,7 @@ export function WorldHud({ world, playerId, onOpen }: { world?: WorldState; play
           {sharing.length > 2 && <span className="more">+{sharing.length - 2}</span>}
         </button>
       )}
+      <button type="button" className="messages-button" onClick={onMessages} aria-label={`Messages${unread ? `, ${unread} new` : ''}`}>✉{unread > 0 && <b>{unread}</b>}</button>
       <button type="button" className="mode-badge" onClick={onOpen} aria-label={`Mode: ${world ? modeLabel[world.mode] : 'loading'}. Open settings`}>
         {world ? modeLabel[world.mode] : '…'}
       </button>

@@ -35,7 +35,7 @@ const CONFIRM_WINDOW = 30 * MINUTE;
 const MAX_PRESENCE = 30 * 24 * 60 * MINUTE;
 const ROLES: Role[] = ['member', 'facility', 'first_aider', 'visitor', 'exhibitor'];
 const PIN_KINDS: PinKind[] = ['blocked', 'broken', 'item', 'event', 'info', 'meet'];
-const PING_KINDS: PingKind[] = ['come_to_me', 'meet_halfway', 'pick_up', 'help', 'ask_crowd'];
+const PING_KINDS: PingKind[] = ['come_to_me', 'meet_halfway', 'pick_up', 'help', 'ask', 'ask_crowd'];
 
 export function createWorld(building: Building): StoredWorld {
   return { buildingId: building.building.id, detected: modeFor[detectCategory(building)], version: 1, players: [], presence: [], pins: [], pings: [], skills: [], created: [] };
@@ -268,7 +268,10 @@ export function viewFor(world: StoredWorld, playerId?: string): WorldState {
   const pings = world.pings.filter(p => p.fromId === playerId || (p.to !== 'nearby' && reaches(world, p.to, me)));
   const skills = world.skills.filter(s => s.authorId === playerId || reaches(world, s.audience, me));
   // Only name the people this player can already see something of.
-  const named = new Set([playerId, ...presence.map(p => p.playerId), ...pins.map(p => p.authorId), ...pings.map(p => p.fromId)]);
+  const named = new Set([
+    playerId, ...presence.map(p => p.playerId), ...pins.map(p => p.authorId), ...pings.map(p => p.fromId),
+    ...pings.flatMap(p => [...(p.answers ?? []).map(a => a.playerId), p.to.startsWith('player:') ? p.to.slice(7) : undefined]),
+  ]);
   return {
     buildingId: world.buildingId,
     mode: modeOf(world),

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { MultiplayerMode } from './mode';
-import type { Role } from './types';
+import type { Ping, PingKind, Role } from './types';
 
 /** Privacy and multiplayer settings (docs/MULTIPLAYER.md §3). */
 export interface Settings {
@@ -23,6 +23,27 @@ export interface Profile {
   rooms: Record<string, string>;
   /** Pins the passer-by chip already asked about (§4.2: once per pin). */
   asked: string[];
+  /** What I asked or sent others, kept after the pings expire on the server. Newest first. */
+  sent: SentRecord[];
+  /** When I last opened Messages; newer news counts as unread. */
+  messagesSeenAt: number;
+}
+
+/** One ping I sent, as remembered by this browser. */
+export interface SentRecord {
+  id: string;
+  buildingId: string;
+  kind: PingKind;
+  /** "Tom", "lunch crew", "Everyone here". */
+  to: string;
+  message?: string;
+  /** Room name the ping points at. */
+  place?: string;
+  createdAt: number;
+  status: Ping['status'];
+  answers: { name: string; text: string; at: number }[];
+  /** When the status or answers last changed. */
+  updatedAt: number;
 }
 
 export const defaultSettings: Record<MultiplayerMode, Settings> = {
@@ -42,7 +63,7 @@ const listeners = new Set<() => void>();
 let cached: { raw: string | null; profile: Profile } | undefined;
 
 function create(): Profile {
-  return { id: crypto.randomUUID(), name: `Guest ${Math.floor(1000 + Math.random() * 9000)}`, role: 'member', groups: [], settings: {}, rooms: {}, asked: [] };
+  return { id: crypto.randomUUID(), name: `Guest ${Math.floor(1000 + Math.random() * 9000)}`, role: 'member', groups: [], settings: {}, rooms: {}, asked: [], sent: [], messagesSeenAt: 0 };
 }
 
 function read(): Profile {

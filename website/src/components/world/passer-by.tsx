@@ -35,7 +35,10 @@ export function PasserBy({ world, profile, building, routes, act }: {
 }
 
 function passerByPin(world: WorldState, profile: Profile, building: Building, routes: SceneDirective['routes']): Pin | undefined {
-  const here = new Set<string>(routes?.flatMap(r => r.spacePath ?? []) ?? []);
+  const path = new Set<string>(routes?.flatMap(r => r.spacePath ?? []) ?? []);
+  // Passing by counts too: spaces one door away from the route (a closed lift next to the corridor I walk).
+  const here = new Set(path);
+  for (const o of building.openings) if (o.space_ids.some(id => path.has(id))) o.space_ids.forEach(id => here.add(id));
   const room = profile.rooms[building.building.id];
   if (room) here.add(room);
   if (!here.size) return undefined;

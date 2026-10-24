@@ -7,7 +7,7 @@ import type { Ping, Player, WorldState } from '@/lib/world/types';
 import type { WorldActions } from './world-hud';
 
 const kindLabel: Record<Ping['kind'], string> = {
-  come_to_me: 'Come to me', meet_halfway: 'Meet halfway', pick_up: 'Please pick up', help: 'Needs help', ask_crowd: 'Asks everyone',
+  come_to_me: 'Come to me', meet_halfway: 'Meet halfway', pick_up: 'Please pick up', help: 'Needs help', ask: 'Asks you', ask_crowd: 'Asks everyone',
 };
 const MAX_TOASTS = 2;
 
@@ -46,8 +46,8 @@ export function Inbox({ world, playerId, building, pingFrom, groups, top, act, o
           <span className={`person-dot${t.from?.demo ? ' person-dot--demo' : ''}`}>{t.from?.initials ?? '?'}</span>
           <div className="toast-body">
             <strong>{t.from?.name ?? 'Someone'} · {kindLabel[t.ping.kind]}</strong>
-            <small>{t.ping.kind === 'ask_crowd' ? `"${t.ping.message}"` : `${spaceName(t.ping.spaceId)}${t.ping.message ? ` · ${t.ping.message}` : ''}`}</small>
-            {t.ping.kind === 'ask_crowd' ? (
+            <small>{isQuestion(t.ping) ? `"${t.ping.message}"` : `${spaceName(t.ping.spaceId)}${t.ping.message ? ` · ${t.ping.message}` : ''}`}</small>
+            {isQuestion(t.ping) ? (
               <form className="toast-actions" onSubmit={event => {
                 event.preventDefault();
                 const text = answer[t.key]?.trim();
@@ -80,6 +80,9 @@ export function Inbox({ world, playerId, building, pingFrom, groups, top, act, o
     </div>
   );
 }
+
+/** Pings answered with text instead of going somewhere. */
+export const isQuestion = (ping: Ping) => ping.kind === 'ask' || ping.kind === 'ask_crowd';
 
 /** Everything the inbox could show right now, newest first. Keys change when a ping changes, so news shows again. */
 export function inboxToasts(world: WorldState, playerId: string, pingFrom: Settings['pingFrom'], groups: string[]): Toast[] {
