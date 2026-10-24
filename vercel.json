@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "web": {
+      "root": "website",
+      "bindings": [
+        { "type": "service", "service": "agent", "format": "url", "env": "LOSTFOUND_API_URL" }
+      ]
+    },
+    "agent": {
+      "root": ".",
+      "entrypoint": "lostfound.api.server:app",
+      "functions": {
+        "lostfound/api/server.py": {
+          "maxDuration": 300,
+          "excludeFiles": "{website/**,data/**/*.png,data/**/*.svg,notebooks/**,evals/**,submissions/**,docs/**,tools/**,tests/**,scripts/**,supabase/**,agent_output/**,.venv/**,**/__pycache__/**}"
+        }
+      }
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}

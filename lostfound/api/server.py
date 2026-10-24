@@ -155,6 +155,9 @@ class UIChatRequest(BaseModel):
     message: str
     sessionId: str | None = None
     closed: list[str] = []  # openings, stairs, lifts or rooms reported closed in the world layer
+    # Earlier turns as text. Serverless instances do not keep memory, so a session that is gone is rebuilt
+    # from this (the reply text is kept; edits made in a lost session are not replayed).
+    history: list[dict] = []
     model: str = DEFAULT_CHAT_MODEL
     effort: str = "low"
 
@@ -166,6 +169,7 @@ def ui_chat(request: UIChatRequest) -> dict:
     if session_id not in SESSIONS:
         config = AgentConfig(design="chat", model=MODELS.get(request.model, request.model), effort=request.effort)
         SESSIONS[session_id] = ChatSession(load(request.buildingId), config)
+        SESSIONS[session_id].seed_history(request.history)
     session = SESSIONS[session_id]
     if session.building.id != request.buildingId:
         raise HTTPException(400, "Session belongs to another building.")

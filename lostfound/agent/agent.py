@@ -189,6 +189,18 @@ class ChatSession:
         self.last_scene: dict = {"focus": {"mode": "building"}}
         self.world_closed: set[str] = set()  # closures reported by people in the building (web world layer)
 
+    def seed_history(self, history: list[dict]) -> None:
+        """Rebuild a lost session from text turns: strictly alternating user/assistant, starting with the user."""
+        expected = "user"
+        for turn in history[-20:]:
+            role, content = turn.get("role"), str(turn.get("content", "")).strip()
+            if role != expected or not content:
+                continue
+            self.messages.append({"role": role, "content": content})
+            expected = "assistant" if role == "user" else "user"
+        if self.messages and self.messages[-1]["role"] == "user":
+            self.messages.pop()  # the new question is appended by ask()
+
     def set_world_closures(self, element_ids: list[str]) -> None:
         """Replace last turn's reported closures with this turn's; closures the agent made itself stay."""
         b = self.building
