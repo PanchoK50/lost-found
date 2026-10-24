@@ -11,7 +11,9 @@ export async function GET(request: Request) {
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   const world = await worldStore.get(entry.building, Date.now());
   if (Number(params.get('since')) === world.version) return new Response(null, { status: 204 });
-  return Response.json(viewFor(world, params.get('playerId') ?? undefined));
+  const playerId = params.get('playerId') ?? undefined;
+  // Accounts are known by name to everyone (for @ and pings); where they are stays private to their audience.
+  return Response.json({ ...viewFor(world, playerId), players: world.players.filter(p => !p.demo || p.id === playerId) });
 }
 
 // POST /api/world, body: WorldAction → 200 { ok: true, state } or 400 { error }.
@@ -39,7 +41,8 @@ export async function POST(request: Request) {
   }
   try {
     const world = await worldStore.apply(entry.building, action, Date.now());
-    return Response.json({ ok: true, state: viewFor(world, actorOf(action)) });
+    const actor = actorOf(action);
+    return Response.json({ ok: true, state: { ...viewFor(world, actor), players: world.players.filter(p => !p.demo || p.id === actor) } });
   } catch (error) {
     if (error instanceof WorldError) return Response.json({ error: error.message }, { status: 400 });
     throw error;

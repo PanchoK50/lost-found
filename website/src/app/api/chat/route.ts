@@ -7,7 +7,7 @@ import { resolveDemo } from '@/lib/chat/demo-resolver';
 import { markBroken, offerAskCrowd, resolveWorld } from '@/lib/world/chat';
 import { activeClosures, viewFor } from '@/lib/world/rules';
 import { worldStore } from '@/lib/world/store';
-import { supabaseAdmin, userFrom } from '@/lib/supabase/server';
+import { supabaseAdmin, supabaseConfigured, userFrom } from '@/lib/supabase/server';
 
 /** The Python agent (lostfound.api.server). Start it with `uv run uvicorn lostfound.api.server:app --port 8000`. */
 const AGENT_URL = process.env.LOSTFOUND_API_URL ?? 'http://127.0.0.1:8000';
@@ -28,16 +28,30 @@ export async function POST(request: Request) {
   const world = await worldStore.get(entry.building, Date.now());
   const worldClosed = activeClosures(world, playerId);
   // People, reports and skills first (docs/MULTIPLAYER.md §7); everything else is a question about the building.
-  const input = { world: viewFor(world, playerId), playerId, skillId: typeof body.skillId === 'string' ? body.skillId : undefined, history: Array.isArray(body.history) ? body.history : undefined, closed: worldClosed };
+  // Every account can be addressed with @, also people who are not sharing their location right now.
+  const input = { world: { ...viewFor(world, playerId), players: world.players.filter(p => !p.demo || p.id === playerId) }, playerId, skillId: typeof body.skillId === 'string' ? body.skillId : undefined, history: Array.isArray(body.history) ? body.history : undefined, closed: worldClosed };
   const fromWorld = resolveWorld(entry.building, message, input);
   if (fromWorld?.usedSkill && playerId) await worldStore.apply(entry.building, { type: 'skill.use', buildingId: entry.building.building.id, skillId: fromWorld.usedSkill, playerId }, Date.now()).catch(() => undefined);
 
   let resolved: ChatResponse;
-  if (fromWorld) {
+  const user = await userFrom(request);
+  const directAsk = fromWorld?.response.proposals?.length === 1 ? fromWorld.response.proposals[0] : undefined;
+  if (fromWorld && directAsk?.action.type === 'ping.send' && directAsk.action.ping.kind === 'ask' && message.trimStart().startsWith('@')
+      && playerId && (!supabaseConfigured || user?.id === playerId)) {
+    // "@Rabea where is the key?" is an explicit message: send it now instead of asking for a confirm tap.
+    try {
+      await worldStore.apply(entry.building, directAsk.action, Date.now());
+      const to = directAsk.label.replace(/^Ask\s+/i, '');
+      resolved = { ...fromWorld.response, proposals: undefined, source: 'world', reply: `Sent to ${to}. The answer shows up under Messages (✉).`, answer: { title: `Message to ${to}`, value: 'Sent' } };
+    } catch (error) {
+      resolved = { ...fromWorld.response, source: 'world', reply: `I couldn't send it: ${error instanceof Error ? error.message : 'unknown error'}` };
+    }
+  } else if (fromWorld) {
     resolved = { ...fromWorld.response, source: 'world' };
   } else {
     // Building questions go to the Python agent, which routes around the same reported closures.
-    const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history);
+    const location = typeof body.location === 'string' && entry.building.spaces.some(s => s.id === body.location) ? body.location : undefined;
+    const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location);
     if (agent.ok) {
       resolved = markBroken(entry.building, agent.response, input.world);
     } else if (agent.unreachable) {
@@ -51,7 +65,6 @@ export async function POST(request: Request) {
     ? { ...resolved, scene: { ...resolved.scene, closed: [...new Set([...(resolved.scene.closed ?? []), ...worldClosed])] } }
     : resolved;
   const finished = withRoutePoints(entry.building, response);
-  const user = await userFrom(request);
   const conversationId = user ? await saveTurn(user.id, entry.id, body.conversationId, message, finished).catch(() => undefined) : undefined;
   return Response.json({ ...finished, conversationId });
 }
@@ -89,13 +102,13 @@ type AgentResult =
   | { ok: false; unreachable: true }
   | { ok: false; unreachable: false; error: string };
 
-async function askAgent(buildingId: string, message: string, sessionId: string | undefined, closed: string[], history?: ChatRequest['history']): Promise<AgentResult> {
+async function askAgent(buildingId: string, message: string, sessionId: string | undefined, closed: string[], history?: ChatRequest['history'], location?: string): Promise<AgentResult> {
   let agent: Response;
   try {
     agent = await fetch(`${AGENT_URL}/ui/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ buildingId, message, sessionId, closed, history: history ?? [] }),
+      body: JSON.stringify({ buildingId, message, sessionId, closed, history: history ?? [], location }),
       cache: 'no-store',
       signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
     });

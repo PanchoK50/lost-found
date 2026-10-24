@@ -169,7 +169,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId, location: profile?.rooms[building.building.id] }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;

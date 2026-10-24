@@ -158,6 +158,7 @@ class UIChatRequest(BaseModel):
     # Earlier turns as text. Serverless instances do not keep memory, so a session that is gone is rebuilt
     # from this (the reply text is kept; edits made in a lost session are not replayed).
     history: list[dict] = []
+    location: str | None = None  # the room the person picked as "I'm here"
     model: str = DEFAULT_CHAT_MODEL
     effort: str = "low"
 
@@ -174,7 +175,7 @@ def ui_chat(request: UIChatRequest) -> dict:
     if session.building.id != request.buildingId:
         raise HTTPException(400, "Session belongs to another building.")
     session.set_world_closures(request.closed)
-    turn = session.ask(request.message)
+    turn = session.ask(request.message, request.location)
     ui = turn["ui"]
     return {
         "kind": ui["kind"],
