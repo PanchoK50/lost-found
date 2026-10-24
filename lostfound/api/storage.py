@@ -42,6 +42,17 @@ def cached_directory(building_id: str) -> Path | None:
     return directory
 
 
+def load_edits(building_id: str) -> list[dict]:
+    """Edits made by conversation (closures, doors, moved assets, corrections), oldest first."""
+    if not configured() or not re.fullmatch(r"[\w.-]{1,120}", building_id):
+        return []
+    try:
+        rows = json.loads(_request("GET", f"/rest/v1/building_edits?building_id=eq.{building_id}&select=action&order=id"))
+    except (urllib.error.URLError, ValueError):
+        return []
+    return [row["action"] for row in rows if isinstance(row.get("action"), dict)]
+
+
 def new_building_id(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "building"
     return f"upload-{slug}-{secrets.token_hex(2)}"

@@ -175,19 +175,39 @@ def answer(building_directory: Path, question_text: str) -> str:
     return _DEFAULT_QA.answer_question(Path(building_directory), question_text).reply
 
 
+def import_checks(building: Building) -> list[dict]:
+    """For buildings created from plans: what the importer could not tell, so the agent can settle it by conversation."""
+    issues = (building.data.get("ingest_report") or {}).get("issues") or []
+    open_items = [i for i in issues if i.get("severity") in ("high", "medium") and i.get("question")][:15]
+    if not open_items:
+        return []
+    lines = "\n".join(f"- [{i['field']}] {i['id']}: {i['message']} Ask: {i['question']}" for i in open_items)
+    return [{"type": "text", "text": (
+        "This building was just created from uploaded floor plans. The importer is unsure about these points:\n"
+        f"{lines}\n"
+        "When the person wants to check the import (or asks what is uncertain), go through them one at a time, most "
+        "important first (scale, missing stairs/links, then rooms): ask one short question, then fix the answer with "
+        "rename_room, set_room_type, set_door_width or rescale_building and confirm in one line. Changes are saved for everyone."
+    )}]
+
+
 class ChatSession:
     """Chat mode: one conversation about one building, with edits that persist for the session."""
 
     def __init__(self, building: Building, config: AgentConfig | None = None, client: anthropic.Anthropic | None = None) -> None:
-        self.building = building
         self.config = config or AgentConfig(design="hybrid", effort="low")
         self.loop = ClaudeLoop(self.config, client)
         self.toolbox = Toolbox(building, "chat")
         self.messages: list[dict] = []
-        self.system = system_blocks(CHAT_INSTRUCTIONS, building)
+        self.system = system_blocks(CHAT_INSTRUCTIONS, building) + import_checks(building)
         self.usage: Counter = Counter()
         self.last_scene: dict = {"focus": {"mode": "building"}}
         self.world_closed: set[str] = set()  # closures reported by people in the building (web world layer)
+
+    @property
+    def building(self) -> Building:
+        """The session's building; the toolbox may replace it (e.g. after a rescale)."""
+        return self.toolbox.building
 
     def seed_history(self, history: list[dict]) -> None:
         """Rebuild a lost session from text turns: strictly alternating user/assistant, starting with the user."""

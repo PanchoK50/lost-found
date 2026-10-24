@@ -2,6 +2,7 @@
 
   source .envrc && uv run uvicorn lostfound.api.server:app --reload --port 8000"""
 
+import base64
 import csv
 import os
 import re
@@ -15,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from lostfound.agent.agent import AgentConfig, BuildingQA, ChatSession
 from lostfound.api import storage
+from lostfound.core.edits import apply_edits
 from lostfound.ingest.assemble import assemble
 from lostfound.ingest.verify import summary as issue_summary
 from lostfound.ingest.verify import verify
@@ -46,10 +48,18 @@ def building_directory(building_id: str) -> Path | None:
 
 
 def load(building_id: str) -> Building:
+    """The building as it is now: the plan plus every edit made by conversation (stored in Supabase)."""
     directory = building_directory(building_id)
     if directory is None:
         raise HTTPException(404, f"Unknown building '{building_id}'.")
-    return Building.load(directory)
+    base = Building.load(directory)
+    changes = storage.load_edits(building_id)
+    if not changes:
+        return base
+    data, closed = apply_edits(base.data, changes)
+    building = Building(data, directory)  # its own walk cache: the edited plan differs from the file
+    building.closed = closed
+    return building
 
 
 def session_building(building_id: str, session_id: str | None) -> Building:
@@ -254,7 +264,8 @@ def ask(request: AskRequest) -> dict:
 
 class IngestFile(BaseModel):
     name: str
-    content: str  # SVG text
+    content: str  # SVG text, or base64 for PNG
+    encoding: str = "text"  # text | base64
     level: int | None = None
 
 
@@ -272,18 +283,34 @@ def ingest(request: IngestRequest) -> dict:
     with tempfile.TemporaryDirectory() as scratch:
         used: set[int] = set()
         for index, upload in enumerate(request.files):
-            if "<svg" not in upload.content[:2000]:
-                raise HTTPException(400, f"{upload.name} is not an SVG floor plan. PNG and PDF plans are not supported yet.")
             match = re.search(r"floor[_ -]?(-?\d+)", upload.name, re.IGNORECASE)
             level = upload.level if upload.level is not None else int(match.group(1)) if match else index
             if level in used:
-                raise HTTPException(400, f"Two files are for floor {level}. Name them floor_<level>.svg or set the levels.")
+                raise HTTPException(400, f"Two files are for floor {level}. Name them floor_<level>.svg / .png or set the levels.")
             used.add(level)
-            (Path(scratch) / f"floor_{level}.svg").write_text(upload.content, encoding="utf-8")
+            if upload.encoding == "base64":
+                data = base64.b64decode(upload.content)
+                if not data.startswith(b"\x89PNG"):
+                    raise HTTPException(400, f"{upload.name} is not a PNG image. Use SVG or PNG floor plans.")
+                (Path(scratch) / f"floor_{level}.png").write_bytes(data)
+            else:
+                if "<svg" not in upload.content[:2000]:
+                    raise HTTPException(400, f"{upload.name} is not an SVG floor plan. Use SVG or PNG floor plans.")
+                (Path(scratch) / f"floor_{level}.svg").write_text(upload.content, encoding="utf-8")
         try:
             building = assemble(Path(scratch), building_id=building_id, name=request.name)
         except Exception as error:  # noqa: BLE001 - report any parse failure to the uploader
             raise HTTPException(422, f"Could not read the plans: {error}") from error
+        if any(space.get("label_px") for space in building["spaces"]):
+            # Image plans: room numbers are pixels, so Claude reads them from one small crop per room.
+            try:
+                from lostfound.ingest.label import label_rooms
+
+                label_rooms(building, Path(scratch))
+            except Exception as error:  # noqa: BLE001 - labels are a bonus; the building works without them
+                building["ingest_report"]["assumptions"].append(f"room numbers could not be read: {error}")
+                for space in building["spaces"]:
+                    space.pop("label_px", None)
     if not building["spaces"]:
         raise HTTPException(422, "No rooms found in these plans.")
     issues = verify(building)

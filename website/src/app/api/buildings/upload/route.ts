@@ -15,12 +15,18 @@ export async function POST(request: Request) {
   const name = String(form.get('name') ?? '').trim();
   const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
   if (!name || name.length > 80) return Response.json({ error: 'Give the building a name (up to 80 characters).' }, { status: 400 });
-  if (!files.length || files.length > MAX_FILES) return Response.json({ error: `Choose 1 to ${MAX_FILES} floor plans (SVG).` }, { status: 400 });
+  if (!files.length || files.length > MAX_FILES) return Response.json({ error: `Choose 1 to ${MAX_FILES} floor plans (SVG or PNG).` }, { status: 400 });
   if (files.reduce((sum, f) => sum + f.size, 0) > MAX_BYTES) return Response.json({ error: 'The plans are too large together (max 4 MB).' }, { status: 413 });
-  const bad = files.find(f => !/\.svg$/i.test(f.name) && f.type !== 'image/svg+xml');
-  if (bad) return Response.json({ error: `${bad.name} is not an SVG. PNG and PDF plans are not supported yet.` }, { status: 400 });
+  const isPng = (f: File) => /\.png$/i.test(f.name) || f.type === 'image/png';
+  const bad = files.find(f => !isPng(f) && !/\.svg$/i.test(f.name) && f.type !== 'image/svg+xml');
+  if (bad) return Response.json({ error: `${bad.name} is not an SVG or PNG floor plan.` }, { status: 400 });
 
-  const payload = { name, created_by: user?.id ?? null, files: await Promise.all(files.map(async f => ({ name: f.name, content: await f.text() }))) };
+  const payload = {
+    name, created_by: user?.id ?? null,
+    files: await Promise.all(files.map(async f => isPng(f)
+      ? { name: f.name, encoding: 'base64', content: Buffer.from(await f.arrayBuffer()).toString('base64') }
+      : { name: f.name, content: await f.text() })),
+  };
   let agent: Response;
   try {
     agent = await fetch(`${AGENT_URL}/ingest`, {

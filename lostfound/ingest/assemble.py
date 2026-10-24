@@ -3,6 +3,7 @@ vertical connectors. Facts the drawing does not contain (room types, door widths
 priors and are listed in `ingest_report` so the agent can confirm them with the user."""
 
 import itertools
+import re
 import math
 import statistics
 from collections import Counter
@@ -78,14 +79,33 @@ def _shift(spaces: list[dict], dx: float, dy: float) -> None:
         space["polygon"] = [[round(x + dx, 3), round(y + dy, 3)] for x, y in space["polygon"]]
 
 
-def assemble(directory: Path, building_id: str | None = None, name: str | None = None) -> dict:
+def load_drawings(directory: Path, prefer: str = "svg") -> list[svg.Drawing]:
+    """One drawing per floor: floor_<level>.svg when present (exact), else floor_<level>.png (raster)."""
+    from lostfound.ingest import raster
+
+    by_level: dict[int, svg.Drawing] = {}
+    if prefer == "svg":
+        for path in directory.glob("floor_*.svg"):
+            if "_plain" not in path.name:
+                drawing = svg.parse(path)
+                by_level[drawing.level] = drawing
+    for path in sorted(directory.glob("floor_*.png")):
+        if "_plain" in path.name:
+            continue
+        level = int(re.search(r"floor_(-?\d+)", path.name).group(1))
+        if level not in by_level:
+            by_level[level] = raster.parse(path)
+    return [by_level[level] for level in sorted(by_level)]
+
+
+def assemble(directory: Path, building_id: str | None = None, name: str | None = None, prefer: str = "svg") -> dict:
     building_id = building_id or directory.name
-    drawings = sorted((svg.parse(path) for path in directory.glob("floor_*.svg") if "_plain" not in path.name), key=lambda d: d.level)
+    drawings = load_drawings(directory, prefer)
     if not drawings:
-        raise FileNotFoundError(f"No floor_<level>.svg in {directory}")
+        raise FileNotFoundError(f"No floor_<level>.svg or floor_<level>.png in {directory}")
     report: dict = {"scales": {}, "registration": {}, "assumptions": []}
 
-    estimates = {d.level: scale_module.estimate(d.assets) for d in drawings}
+    estimates = {d.level: (scale_module.estimate_raster(d.assets) if getattr(d, "raster", False) else scale_module.estimate(d.assets)) for d in drawings}
     known = [value for value, _ in estimates.values() if value]
     fallback = statistics.median(known) if known else None
     floors, spaces, openings, assets = [], [], [], []
@@ -97,7 +117,7 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
         if not points_per_metre:
             points_per_metre, confidence = fallback or 10.0, 0.0
             report["assumptions"].append(f"level {drawing.level}: no furniture to infer scale; used {points_per_metre:.3f} pt/m")
-        report["scales"][drawing.level] = {"points_per_metre": round(points_per_metre, 4), "confidence": round(confidence, 2)}
+        report["scales"][drawing.level] = {"points_per_metre": round(points_per_metre, 4), "confidence": round(confidence, 2), "raster": getattr(drawing, "raster", False)}
         floor_id = f"{building_id}-F{drawing.level}"
         floors.append(
             {
@@ -120,6 +140,7 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
                     "ref": "",
                     "polygon": [[round(x, 3), round(y, 3)] for x, y in _to_metres(drawn["points"], points_per_metre)],
                     "synthetic": False,
+                    **({"label_px": drawn["anchor_px"]} if "anchor_px" in drawn else {}),
                 }
             )
         _assign_labels(drawing, floor_spaces, points_per_metre)

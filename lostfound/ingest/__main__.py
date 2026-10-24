@@ -33,11 +33,13 @@ def main() -> None:
     parser.add_argument("source", type=Path, help="folder with floor_<level>.svg files (or a split folder with --evaluate)")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--evaluate", action="store_true", help="rebuild every building in the folder and score it")
-    parser.add_argument("--label", action="store_true", help="label room types with Claude (uses API credits)")
+    parser.add_argument("--label", action="store_true", help="read room labels with Claude (uses API credits)")
+    parser.add_argument("--png", action="store_true", help="use the PNG plans even when SVGs exist (raster pipeline)")
+    parser.add_argument("--limit", type=int, default=None, help="only the first N buildings (with --evaluate)")
     arguments = parser.parse_args()
 
     if not arguments.evaluate:
-        building = assemble(arguments.source)
+        building = assemble(arguments.source, prefer='png' if arguments.png else 'svg')
         if arguments.label:
             from lostfound.ingest.label import label_rooms
 
@@ -52,12 +54,13 @@ def main() -> None:
 
     rows = []
     verifier_totals: dict[str, dict[str, int]] = {}
-    for directory in sorted(p for p in arguments.source.iterdir() if (p / "building.json").exists()):
-        building = assemble(directory)
+    for directory in sorted(p for p in arguments.source.iterdir() if (p / "building.json").exists())[: arguments.limit]:
+        building = assemble(directory, prefer="png" if arguments.png else "svg")
         if arguments.label:
             from lostfound.ingest.label import label_rooms
 
-            label_rooms(building, directory)
+            used = label_rooms(building, directory)
+            print(f"  labels: {used}", flush=True)
         scores = evaluate(directory, building)
         issues = verify(building)
         scores["issues"] = len(issues)
@@ -78,7 +81,7 @@ def main() -> None:
         precision = totals["caught"] / totals["flagged"] if totals["flagged"] else float("nan")
         print(f"  {field:10s} {totals['errors']:6d} {totals['flagged']:8d} {totals['caught']:7d}  {recall:6.1%}  {precision:6.1%}")
     rows.append(("_verifier", verifier_totals))
-    results = Path("evals") / "results" / f"ingest__{arguments.source.name}{'__labelled' if arguments.label else ''}.json"
+    results = Path("evals") / "results" / f"ingest__{arguments.source.name}{'__png' if arguments.png else ''}{'__labelled' if arguments.label else ''}.json"
     results.write_text(json.dumps(dict(rows), indent=1, default=str), encoding="utf-8")
     print(f"details: {results}")
 

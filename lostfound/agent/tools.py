@@ -12,11 +12,14 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import re
+import uuid
 from pathlib import Path
 
 from lostfound.agent.format import answer_line
 from lostfound.api import scene
 from lostfound.core import directions, geometry, skills
+from lostfound.core.edits import apply_edits
 from lostfound.core.building import Building, MapError
 from lostfound.core.resolve import Resolver
 
@@ -167,6 +170,27 @@ EDIT_TOOLS = [
         ),
     },
     {
+        "name": "rename_room",
+        "description": "Give a room its number and/or name (fix a plan import, or a renamed room). Saved for everyone.",
+        "input_schema": _schema({"room": PLACE, "ref": _string("Room number, e.g. '1.04', or '' to keep it."), "name": _string("Full name, e.g. 'Meeting room 1.04', or '' to build it from type + number.")}),
+    },
+    {
+        "name": "set_room_type",
+        "description": "Set what a room is used for (e.g. 'bathroom', 'office', 'kitchen'); fixes a wrong guess from a plan import. Saved for everyone.",
+        "input_schema": _schema({"room": PLACE, "room_type": _string("Room type, e.g. 'meeting room'.")}),
+    },
+    {
+        "name": "set_door_width",
+        "description": "Set the width of a door (by its id, or the door between two rooms). Saved for everyone.",
+        "input_schema": _schema({"door": _string("Door id, or two rooms as 'Room A | Room B'."), "width_m": {"type": "number"}}),
+    },
+    {
+        "name": "rescale_building",
+        "description": "Fix the scale of an imported plan from one known measurement: a room's real area (m²) or real width (m). "
+        "Everything is rescaled. Saved for everyone.",
+        "input_schema": _schema({"room": PLACE, "real_area_m2": {"type": "number", "description": "0 if unknown"}, "real_width_m": {"type": "number", "description": "0 if unknown; the room's longer side"}}),
+    },
+    {
         "name": "move_asset",
         "description": "Record that a thing (machine, furniture, equipment) is now in another room (edits the building).",
         "input_schema": _schema({"asset": _string("Asset name or id, e.g. 'Press 3' or 'Desk 2.03-B'."), "to_room": PLACE}),
@@ -208,6 +232,12 @@ KIND_TOOLS = {
     "straight_line_3d": "straight_line_3d",
     "what_if_door": "what_if_door",
 }
+
+
+def infer_room_types() -> list[str]:
+    from lostfound.ingest import infer
+
+    return sorted(infer.model()["priors"])
 
 
 class Toolbox:
@@ -445,7 +475,7 @@ class Toolbox:
             raise MapError("A door can only join two spaces on the same floor.")
         midpoint = geometry.shared_wall_midpoint(self.building, first_id, second_id)
         opening = {
-            "id": f"{self.building.spaces[first_id]['floor_id']}-O-new{len(self.edits) + 1}",
+            "id": f"{self.building.spaces[first_id]['floor_id']}-O-edit-{uuid.uuid4().hex[:8]}",
             "floor_id": self.building.spaces[first_id]["floor_id"],
             "space_ids": [first_id, second_id],
             "kind": "door",
@@ -476,11 +506,84 @@ class Toolbox:
         centre = self.building.polygon(room_id).representative_point()
         record = self.building.assets[asset_id]
         record.update({"space_id": room_id, "floor_id": self.building.spaces[room_id]["floor_id"], "position": [round(centre.x, 3), round(centre.y, 3)]})
-        edit = {"action": "move_asset", "asset_id": asset_id, "to_space_id": room_id}
+        edit = {"action": "move_asset", "asset_id": asset_id, "to_space_id": room_id, "position": record["position"]}
         self.edits.append(edit)
         self.turn["edits"].append(edit)
         self._scene(lambda: scene.edit(self.building, edit))
         return edit
+
+    def _record(self, edit: dict) -> dict:
+        self.edits.append(edit)
+        self.turn["edits"].append(edit)
+        self._scene(lambda: scene.edit(self.building, edit))
+        return edit
+
+    def _rebuild(self, data: dict) -> None:
+        closed = set(self.building.closed)
+        self.building = Building(data, self.building.directory)
+        self.building.closed = closed
+        self.resolver = Resolver(self.building)
+
+    def tool_rename_room(self, room: str, ref: str, name: str) -> dict:
+        space_id = self._space(room)
+        space = self.building.spaces[space_id]
+        ref = ref.strip() or space.get("ref", "")
+        name = name.strip() or f"{space['room_type'].replace('_', ' ').capitalize()} {ref}".strip()
+        space.update(ref=ref, name=name)
+        self.resolver = Resolver(self.building)
+        return self._record({"action": "rename_room", "space_id": space_id, "ref": ref, "name": name})
+
+    def tool_set_room_type(self, room: str, room_type: str) -> dict:
+        space_id = self._space(room)
+        known = sorted({s["room_type"] for s in self.building.spaces.values()} | set(infer_room_types()))
+        try:
+            kind = Resolver(self.building).room_type(room_type)
+        except MapError:
+            kind = room_type.strip().lower().replace(" ", "_")
+            if not re.fullmatch(r"[a-z_]{2,40}", kind):
+                raise MapError(f"'{room_type}' is not a room type. Known: {', '.join(known)}.") from None
+        space = self.building.spaces[space_id]
+        old = space["room_type"]
+        space["room_type"] = kind
+        if space.get("name", "").lower().startswith(old.replace("_", " ")):  # the name was generated from the type
+            self.tool_rename_room(space_id, space.get("ref", ""), "")
+        self.resolver = Resolver(self.building)
+        return self._record({"action": "set_room_type", "space_id": space_id, "room_type": kind})
+
+    def tool_set_door_width(self, door: str, width_m: float) -> dict:
+        if not 0.4 <= width_m <= 10:
+            raise MapError("A door width should be between 0.4 and 10 m.")
+        if door in self.building.openings:
+            opening_id = door
+        else:
+            parts = [p.strip() for p in door.split("|")]
+            if len(parts) != 2:
+                raise MapError("Name the door by its id or as 'Room A | Room B'.")
+            pair = {self._space(parts[0]), self._space(parts[1])}
+            opening_id = next((o["id"] for o in self.building.openings.values() if set(o["space_ids"]) == pair), None)
+            if opening_id is None:
+                raise MapError("There is no door between those two rooms.")
+        self.building.openings[opening_id]["width_m"] = float(width_m)
+        return self._record({"action": "set_door_width", "opening_id": opening_id, "width_m": float(width_m)})
+
+    def tool_rescale_building(self, room: str, real_area_m2: float, real_width_m: float) -> dict:
+        space_id = self._space(room)
+        polygon = self.building.polygon(space_id)
+        if real_area_m2 > 0:
+            factor = (real_area_m2 / polygon.area) ** 0.5
+        elif real_width_m > 0:
+            rectangle = polygon.minimum_rotated_rectangle
+            xs = list(rectangle.exterior.coords)
+            sides = sorted(((xs[i][0] - xs[i + 1][0]) ** 2 + (xs[i][1] - xs[i + 1][1]) ** 2) ** 0.5 for i in range(2))
+            factor = real_width_m / sides[-1]
+        else:
+            raise MapError("Give the room's real area or width.")
+        if not 0.5 <= factor <= 2:
+            raise MapError(f"That would change the scale by {factor:.2f}x, which looks wrong. Please check the measurement.")
+        edit = {"action": "rescale", "factor": round(factor, 5)}
+        data, _ = apply_edits(self.building.data, [edit])
+        self._rebuild(data)
+        return {**self._record(edit), "now": f"{self.building.label(space_id)} is {self.building.polygon(space_id).area:.1f} m²"}
 
     # ---------- code ----------
 

@@ -102,6 +102,14 @@ def verify(building: dict) -> list[dict]:
         if registration.get("matched_cores", 0) < 1:
             add("registration", f"level {level}", "high", f"level {level} could not be aligned via stairs/lifts",
                 f"Which stair on level {level} sits above/below which stair on level {registration['to_level']}?")
+    raster_levels = [level for level, scale in report.get("scales", {}).items() if scale.get("raster")]
+    if raster_levels:
+        biggest = max((sp for sp in spaces.values() if sp["type"] in ("room", "hall")), key=lambda sp: Polygon(sp["polygon"]).area, default=None)
+        if biggest:
+            label = biggest["ref"] or biggest["name"] or biggest["id"]
+            add("scale", f"level {raster_levels[0]}", "high",
+                f"scale of image plans estimated from furniture sizes (can be a few % off); {label} measures {Polygon(biggest['polygon']).area:.1f} m²",
+                f"Is {label} about {Polygon(biggest['polygon']).area:.0f} m²? If you know its real width or area, tell me and I'll rescale.")
     for level, scale in report.get("scales", {}).items():
         if scale["confidence"] < SCALE_CONFIDENCE:
             add("scale", f"level {level}", "high", f"scale of level {level} weakly supported ({scale['confidence']:.0%} of furniture matched)",

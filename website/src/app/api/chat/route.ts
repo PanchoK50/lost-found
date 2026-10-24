@@ -1,4 +1,5 @@
 import { getCatalogEntry } from '@/lib/buildings/catalog';
+import { applyEdits, loadEdits } from '@/lib/buildings/edits';
 import type { Building } from '@/lib/buildings/types';
 import { WalkGraph } from '@/lib/buildings/walk';
 import { turnByTurn } from '@/lib/buildings/turns';
@@ -53,6 +54,15 @@ export async function POST(request: Request) {
     resolved = { ...fromWorld.response, source: 'world' };
   } else {
     // Building questions go to the Python agent, which routes around the same reported closures.
+    if (supabaseConfigured && !user) {
+      return Response.json({ error: 'Sign in (pick a name under “Who are you?”) to ask the building agent.' }, { status: 401 });
+    }
+    const spent = await spentToday();
+    if (spent >= DAILY_LIMIT_USD) {
+      // Over the day's budget: answer with the free offline resolver rather than spend more credits.
+      const demo = resolveDemo(entry.building, message, { closed: worldClosed });
+      return Response.json(withRoutePoints(entry.building, { ...demo, source: 'demo', reply: `${demo.reply}\n\n(The AI agent reached today's budget, so this is the simple offline answer.)` }));
+    }
     const location = typeof body.location === 'string' && entry.building.spaces.some(s => s.id === body.location) ? body.location : undefined;
     const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location);
     if (agent.ok) {
@@ -67,7 +77,9 @@ export async function POST(request: Request) {
   const response = resolved.scene.routes?.length && worldClosed.length
     ? { ...resolved, scene: { ...resolved.scene, closed: [...new Set([...(resolved.scene.closed ?? []), ...worldClosed])] } }
     : resolved;
-  const finished = withRoutePoints(entry.building, response);
+  // Draw routes on the plan as it is now (doors added by conversation), including this turn's edits.
+  const current = applyEdits(entry.building, [...(await loadEdits(entry.id)), ...((response.edits ?? []) as Parameters<typeof applyEdits>[1])]).building;
+  const finished = withRoutePoints(current, response);
   const conversationId = user ? await saveTurn(user.id, entry.id, body.conversationId, message, finished).catch(() => undefined) : undefined;
   return Response.json({ ...finished, conversationId });
 }
@@ -98,6 +110,23 @@ async function saveTurn(userId: string, buildingId: string, conversationId: stri
     await db.from('building_edits').insert(response.edits.map(action => ({ building_id: buildingId, user_id: userId, conversation_id: id, action })));
   }
   return id;
+}
+
+/** Dollars the agent may spend per day (all users together); above it the offline resolver answers. */
+const DAILY_LIMIT_USD = Number(process.env.AGENT_DAILY_LIMIT_USD ?? 20);
+const SPEND_CACHE_MS = 60_000;
+const spend = globalThis as { __lfSpend?: { at: number; dollars: number } };
+
+/** Today's agent spend from the saved chat history (UTC day), cached for a minute. */
+async function spentToday(): Promise<number> {
+  const db = supabaseAdmin();
+  if (!db) return 0;
+  if (spend.__lfSpend && Date.now() - spend.__lfSpend.at < SPEND_CACHE_MS) return spend.__lfSpend.dollars;
+  const since = new Date(); since.setUTCHours(0, 0, 0, 0);
+  const { data } = await db.from('messages').select('cost').gte('created_at', since.toISOString()).not('cost', 'is', null).limit(10_000);
+  const dollars = (data ?? []).reduce((sum, row) => sum + Number(row.cost ?? 0), 0);
+  spend.__lfSpend = { at: Date.now(), dollars };
+  return dollars;
 }
 
 type AgentResult =

@@ -80,10 +80,10 @@ export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: B
 
       <section className="buildings-upload">
         <h3>Add a building</h3>
-        <p className="sheet-hint">Upload one floor-plan SVG per floor, named <code>floor_0.svg</code>, <code>floor_1.svg</code>, … (basements <code>floor_-1.svg</code>). Rooms, doors, stairs and room types are read from the plans; anything uncertain is listed so you can check it.</p>
+        <p className="sheet-hint">Upload one plan per floor (SVG or PNG), named <code>floor_0</code>, <code>floor_1</code>, … (basements <code>floor_-1</code>). Rooms, doors, stairs, room numbers and room types are read from the plans; anything uncertain is checked with you in the chat.</p>
         <form onSubmit={upload}>
           <label>Name<input value={name} maxLength={80} onChange={e => setName(e.target.value)} placeholder="e.g. Hall 7" /></label>
-          <label>Floor plans<input type="file" accept=".svg,image/svg+xml" multiple onChange={e => setFiles([...(e.target.files ?? [])])} /></label>
+          <label>Floor plans<input type="file" accept=".svg,image/svg+xml,.png,image/png" multiple onChange={e => setFiles([...(e.target.files ?? [])])} /></label>
           <button type="submit" className="button button--primary" disabled={busy || !name.trim() || !files.length}>{busy ? 'Reading the plans…' : 'Create building'}</button>
         </form>
         {error && <p className="sheet-error" role="alert">{error}</p>}
@@ -92,7 +92,7 @@ export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: B
             <p><strong>{result.name}</strong>: {result.floors} floor{result.floors === 1 ? '' : 's'}, {result.spaces} spaces, {result.doors} doors, {result.connectors} stairs/lifts.</p>
             {result.issues.issues > 0 && <p className="sheet-hint">To check: {fields}.</p>}
             {result.questions.map(q => <p key={q} className="sheet-hint">• {q}</p>)}
-            <Link className="button button--primary" href={`/?building=${result.id}`} onClick={onClose}>Open {result.name}</Link>
+            <Link className="button button--primary" href={`/?building=${result.id}&check=1`} onClick={onClose}>Open {result.name} and check it</Link>
           </div>
         )}
       </section>

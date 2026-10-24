@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Building } from '@/lib/buildings/types';
 import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
@@ -39,6 +40,8 @@ interface Props {
   building: Building;
   buildings: BuildingRow[];
   suggestions: { label: string; question: string }[];
+  /** Just created from plans: offer to go through what the importer was unsure about. */
+  importIntro?: { checks: number; first?: string };
 }
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
@@ -53,7 +56,10 @@ function useWide() {
   );
 }
 
-export function BuildingExperience({ building, buildings, suggestions }: Props) {
+export function BuildingExperience({ building, buildings, suggestions, importIntro }: Props) {
+  const router = useRouter();
+  // Wake the Python agent while people read the start screen (cold starts on Vercel).
+  useEffect(() => { void fetch('/api/health').catch(() => undefined); }, []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [directive, setDirective] = useState<SceneDirective>(overview);
   const [draft, setDraft] = useState('');
@@ -175,6 +181,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
       sessionId.current = response.sessionId;
+      // The building changed (new door, moved machine, renamed room): reload the plan for the viewer.
+      if (response.edits?.length) router.refresh();
       conversationId.current = response.conversationId ?? conversationId.current;
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
       setDirective(response.scene);
@@ -307,6 +315,13 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             <p className="eyebrow">{building.building.name} · {building.floors.length} floors · {building.spaces.length} spaces</p>
             <h1>Ask me anything.</h1>
           </div>}
+          {!started && importIntro && (
+            <div className="import-intro">
+              <strong>Built from your plans.</strong>
+              <span>{importIntro.checks ? `${importIntro.checks} thing${importIntro.checks === 1 ? '' : 's'} to check, e.g. “${importIntro.first}”` : 'Nothing to check: ask me anything.'}</span>
+              {importIntro.checks > 0 && <button type="button" className="button button--primary" onClick={() => void ask('Let’s check what you were unsure about in this building, one question at a time.')}>Check it with me</button>}
+            </div>
+          )}
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
           {profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
           {world && profile && mentionQuery(draft) !== undefined

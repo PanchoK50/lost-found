@@ -350,4 +350,16 @@ def edit(b: Building, edit_record: dict) -> dict:
         scene["markers"] = [{"floorId": asset["floor_id"], "position": asset["position"], "label": asset["name"]}]
         scene["highlights"] = [_highlight(asset["space_id"], "primary", b.spaces[asset["space_id"]]["name"])]
         title = f"{asset['name']} moved"
-    return {"kind": "show", "answer": {"title": title, "detail": "Edit applied for this session"}, "scene": scene}
+    elif action in ("rename_room", "set_room_type") and edit_record["space_id"] in b.spaces:
+        space = b.spaces[edit_record["space_id"]]
+        scene["focus"] = {"mode": "floor", "floorId": space["floor_id"]}
+        scene["highlights"] = [_highlight(space["id"], "primary", space["name"])]
+        title = f"{space['name']} updated" if action == "rename_room" else f"{space['name']}: {space['room_type'].replace('_', ' ')}"
+    elif action == "set_door_width" and edit_record["opening_id"] in b.openings:
+        opening = b.openings[edit_record["opening_id"]]
+        scene["focus"] = {"mode": "floor", "floorId": opening["floor_id"]}
+        scene["markers"] = [{"floorId": opening["floor_id"], "position": opening["position"], "label": f"{opening['width_m']} m door"}]
+        title = f"Door width {opening['width_m']} m"
+    elif action == "rescale":
+        title = f"Plan rescaled ×{edit_record['factor']:.3f}"
+    return {"kind": "show", "answer": {"title": title, "detail": "Saved for everyone"}, "scene": scene}

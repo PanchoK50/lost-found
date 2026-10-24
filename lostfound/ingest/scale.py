@@ -84,3 +84,49 @@ def estimate(assets: list[dict]) -> tuple[float | None, float]:
             implied += [short / entry[0], long / entry[1]]
     refined = statistics.median(implied)
     return refined, best_score / len(rectangles)
+
+
+RASTER_PIXEL_TOLERANCE = 1.2   # a drawn side is accurate to about one pixel
+RASTER_MIN_EXAMPLES = 40       # only common furniture sizes: rare ones match anything at some scale
+RASTER_MIN_LONG_PX = 6
+
+
+def estimate_raster(assets: list[dict]) -> tuple[float | None, float]:
+    """Scale for raster plans, where sides are only known to about a pixel: every common catalogue size votes
+    for the scale it implies, weighted by the rectangle's size (big furniture pins the scale down), and the
+    densest weighted cluster of votes wins; then the weighted median inside it."""
+    rectangles = [rectangle_sides(asset["points"]) + (asset["category"],) for asset in assets if len(asset["points"]) == 4]
+    rectangles = [r for r in rectangles if r[1] >= RASTER_MIN_LONG_PX and r[0] >= 2]
+    if len(rectangles) < 3:
+        return None, 0.0
+    votes: list[tuple[float, float, float]] = []  # (log scale, log half-width, weight)
+    for short, long, category in rectangles:
+        for entry in catalogue().get(category, []):
+            if entry[2] < RASTER_MIN_EXAMPLES:
+                continue
+            s_short, s_long = short / entry[0], long / entry[1]
+            if abs(math.log(s_short / s_long)) > math.log(1 + 2 * RASTER_PIXEL_TOLERANCE / max(short, 1)):
+                continue
+            implied = math.sqrt(s_short * s_long)
+            if not SEARCH_RANGE[0] <= implied <= SEARCH_RANGE[1]:
+                continue
+            width = RASTER_PIXEL_TOLERANCE / long
+            votes.append((math.log(implied), width, long * math.log1p(entry[2])))
+    if not votes:
+        return None, 0.0
+    low, high = math.log(SEARCH_RANGE[0]), math.log(SEARCH_RANGE[1])
+    best, best_score = None, 0.0
+    for step in range(SEARCH_STEPS):
+        x = low + (high - low) * step / (SEARCH_STEPS - 1)
+        score = sum(weight for centre, width, weight in votes if abs(centre - x) <= width)
+        if score > best_score:
+            best, best_score = x, score
+    inside = sorted((centre, weight) for centre, width, weight in votes if abs(centre - best) <= width)
+    total = sum(weight for _, weight in inside)
+    running = 0.0
+    for centre, weight in inside:
+        running += weight
+        if running >= total / 2:
+            matched = len({id(v) for v in inside})
+            return math.exp(centre), min(1.0, matched / len(rectangles))
+    return math.exp(best), 0.0
