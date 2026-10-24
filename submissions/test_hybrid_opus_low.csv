@@ -1,0 +1,453 @@
+question_id,answer
+osm-way363805324-H01,"The largest generic room on Floor 1 is room 1.02, at 162.33 m². The next biggest, room 108, is much smaller at 39.25 m².
+
+Answer: 1.02, 162.33 m²"
+osm-way363805324-H02,"There are 5 generic rooms on the ground floor, and their floor areas add up to 54.77 m².
+
+Answer: 54.77"
+osm-way363805324-H03,"You'd walk 44.9 m in total. The closest office chair is in room 114 (Gemeinschaftsbüro), 14.84 m from Generic room 1.10. From there it's 30.06 m to Generic room 1.02, the largest generic room on Floor 1.
+
+Answer: 44.9"
+osm-way363805324-H04,"The room directly below Büchercorner is the Großer Saal (room E01) on the ground floor. Almost all of Büchercorner's floor (98.9%) sits over it, so that's where the water will go.
+
+Answer: E01"
+osm-way363805324-H07,"The room directly above Kitchen 0.16 is Generic room 1.10 on Floor 1. It's the Floor 1 room with the most floor overlap, covering about 64% of the kitchen's footprint.
+
+Answer: 1.10"
+osm-way363805324-H10,"Five rooms on Basement 1 share at least 1 m of wall with Generic room U20: U13 (Musik- und Tanraum), -1.10, -1.11, -1.12 and -1.13. Corridors, stairwells and lifts aren't counted.
+
+Answer: 5"
+osm-way363805324-H11,"The straight-line distance between the centre of Generic room -1.11 (Basement 1) and the centre of Büchercorner (room 107, Floor 1) is 21.16 m. Each centre is the room's floor-plan centroid, placed at its floor's height.
+
+Answer: 21.16"
+osm-way43035346-H01,"The largest generic room on Floor 3 is N3806, at 115.03 m². The next biggest is N3823, at 98.58 m².
+
+Answer: N3806, 115.03 m²"
+osm-way43035346-H02,"I added up the floor areas of all 26 generic rooms on Floor 1, and they come to 592.8 m².
+
+Answer: 592.8"
+osm-way43035346-H03,"You'd walk 53.98 m in total. The closest fire extinguisher is in Stairwell N3834 on Floor 3, which is 21.26 m from your room. From there it's 32.73 m, using the stairs, to N1838, the largest generic room on Floor 1.
+
+Answer: 53.98"
+osm-way43035346-H04,"The room directly above Generic room -1.14 is Generic room N0806 on the Ground floor. It covers about 86% of the basement room's floor area, more than any other room above it.
+
+Answer: N0806"
+osm-way43035346-H05,"On Basement 1, 6 other rooms share at least 1 m of wall with Generic room N-1840: -1.07, N-1806B, N-1806A, N-1841, N-1842 and -1.26. Corridors, stairwells and lifts aren't counted.
+
+Answer: 6"
+osm-way43035346-H06,"The straight-line distance between the centre of room N-1828 in Basement 1 (at −3 m) and the centre of room N2821 on Floor 2 (at +6 m) is 11.85 m. That includes the 9 m height difference between the two floors.
+
+Answer: 11.85"
+osm-way43035346-H07,"I added a door in the middle of the wall shared by N0808 and N0809 on the ground floor. With that door, no room on Floor 3 gets a walk to its nearest entrance that is more than 1 m shorter.
+
+Answer: 0"
+osm-way50299584-H01,"The largest generic room on the ground floor is room 0566, with a floor area of 559.8 m². That is roughly three times the size of the next largest, room 0583, at 189.21 m².
+
+Answer: 0566, 559.8 m²"
+osm-way50299584-H02,"The 41 generic rooms on Floor 3 add up to 959.75 m² of floor area.
+
+Answer: 959.75"
+osm-way50299584-H03,"You'd walk 103.36 m in total. The nearest coat rack by walking distance is in Corridor 2591 on Floor 2, 56.15 m from you. From there it's 47.21 m to Generic room 2538, the largest generic room on Floor 2.
+
+Answer: 103.36"
+osm-way50299584-H04,"The room directly above Generic room -1517 is Generic room 0583 on the ground floor. It sits over 98% of the basement room's floor area.
+
+Answer: 0583"
+osm-way50299584-H06,"The room directly below Generic room 0520 is Generic room -1530 on Basement 1. Its floor area lies completely under room 0520, so that's where the water will go.
+
+Answer: -1530"
+osm-way50299584-H11,"Room 1530 on Floor 1 is directly above Generic room 0523. It covers about 88% of room 0523's floor area, so that's the place to check for the leak.
+
+Answer: 1530"
+osm-way50299584-H12,"Four rooms on Floor 2 share at least 1 m of wall with Generic room 2522: 2530, 2523, 2522A and 2523A. Corridors, stairwells and lifts are not counted.
+
+Answer: 4"
+osm-way50299584-H13,"The straight-line distance between the centre of room 3580.2 on Floor 3 and the centre of room 1561 on Floor 1 is 62.01 m. Each centre is the room's floor-plan centre, set at its floor's height.
+
+Answer: 62.01"
+osm-way50300147-H01,"Generic room 0219 is the largest generic room on the ground floor, at 530.16 m². That's about three times the size of the next biggest one, room 0220 (174.63 m²).
+
+Answer: 0219, 530.16 m²"
+osm-way50300147-H02,"I added up the floor areas of all 43 generic rooms on Floor 1, and they come to 1699.55 m² in total.
+
+Answer: 1699.55"
+osm-way50300147-H03,"The closest desk is in room 1211B, which is 2.71 m from you. Carrying it from there up to 2221, the largest generic room on Floor 2, is another 75.53 m, using the stairs.
+
+Answer: 78.24"
+osm-way50300147-H04,"Room 0260 on the ground floor is directly above Generic room -1284. Their floor outlines overlap by about 99%.
+
+Answer: 0260"
+osm-way50300147-H05,"The water would reach room 0219 on the ground floor. It sits directly below Generic room 1271C, and the floor plans show room 1271C lies entirely over room 0219.
+
+Answer: 0219"
+osm-way50300147-H06,"Room 0209 on the ground floor is directly above Generic room -1216. Its floor area overlaps 93% of the basement room, so it's the most likely place to check for the leak.
+
+Answer: 0209"
+osm-way50300147-H07,"Six rooms on Basement 1 share at least 1 m of wall with Generic room -1208: -1247e, -1206, -1202, -1247d, -1247f and -1247c. Corridors, stairwells and lifts aren't counted.
+
+Answer: 6"
+osm-way50300147-H08,"The straight-line distance between the centres of room 2231 on Floor 2 and room -1248 in Basement 1 is 45.49 m. Each centre is the room's floor-plan centroid, set at its floor's height (6 m and -3 m).
+
+Answer: 45.49"
+osm-way50300147-H09,"I added a door in the middle of the wall between Corridor 0263 and Corridor 0244 on the ground floor. With that door, 47 rooms in Basement 1 would have a walk to their nearest building entrance that is more than 1 m shorter.
+
+Answer: 47"
+osm-way50300147-H10,"I added a door in the middle of the wall that Lobby 0.01 and Generic room 0293 share on the ground floor. With that door, 47 rooms on Basement 1 would have a walk to their nearest building entrance that is more than 1 m shorter.
+
+Answer: 47"
+proc-campus-test-000-H01,"The largest toilet on Floor 1 is Toilet 1.25, at 34.02 m². The next largest are 1.29 at 23.94 m² and 1.21 at 21.54 m².
+
+Answer: 1.25, 34.02 m²"
+proc-campus-test-000-H02,"Basement 1 has 4 server rooms, and together they cover 105.42 m² of floor area.
+
+Answer: 105.42"
+proc-campus-test-000-H03,"Starting from the entrance into the Main lobby, the 1.0 m trolley can reach 21 rooms on Floor 1. That route uses lifts only, with no stairs or steps, and every door it goes through is at least 1.0 m wide.
+
+Answer: 21"
+proc-campus-test-000-H04,"You'd walk 45.3 m from Office 4.27 to Kitchen 4.41, the closest room with a coffee machine. From there it's 82.94 m, using the stairs, to Meeting room 2.09, the largest meeting room on Floor 2.
+
+Answer: 128.24"
+proc-campus-test-000-H05,"The straight-line distance between the centre of Lab 2.23 on Floor 2 and the centre of Storage 0.36 on the Ground floor is 41.31 m. Each centre is the room's floor-plan centroid at its floor's height (7.6 m and 0.0 m).
+
+Answer: 41.31"
+proc-campus-test-004-H01,"Meeting room 0.15 is the largest of the four meeting rooms on the ground floor, at 35.46 m². The next largest is Meeting room 0.21, at 26.52 m².
+
+Answer: 0.15, 35.46 m²"
+proc-campus-test-004-H02,"The 6 offices on Floor 1 add up to 184.14 m² of floor area.
+
+Answer: 184.14"
+proc-campus-test-004-H03,"The trolley can be delivered to 13 rooms on Floor 2. That counts the Floor 2 rooms it can reach from the Main lobby without using stairs or steps (lifts allowed), going only through doors at least 1.0 m wide.
+
+Answer: 13"
+proc-campus-test-004-H04,"You'd walk 33.56 m from Storage 0.12 to Kitchen 0.05, which is the closest room with a stove. Then you'd carry it 40.73 m, using the stairs, to Lab 1.17, the largest lab on Floor 1.
+
+Answer: 74.29"
+proc-campus-test-004-H05,"I measured the straight line from the centre of Lab 1.17 on Floor 1 to the centre of Lab 3.19 on Floor 3, with each centre at its floor's height. The distance is 15.06 m.
+
+Answer: 15.06"
+proc-campus-test-005-H01,"Meeting room 1.13 is the largest meeting room on Floor 1, at 41.52 m². The next largest is 1.20, at 34.68 m².
+
+Answer: 1.13, 41.52 m²"
+proc-campus-test-005-H02,"The 16 offices on the ground floor add up to 456.72 m² of floor area.
+
+Answer: 456.72"
+proc-campus-test-005-H03,"The bed can reach 18 rooms on Floor 4. That counts every route from the Main lobby that uses lifts instead of stairs or steps and only goes through doors at least 1.0 m wide.
+
+Answer: 18"
+proc-campus-test-005-H04,"The closest kitchen counter is in Kitchen 2.33, which is 29.09 m from Seminar room 2.37. Carrying it from there to Storage 1.27, the largest storage room on Floor 1, is another 60.43 m using the stairs.
+
+Answer: 89.51"
+proc-campus-test-005-H05,"Three rooms on Basement 1 share at least 1 m of wall with Toilet -1.31:
+- Storage -1.30 shares 6.7 m.
+- Locker room -1.40 shares 5.19 m.
+- Locker room -1.41 shares 2.21 m.
+
+Answer: 3"
+proc-campus-test-005-H06,"I measured from the centre of Lab 4.10 on Floor 4 (15.2 m up) to the centre of Office 2.41 on Floor 2 (7.6 m up). The straight line between them is 39.09 m.
+
+Answer: 39.09"
+proc-campus-test-008-H01,"Office 2.19 is the largest office on Floor 2, at 39.66 m². The next largest is Office 2.07 at 35.94 m².
+
+Answer: 2.19, 39.66 m²"
+proc-campus-test-008-H02,"Floor 1 has 3 meeting rooms, and their floor areas add up to 86.4 m².
+
+Answer: 86.4"
+proc-campus-test-008-H03,"I counted the Floor 5 rooms the bed can reach from the Main lobby (Ground floor) entrance using lifts only, with no stairs or steps and every door at least 1.0 m wide. 11 rooms meet those conditions.
+
+Answer: 11"
+proc-campus-test-008-H04,"You'd walk 78.91 m in total. The closest plant is in Office 3.24, 22.46 m from Seminar room 3.21. From there it's 56.45 m, using the stairs, to Meeting room 1.07, the largest meeting room on Floor 1.
+
+Answer: 78.91"
+proc-campus-test-008-H05,"The straight-line distance between the centre of Office 1.25 on Floor 1 and the centre of Technical room -1.19 in Basement 1 is 33.73 m. Each centre is the room's floor-plan centroid, placed at its floor's elevation.
+
+Answer: 33.73"
+proc-campus-test-012-H01,"Office 1.12 is the largest office on Floor 1, at 40.02 m². The next largest is Office 1.28, at 33.06 m².
+
+Answer: 1.12, 40.02 m²"
+proc-campus-test-012-H02,"Floor 4 has 3 toilets, and together they cover 99.18 m².
+
+Answer: 99.18"
+proc-campus-test-012-H03,"I counted the rooms on Floor 1 the pallet can reach from the Main lobby entrance without using stairs or steps (lifts allowed), passing only through doors at least 1.0 m wide. 16 rooms meet those conditions.
+
+Answer: 16"
+proc-campus-test-012-H04,"You'd walk 43.83 m in total. The closest plant is in Office 3.23, 9.77 m from Seminar room 3.22. From there it's 34.06 m to Lab 3.13, the largest lab on Floor 3.
+
+Answer: 43.83"
+proc-campus-test-012-H05,"The straight-line distance between the centre of Print room 4.28 on Floor 4 and the centre of Seminar room 0.06 on the ground floor is 38.46 m. Each centre is taken at its own floor's height, and Floor 4 is 15.2 m above the ground floor.
+
+Answer: 38.46"
+proc-campus-test-013-H01,"The largest storage room on Floor 5 is Storage 5.26, at 40.86 m². The next largest is 5.07, at 25.62 m².
+
+Answer: 5.26, 40.86 m²"
+proc-campus-test-013-H02,"I added up the floor areas of all 8 labs on Floor 1, and they come to 200.28 m² in total.
+
+Answer: 200.28"
+proc-campus-test-013-H03,"The pallet enters at the Main lobby on the ground floor and can't use stairs or steps, so it goes up by lift. On floor 3, it can reach 15 rooms where every door on the way is at least 1.0 m wide.
+
+Answer: 15"
+proc-campus-test-013-H04,"The closest chemical cabinet by walking distance is in Lab 5.38 on Floor 5, 35.49 m from Office 4.29. Carrying it from there to Lab 1.34, the largest lab on Floor 1, is another 81.12 m, using the stairs.
+
+Answer: 116.61"
+proc-campus-test-013-H05,"I measured from the centre of Office 5.35's floor plan on Floor 5 to the centre of Lab 1.07's floor plan on Floor 1, using each floor's height. The straight-line distance between them is 36.37 m.
+
+Answer: 36.37"
+proc-factory-test-001-H01,"The ground floor has 4 meeting rooms, and together they cover 92.1 m².
+
+Answer: 92.1"
+proc-factory-test-001-H02,"Coming in through the entrance into Logistics zone H-C1, the bed can be delivered to 9 rooms on the ground floor. That count only includes routes with no stairs or steps (the lift is allowed) where every door is at least 1.0 m wide. Halls, corridors, stairwells and lifts aren't counted as rooms.
+
+Answer: 9"
+proc-factory-test-001-H03,"Six rooms on the ground floor share at least 1 m of wall with Production zone H-A2. They are Assembly zone H-A1, Production zone H-A3, Offices 0.22 and 0.23, Server room 0.24 and Meeting room 0.25. Corridors, stairwells and lifts aren't counted.
+
+Answer: 6"
+proc-factory-test-002-H01,"The ground floor has 5 meeting rooms, and their floor areas add up to 126.5 m².
+
+Answer: 126.5"
+proc-factory-test-002-H02,"Coming in through Office corridor 0.31, the bed can reach 9 rooms on the ground floor. That count only includes routes with no stairs or steps, where every door is at least 1.0 m wide.
+
+Answer: 9"
+proc-factory-test-002-H03,"Four rooms on the ground floor share at least 1 m of wall with Office 0.38: Warehouse zone H-A1, Production zone H-A2, Office 0.37 and Office 0.39. Corridors, stairwells and lifts were left out.
+
+Answer: 4"
+proc-factory-test-002-H04,"The straight-line distance is 111.98 m. That's measured from the floor-plan centre of Meeting room 2.20 on Floor 2, at 7.0 m up, to the centre of Warehouse zone H-D6 on the ground floor, at 0 m.
+
+Answer: 111.98"
+proc-factory-test-003-H01,"Meeting room 1.17 is the largest meeting room on Floor 1, at 29.35 m². The next largest is meeting room 1.20, at 25.25 m².
+
+Answer: 1.17, 29.35 m²"
+proc-factory-test-003-H02,"I added up the floor areas of all 7 meeting rooms on Floor 2, and they come to 154.2 m² in total.
+
+Answer: 154.2"
+proc-factory-test-003-H03,"Coming in through Office corridor 0.25, the 1.1 m bed can reach 7 rooms on the ground floor. That count only includes routes with no stairs or steps (lifts allowed) where every door is at least 1.1 m wide.
+
+Answer: 7"
+proc-factory-test-003-H04,"You'll walk 89.86 m in total. The closest server rack is in Server room 1.14, which is 24.23 m from Meeting room 1.10. From there it's 65.63 m, using the stairs, to Kitchen 0.29, the largest kitchen on the ground floor.
+
+Answer: 89.86"
+proc-factory-test-003-H05,"Three rooms on the ground floor share at least 1 m of wall with Office 0.33: Warehouse zone H-A2 (6.05 m of shared wall), Office 0.32 (5.7 m) and Kitchen 0.34 (5.7 m).
+
+Answer: 3"
+proc-factory-test-003-H06,"I measured the straight line from the centre of Office 2.27 on Floor 2 to the centre of Office 0.58 on the ground floor, with each centre set at its own floor's height. The distance is 32.02 m.
+
+Answer: 32.02"
+proc-factory-test-006-H01,"I added up the floor areas of all 9 offices on Floor 2, and they come to 203.3 m² in total.
+
+Answer: 203.3"
+proc-factory-test-006-H02,"From the entrance into Main aisle H-B4, a 1.1 m wide load that avoids stairs and steps but can use the lift can reach 4 rooms on Floor 2. Every door on the way to those rooms is at least 1.1 m wide.
+
+Answer: 4"
+proc-factory-test-006-H03,"Three ground-floor rooms share at least 1 m of wall with Office 0.20: Additive zone H-A2 (5.27 m), Server room 0.19 (5.7 m) and Meeting room 0.21 (5.7 m). Corridors, stairwells and lifts were left out.
+
+Answer: 3"
+proc-factory-test-006-H04,"The straight-line distance is 53.09 m. It runs from the centre of Warehouse zone H-C4 on the ground floor (0 m) to the centre of Office 2.10 on Floor 2 (7.0 m), using each room's floor-plan centre at its floor's height.
+
+Answer: 53.09"
+proc-factory-test-007-H01,"Kitchen 1.10 is the largest kitchen on Floor 1, at 28.75 m². The next biggest is Kitchen 1.37, at 25.9 m².
+
+Answer: 1.10, 28.75 m²"
+proc-factory-test-007-H02,"Floor 1 has 18 offices, and their floor areas add up to 413.4 m².
+
+Answer: 413.4"
+proc-factory-test-007-H03,"Starting from the entrance into Logistics zone H-D1, the trolley can reach 9 rooms on the ground floor. That count only uses routes with no stairs or steps where every door is at least 1.1 m wide.
+
+Answer: 9"
+proc-factory-test-007-H04,"The closest drill press is in Production zone H-B2 on the ground floor, 97.02 m from Office 1.05. Carrying it from there to Kitchen 1.10, the largest kitchen on Floor 1, is another 123.59 m, using the stairs.
+
+Answer: 220.61"
+proc-factory-test-007-H05,"Four rooms on the ground floor share at least 1 m of wall with Kitchen 0.43:
+- Office 0.42 (5.7 m)
+- Hall access 0.44 (5.7 m)
+- Warehouse zone H-A5 (3.34 m)
+- Production zone H-A4 (2.71 m)
+
+I counted Hall access 0.44 because halls aren't on your list of exclusions (corridors, stairwells and lifts). If you'd rather leave it out, the answer is 3.
+
+Answer: 4"
+proc-factory-test-007-H06,"The straight-line distance is 34.8 m. That's measured from the centre of Production zone H-A4 at ground level (0 m) to the centre of Office 2.10 at Floor 2's height (7.0 m), so it includes the height difference between the floors.
+
+Answer: 34.8"
+proc-factory-test-009-H01,"The four production zones on the ground floor add up to 1220.16 m² of floor area.
+
+Answer: 1220.16"
+proc-factory-test-009-H02,"Starting from Office corridor 0.21 and using the lift instead of stairs, the bed can reach 12 rooms on Floor 1 where every door on the way is at least 1.0 m wide.
+
+Answer: 12"
+proc-factory-test-009-H03,"On the ground floor, 4 rooms share at least 1 m of wall with Office 0.27: Additive zone H-A1 (4.21 m), Warehouse zone H-A2 (2.96 m), Meeting room 0.26 (5.7 m) and Kitchen 0.28 (5.7 m).
+
+Answer: 4"
+proc-factory-test-010-H01,"Meeting room 0.40 is the largest meeting room on the ground floor, at 29.95 m². The next largest is 0.33, at 23.9 m².
+
+Answer: 0.40, 29.95 m²"
+proc-factory-test-010-H02,"The five meeting rooms on the ground floor add up to 111.6 m² of floor area.
+
+Answer: 111.6"
+proc-factory-test-010-H03,"Starting from the entrance into Logistics zone H-E1, the pallet can reach 10 rooms on Floor 1. That count uses only routes with no stairs or steps (lifts allowed) and where every door is at least 1.0 m wide.
+
+Answer: 10"
+proc-factory-test-010-H04,"You'll walk 113.02 m in total. The closest UPS unit is in Server room 1.16, 21.48 m from Office 1.12. From there it's 91.55 m to Meeting room 0.40, the largest meeting room on the ground floor, using the stairs.
+
+Answer: 113.02"
+proc-factory-test-010-H05,"Four rooms on the ground floor share at least 1 m of wall with Quality lab 0.27: assembly zones H-A1 (3.42 m) and H-A2 (2.72 m), server room 0.26 (5.7 m) and office 0.28 (5.7 m).
+
+Answer: 4"
+proc-factory-test-011-H01,"The 7 production zones on the ground floor add up to 2079.98 m² of floor area.
+
+Answer: 2079.98"
+proc-factory-test-011-H02,"If the trolley comes in through Logistics zone H-E3 on the ground floor, it can reach 7 rooms on Floor 2. That count only uses routes with no stairs or steps (lifts are allowed) where every door is at least 1.1 m wide.
+
+Answer: 7"
+proc-factory-test-011-H03,"Four rooms on the ground floor share at least 1 m of wall with Locker room 0.41: Assembly zone H-A3 (1.92 m), Additive zone H-A4 (4.27 m), Office 0.40 (5.7 m) and Office 0.42 (5.7 m).
+
+Answer: 4"
+proc-factory-test-011-H04,"The straight-line distance between the centre of Production zone H-B3 (Ground floor) and the centre of Kitchen 2.04 (Floor 2) is 51.42 m. Each centre is the room's floor-plan centroid, placed at its floor's height.
+
+Answer: 51.42"
+resplan-1153-H01,"The ground floor has 4 bedrooms, and their floor areas add up to 71.29 m².
+
+Answer: 71.29"
+resplan-1153-H02,"Three rooms share at least 1 m of wall with Bedroom 0.03: Bedroom 0.04 (5.72 m), Bathroom 0.06 (3.45 m) and Living room 0.01 (2.98 m).
+
+Answer: 3"
+resplan-12469-H01,"The ground floor has 5 bedrooms, and together they cover 109.7 m².
+
+Answer: 109.7"
+resplan-12469-H02,"I counted the ground-floor rooms the machine can reach from the entrance into Living room 0.01. The route can't use stairs or steps, and every door on it is at least 1.0 m wide. It can reach 8 rooms.
+
+Answer: 8"
+resplan-12469-H03,"Five rooms share at least 1 m of wall with Bedroom 0.05: Living room 0.01 (6.8 m of shared wall) and Bathrooms 0.07 (4.1 m), 0.08 (3.13 m), 0.09 (2.21 m) and 0.10 (2.13 m).
+
+Answer: 5"
+resplan-12962-H01,"Five rooms on the ground floor share at least 1 m of wall with Living room 0.01: bedrooms 0.02 and 0.03, bathrooms 0.04 and 0.05, and kitchen 0.06.
+
+Answer: 5"
+resplan-14307-H01,"Three rooms on the ground floor share at least 1 m of wall with Bedroom 0.02: Living room 0.01 (2.72 m), Kitchen 0.05 (1.94 m) and Bathroom 0.04 (1.89 m).
+
+Answer: 3"
+resplan-3573-H01,"Bathroom 0.06 is the largest of the three bathrooms on the ground floor, at 6.98 m². The other two are 0.05 at 5.63 m² and 0.07 at 5.05 m².
+
+Answer: 0.06, 6.98 m²"
+resplan-3573-H02,"There are 3 bathrooms on the ground floor, and their floor areas add up to 17.65 m².
+
+Answer: 17.65"
+resplan-3573-H03,"I counted the rooms on the ground floor that the machine can reach from Living room 0.01 with no stairs or steps, where every door is at least 1.0 m wide. Six rooms meet those conditions.
+
+Answer: 6"
+resplan-3573-H04,"You'd walk 6.2 m from Living room 0.01 to the nearest sink, in Bathroom 0.07. Then you'd carry it 12.38 m to Bathroom 0.06, the largest bathroom on the ground floor, for 18.58 m in total.
+
+Answer: 18.58"
+resplan-3573-H05,"Six rooms on the ground floor share at least 1 m of wall with Living room 0.01. They are bedrooms 0.02, 0.03 and 0.04, bathrooms 0.06 and 0.07, and kitchen 0.08.
+
+Answer: 6"
+resplan-6532-H01,"I counted the ground-floor rooms the pallet can reach from the entrance into Living room 0.01 without using stairs or steps, going only through doors at least 1.0 m wide. Three rooms are reachable that way.
+
+Answer: 3"
+resplan-6532-H02,"Three rooms share at least 1 m of wall with Bedroom 0.03: Living room 0.01 (2.45 m), Bathroom 0.04 (2.1 m) and Kitchen 0.06 (4.43 m).
+
+Answer: 3"
+resplan-8357-H01,"The pallet can reach 4 rooms on the ground floor from the entrance into Living room 0.01. That count covers routes with no stairs or steps where every door is at least 1.1 m wide.
+
+Answer: 4"
+resplan-8357-H02,"Five rooms share at least 1 m of wall with Living room 0.01: Bedroom 0.02, Bedroom 0.03, Bathroom 0.04, Bathroom 0.05 and Kitchen 0.06. The kitchen shares the most wall, at 19.62 m.
+
+Answer: 5"
+resplan-9751-H01,"Five rooms on the ground floor share at least 1 m of wall with Living room 0.01:
+- Bedroom 0.02 (4.18 m of shared wall)
+- Bedroom 0.03 (5.35 m)
+- Bathroom 0.04 (3.49 m)
+- Bathroom 0.05 (2.35 m)
+- Kitchen 0.06 (4.84 m)
+
+Answer: 5"
+swiss-100-H01,"The largest living room on Floor 1 is room 1.05, the living room of apartment 4, at 30.16 m². The next largest is 1.36 at 27.21 m².
+
+Answer: 1.05, 30.16 m²"
+swiss-100-H02,"Floor 5 has 8 bathrooms, and together their floor area comes to 32.47 m².
+
+Answer: 32.47"
+swiss-100-H03,"You'd walk 39.2 m in total. The nearest microwave is in Kitchen 4.03, 7.07 m from you. From there it's 32.13 m, using the stairs, to Living room 1.05, the largest living room on floor 1.
+
+Answer: 39.2"
+swiss-1195-H01,"Floor 3 has 14 bedrooms, and their floor areas add up to 207.01 m².
+
+Answer: 207.01"
+swiss-1195-H02,"Three rooms on Floor 1 share at least 1 m of wall with Bedroom 1.34: Bedroom 1.11 (3.66 m), Kitchen 1.31 (3.82 m) and Bathroom 1.30 (2.04 m).
+
+Answer: 3"
+swiss-1671-H01,"The largest bedroom on the ground floor is Bedroom 0.05 in apartment 1, at 19.34 m². The next largest is Bedroom 0.09, at 17.32 m².
+
+Answer: 0.05, 19.34 m²"
+swiss-1671-H02,"The 8 bedrooms on Floor 2 add up to 133.95 m² of floor area.
+
+Answer: 133.95"
+swiss-1671-H03,"You'd walk 9.38 m to pick up the kitchen counter in Kitchen 1.09, the nearest room that has one. From there it's 18.11 m, using the stairs, to Bedroom 0.05, the largest bedroom on the ground floor.
+
+Answer: 27.49"
+swiss-1671-H04,"Three rooms on Floor 2 share at least 1 m of wall with Kitchen 2.09: Storage 2.08 (2.02 m of wall), Bedroom 2.12 (3.62 m) and Bathroom 2.14 (2.26 m).
+
+Answer: 3"
+swiss-17033-H01,"The 4 bedrooms on Floor 1 add up to 50.66 m² of floor area.
+
+Answer: 50.66"
+swiss-1760-H01,"The largest kitchen on the ground floor is Kitchen 0.06 in apartment 1, at 6.73 m². The next biggest is Kitchen 0.23 in apartment 4, at 6.08 m².
+
+Answer: 0.06, 6.73 m²"
+swiss-1760-H02,"There are 4 living rooms on the ground floor, and together they cover 61.12 m².
+
+Answer: 61.12"
+swiss-17736-H01,"The largest bedroom on Floor 3 is 3.03, in apartment 8, at 19.44 m². The next biggest is 3.02 at 14.35 m².
+
+Answer: 3.03, 19.44 m²"
+swiss-17736-H02,"Floor 2 has 7 bathrooms, and together they cover 34.0 m².
+
+Answer: 34"
+swiss-17736-H03,"You'd walk 34.14 m in total. The nearest sofa is in Living room 2.01, which is 6.57 m from Bedroom 2.08. Carrying it from there to Bedroom 3.03, the largest bedroom on Floor 3, adds 27.58 m, using the stairs.
+
+Answer: 34.14"
+swiss-1825-H01,"Floor 3 has 4 bathrooms, and together they cover 20.54 m².
+
+Answer: 20.54"
+swiss-2-H01,"Floor 3 has three bedrooms, and together they cover 42.31 m².
+
+Answer: 42.31"
+swiss-2080-H01,"The largest bathroom on Floor 2 is Bathroom 2.15 in apartment 8, at 4.13 m². The next largest are 2.19 and 2.01, both 3.1 m².
+
+Answer: 2.15, 4.13 m²"
+swiss-2080-H02,"The 4 bathrooms on Floor 3 add up to 12.3 m² of floor area.
+
+Answer: 12.3"
+swiss-2080-H03,"You'll walk 38.28 m in total. The closest dining table is in Living room 2.08 on Floor 2, which is 23.27 m from you. From there it's another 15.01 m to Bedroom 2.18, the largest bedroom on Floor 2.
+
+Answer: 38.28"
+swiss-2080-H04,"Four rooms on Floor 2 share at least 1 m of wall with Bedroom 2.20: Bathroom 2.01 (2.18 m), Bedroom 2.06 (3.52 m), Bedroom 2.18 (3.53 m) and Bathroom 2.19 (1.76 m). Corridors, stairwells and lifts were left out.
+
+Answer: 4"
+swiss-2873-H01,"The largest storage room on Floor 2 is Storage 2.14 in apartment 10, at 3.22 m². The next biggest is Storage 2.03 at 2.05 m².
+
+Answer: 2.14, 3.22 m²"
+swiss-2873-H02,"The ground floor has 4 storage rooms, and together they cover 12.53 m².
+
+Answer: 12.53"
+swiss-2873-H03,"You'd walk 34.27 m in total. The closest outdoor chair is on Balcony 1.29, which is 6.77 m from the kitchen. Carrying it up the stairs to Storage 2.14, the largest storage room on Floor 2, adds 27.5 m.
+
+Answer: 34.27"
+swiss-2873-H04,"Three rooms on Floor 2 share at least 1 m of wall with Bedroom 2.07:
+- Bedroom 2.02 (3.57 m of shared wall)
+- Bedroom 2.08 (3.45 m)
+- Living room 2.09 (4.42 m)
+
+Answer: 3"
+swiss-482-H01,"The largest storage room on Floor 4 is 4.12, in apartment 18, at 2.32 m². The next largest is 4.08 at 2.08 m².
+
+Answer: 4.12, 2.32 m²"
+swiss-482-H02,"Floor 4 has 6 bathrooms, and together they cover 16.07 m².
+
+Answer: 16.07"
+swiss-482-H03,"The nearest fridge is in Kitchen 4.26, 8.46 m from Storage 4.27. Carrying it up the stairs to Bedroom 9.04, the largest bedroom on Floor 9, is another 58.56 m, so the total walk is 67.01 m.
+
+Answer: 67.01"
+swiss-482-H04,"Three rooms on Floor 7 share at least 1 m of wall with Bedroom 7.22: Bedroom 7.10 (4.72 m, in apartment 30), Bedroom 7.20 (4.77 m) and Storage 7.24 (1.8 m).
+
+Answer: 3"
+swiss-6128-H01,"Floor 2 has 4 bedrooms, and their floor areas add up to 74.92 m².
+
+Answer: 74.92"

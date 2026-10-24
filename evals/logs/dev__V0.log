@@ -1,0 +1,37 @@
+[V0] swiss-1689-H01                     floor_area_total           BAD $  0.07
+[V0] osm-way27326387-H02                floor_area_total           BAD $  0.12
+[V0] proc-campus-dev-001-H04            errand                     BAD $  0.24
+[V0] proc-factory-dev-012-H04           errand                     OK  $  0.47
+[V0] proc-factory-dev-010-H04           errand                     BAD $  0.66
+[V0] swiss-450-H01                      largest_room               BAD $  0.70
+[V0] osm-way360544293-H01               largest_room               BAD $  0.77
+[V0] osm-way27917482-H02                floor_area_total           BAD $  0.87
+[V0] proc-factory-dev-010-H01           largest_room               BAD $  0.92
+[V0] osm-way27917482-H05                room_stacked               BAD $  0.98
+[V0] osm-way27917482-H06                shared_walls_count         BAD $  1.04
+[V0] osm-way27326387-H04                room_stacked               BAD $  1.14
+[V0] proc-factory-dev-008-H05           shared_walls_count         BAD $  1.20
+[V0] resplan-16154-H02                  shared_walls_count         BAD $  1.26
+[V0] osm-way22744230-H05                room_stacked               OK  $  1.60
+[V0] proc-campus-dev-009-H05            straight_line_3d           BAD $  1.66
+[V0] proc-campus-dev-002-H03            straight_line_3d           BAD $  1.71
+[V0] osm-way22744230-H09                straight_line_3d           BAD $  1.77
+[V0] resplan-8269-H01                   wide_delivery_count        BAD $  1.85
+[V0] osm-way22744230-H03                step_free_reachable_count  BAD $  2.26
+[V0] proc-campus-dev-001-H03            wide_delivery_count        BAD $  2.41
+[V0] osm-way27917482-H09                what_if_door               BAD $  2.66
+[V0] proc-factory-dev-011-H03           wide_delivery_count        BAD $  2.74
+[V0] osm-way27917482-H08                what_if_door               BAD $  3.62
+
+kind                         correct / total
+  errand                        1 / 3
+  floor_area_total              0 / 3
+  largest_room                  0 / 3
+  room_stacked                  1 / 3
+  shared_walls_count            0 / 3
+  step_free_reachable_count     0 / 1
+  straight_line_3d              0 / 3
+  what_if_door                  0 / 2
+  wide_delivery_count           0 / 3
+  all                           2 / 24  (8.3%)   cost $3.62
+results: evals/results/dev__V0.jsonl

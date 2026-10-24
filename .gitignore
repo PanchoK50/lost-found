@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Generated art working files (raw images, meshes)
 /tools/art/out/
+
+# Python agent output (kit scratch files)
+/agent_output/

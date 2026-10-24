@@ -1,0 +1,374 @@
+{
+"additive_zone|assembly_zone": [
+13.3,
+1.0
+],
+"additive_zone|corridor": [
+12.6,
+0.333
+],
+"additive_zone|lobby": [
+1.6,
+1.0
+],
+"additive_zone|production_zone": [
+15.6,
+0.667
+],
+"assembly_zone|assembly_zone": [
+12.9,
+0.667
+],
+"assembly_zone|corridor": [
+15.2,
+0.25
+],
+"assembly_zone|lobby": [
+1.6,
+1.0
+],
+"assembly_zone|production_zone": [
+13.6,
+0.4
+],
+"balcony|bedroom": [
+0.7,
+0.069
+],
+"balcony|corridor": [
+0.81,
+0.25
+],
+"balcony|kitchen": [
+0.79,
+0.074
+],
+"balcony|living_room": [
+0.9,
+0.058
+],
+"balcony|storage": [
+0.66,
+0.588
+],
+"bathroom|bathroom": [
+0.63,
+0.179
+],
+"bathroom|bedroom": [
+0.6,
+0.058
+],
+"bathroom|corridor": [
+0.71,
+0.073
+],
+"bathroom|kitchen": [
+0.94,
+0.32
+],
+"bathroom|living_room": [
+0.83,
+0.075
+],
+"bathroom|stairwell": [
+0.8,
+1.0
+],
+"bathroom|storage": [
+2.5,
+0.333
+],
+"bedroom|bedroom": [
+0.84,
+0.096
+],
+"bedroom|corridor": [
+0.9,
+0.078
+],
+"bedroom|kitchen": [
+1.33,
+0.126
+],
+"bedroom|living_room": [
+0.8,
+0.09
+],
+"bedroom|stairwell": [
+0.9,
+0.311
+],
+"bedroom|storage": [
+0.93,
+0.182
+],
+"canteen|corridor": [
+1.6,
+1.0
+],
+"canteen|generic_room": [
+0.9,
+1.0
+],
+"canteen|lobby": [
+0.9,
+1.0
+],
+"canteen|outside": [
+0.9,
+1.0
+],
+"corridor|corridor": [
+0.9,
+0.309
+],
+"corridor|generic_room": [
+0.9,
+1.0
+],
+"corridor|kitchen": [
+0.9,
+0.108
+],
+"corridor|lab": [
+1.2,
+1.0
+],
+"corridor|lecture_hall": [
+1.6,
+0.846
+],
+"corridor|library": [
+0.9,
+0.645
+],
+"corridor|lift": [
+1.1,
+0.745
+],
+"corridor|living_room": [
+0.9,
+0.051
+],
+"corridor|lobby": [
+1.6,
+0.912
+],
+"corridor|locker_room": [
+0.9,
+1.0
+],
+"corridor|logistics_zone": [
+15.6,
+0.176
+],
+"corridor|makerspace": [
+1.6,
+1.0
+],
+"corridor|meeting_room": [
+1.2,
+0.98
+],
+"corridor|office": [
+0.9,
+1.0
+],
+"corridor|outside": [
+0.9,
+0.575
+],
+"corridor|print_room": [
+0.9,
+1.0
+],
+"corridor|production_zone": [
+15.9,
+0.167
+],
+"corridor|quality_lab": [
+1.6,
+1.0
+],
+"corridor|seminar_room": [
+1.2,
+1.0
+],
+"corridor|server_room": [
+1.6,
+1.0
+],
+"corridor|stairwell": [
+0.9,
+0.135
+],
+"corridor|storage": [
+1.6,
+0.217
+],
+"corridor|toilet": [
+1.2,
+0.707
+],
+"corridor|warehouse_zone": [
+14.7,
+0.227
+],
+"generic_room|generic_room": [
+0.9,
+1.0
+],
+"generic_room|lobby": [
+0.9,
+1.0
+],
+"generic_room|outside": [
+0.9,
+1.0
+],
+"generic_room|stairwell": [
+0.9,
+1.0
+],
+"generic_room|toilet": [
+0.9,
+1.0
+],
+"kitchen|kitchen": [
+0.81,
+1.0
+],
+"kitchen|living_room": [
+0.81,
+0.042
+],
+"kitchen|lobby": [
+0.9,
+1.0
+],
+"kitchen|outside": [
+0.9,
+1.0
+],
+"kitchen|stairwell": [
+1.04,
+0.569
+],
+"kitchen|storage": [
+0.9,
+0.167
+],
+"lecture_hall|stairwell": [
+0.9,
+1.0
+],
+"library|library": [
+0.9,
+1.0
+],
+"library|lobby": [
+0.9,
+1.0
+],
+"library|outside": [
+0.9,
+1.0
+],
+"lift|lift": [
+0.9,
+1.0
+],
+"lift|lobby": [
+0.9,
+1.0
+],
+"lift|stairwell": [
+0.9,
+1.0
+],
+"living_room|living_room": [
+0.75,
+0.2
+],
+"living_room|outside": [
+1.19,
+0.071
+],
+"living_room|stairwell": [
+0.96,
+0.16
+],
+"living_room|storage": [
+0.83,
+0.308
+],
+"lobby|lobby": [
+0.9,
+1.0
+],
+"lobby|meeting_room": [
+0.9,
+1.0
+],
+"lobby|outside": [
+1.8,
+0.579
+],
+"lobby|production_zone": [
+1.6,
+1.0
+],
+"lobby|stairwell": [
+0.9,
+1.0
+],
+"lobby|toilet": [
+0.9,
+1.0
+],
+"lobby|warehouse_zone": [
+1.6,
+1.0
+],
+"logistics_zone|logistics_zone": [
+12.2,
+0.4
+],
+"logistics_zone|outside": [
+4.0,
+1.0
+],
+"office|office": [
+0.9,
+1.0
+],
+"outside|stairwell": [
+0.9,
+1.0
+],
+"outside|warehouse_zone": [
+4.0,
+1.0
+],
+"production_zone|production_zone": [
+15.9,
+0.333
+],
+"stairwell|stairwell": [
+0.9,
+0.994
+],
+"stairwell|storage": [
+0.9,
+1.0
+],
+"stairwell|toilet": [
+0.9,
+1.0
+],
+"toilet|toilet": [
+0.9,
+1.0
+]
+}
