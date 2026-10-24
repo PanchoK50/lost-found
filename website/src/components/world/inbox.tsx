@@ -7,7 +7,7 @@ import type { Ping, Player, WorldState } from '@/lib/world/types';
 import type { WorldActions } from './world-hud';
 
 const kindLabel: Record<Ping['kind'], string> = {
-  come_to_me: 'Come to me', meet_halfway: 'Meet halfway', pick_up: 'Please pick up', help: 'Needs help', ask: 'Asks you', ask_crowd: 'Asks everyone',
+  come_to_me: 'Come to me', meet_halfway: 'Meet halfway', pick_up: 'Please pick up', help: 'Needs help', ask: 'Asks you', ask_crowd: 'Asks everyone', share_location: 'Asks where you are',
 };
 const MAX_TOASTS = 2;
 
@@ -19,7 +19,7 @@ type Toast =
  * Toasts under the HUD (docs/MULTIPLAYER.md §11): pings addressed to me with Go / Later, and news about
  * pings I sent (accepted, arrived, answered). At most two at once; "+n" opens the people sheet.
  */
-export function Inbox({ world, playerId, building, pingFrom, groups, top, act, onGo, onMore }: {
+export function Inbox({ world, playerId, building, pingFrom, groups, top, act, onGo, onMore, onShareLocation }: {
   world?: WorldState;
   playerId: string;
   building: Building;
@@ -30,6 +30,8 @@ export function Inbox({ world, playerId, building, pingFrom, groups, top, act, o
   act: WorldActions['act'];
   onGo(spaceId: string): void;
   onMore(): void;
+  /** "Share location" on a "where are you?" request: open the location picker. */
+  onShareLocation(): void;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [answer, setAnswer] = useState<Record<string, string>>({});
@@ -46,8 +48,13 @@ export function Inbox({ world, playerId, building, pingFrom, groups, top, act, o
           <span className={`person-dot${t.from?.demo ? ' person-dot--demo' : ''}`}>{t.from?.initials ?? '?'}</span>
           <div className="toast-body">
             <strong>{t.from?.name ?? 'Someone'} · {kindLabel[t.ping.kind]}</strong>
-            <small>{isQuestion(t.ping) ? `"${t.ping.message}"` : `${spaceName(t.ping.spaceId)}${t.ping.message ? ` · ${t.ping.message}` : ''}`}</small>
-            {isQuestion(t.ping) ? (
+            <small>{t.ping.kind === 'share_location' ? 'Share your location with the team?' : isQuestion(t.ping) ? `"${t.ping.message}"` : `${spaceName(t.ping.spaceId)}${t.ping.message ? ` · ${t.ping.message}` : ''}`}</small>
+            {t.ping.kind === 'share_location' ? (
+              <span className="toast-actions">
+                <button type="button" className="button button--primary" onClick={() => { void act({ type: 'ping.update', pingId: t.ping.id, playerId, status: 'accepted' }); dismiss(t.key); onShareLocation(); }}>Share location</button>
+                <button type="button" className="button" onClick={() => { void act({ type: 'ping.update', pingId: t.ping.id, playerId, status: 'declined' }); dismiss(t.key); }}>Not now</button>
+              </span>
+            ) : isQuestion(t.ping) ? (
               <form className="toast-actions" onSubmit={event => {
                 event.preventDefault();
                 const text = answer[t.key]?.trim();
@@ -95,9 +102,16 @@ export function inboxToasts(world: WorldState, playerId: string, pingFrom: Setti
   const toasts: Toast[] = [];
   for (const ping of [...world.pings].sort((a, b) => b.createdAt - a.createdAt)) {
     if (ping.fromId !== playerId) {
-      const answered = ping.answers?.some(a => a.playerId === playerId);
+      const answered = ping.answers?.some(a => a.playerId === playerId) || ping.responses?.some(r => r.playerId === playerId);
       if (ping.status === 'sent' && !answered && allowed(ping)) toasts.push({ key: `in:${ping.id}`, type: 'incoming', ping, from: players.get(ping.fromId) });
       continue;
+    }
+    // Group pings: news per person who reacted.
+    for (const r of ping.responses ?? []) {
+      const who = players.get(r.playerId);
+      const name = who?.name ?? 'Someone';
+      const text = r.status === 'declined' ? `${name} can't come right now` : r.status === 'done' ? `${name} arrived` : `${name} is on the way`;
+      toasts.push({ key: `rs:${ping.id}:${r.playerId}:${r.status}`, type: 'update', ping, who, text });
     }
     // My own pings: tell me when someone reacts.
     for (const a of ping.answers ?? []) {
@@ -107,7 +121,10 @@ export function inboxToasts(world: WorldState, playerId: string, pingFrom: Setti
     if (ping.status === 'accepted' || ping.status === 'done' || ping.status === 'declined') {
       const who = ping.to.startsWith('player:') ? players.get(ping.to.slice(7)) : undefined;
       const name = who?.name ?? (ping.to.startsWith('group:') ? `Someone from ${ping.to.slice(6).replaceAll('-', ' ')}` : 'Someone');
-      const text = ping.status === 'declined' ? `${name} can't come right now`
+      if (ping.kind === 'share_location' && ping.status === 'accepted') continue; // only "shared" or "not now" is news
+      const text = ping.kind === 'share_location'
+        ? (ping.status === 'done' ? `${name} shared their location` : `${name} isn't sharing right now`)
+        : ping.status === 'declined' ? `${name} can't come right now`
         : ping.status === 'done' ? (ping.kind === 'pick_up' ? `${name} picked it up` : `${name} arrived`)
         : `${name} is on the way`;
       toasts.push({ key: `st:${ping.id}:${ping.status}`, type: 'update', ping, who, text });

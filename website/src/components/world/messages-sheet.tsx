@@ -9,7 +9,7 @@ import { Sheet } from './sheet';
 import type { WorldActions } from './world-hud';
 
 const kindLabel: Record<SentRecord['kind'], string> = {
-  come_to_me: 'Come to me', meet_halfway: 'Meet', pick_up: 'Pick up', help: 'Help', ask: 'Question', ask_crowd: 'Question to everyone',
+  come_to_me: 'Come to me', meet_halfway: 'Meet', pick_up: 'Pick up', help: 'Help', ask: 'Question', ask_crowd: 'Question to everyone', share_location: 'Location request',
 };
 
 /**

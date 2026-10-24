@@ -31,6 +31,8 @@ export interface ChatRequest {
   playerId?: string;
   /** A skill chip was tapped: resolve this skill relative to the player's presence. */
   skillId?: string;
+  /** The room the player picked as "I'm here" (no GPS indoors). */
+  location?: string;
 }
 
 /** A world change the agent suggests. Shown as a preview card; nothing is written until the user taps Confirm (U8). */

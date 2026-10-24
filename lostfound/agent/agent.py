@@ -209,10 +209,17 @@ class ChatSession:
         self.world_closed = valid
         b.closed = agent_closed | valid
 
-    def ask(self, text: str) -> dict:
+    def ask(self, text: str, location: str | None = None) -> dict:
         outcome = Outcome(reply="", path="chat")
         hints = mention_hints(self.building, text)
-        self.messages.append({"role": "user", "content": text + (f"\n\n{hints}" if hints else "")})
+        where = (
+            f"[The person says they are in {self.building.label(location)} (space id {location}). Use it as the start for "
+            "'here', 'nearest', 'from me' and routes without a start; don't ask where they are.]\n"
+            if location in self.building.spaces
+            else "[The person has not set their location. If you need a start, ask for their room, or tell them to tap a room "
+            "on the map and choose \"I'm here\".]\n"
+        )
+        self.messages.append({"role": "user", "content": where + text + (f"\n\n{hints}" if hints else "")})
         self.toolbox.reset_turn()
         reply = self.loop.run(self.system, self.messages, self.toolbox, outcome)
         self.usage.update(outcome.usage)

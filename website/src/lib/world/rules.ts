@@ -36,7 +36,7 @@ const CONFIRM_WINDOW = 30 * MINUTE;
 const MAX_PRESENCE = 30 * 24 * 60 * MINUTE;
 const ROLES: Role[] = ['member', 'facility', 'first_aider', 'visitor', 'exhibitor'];
 const PIN_KINDS: PinKind[] = ['blocked', 'broken', 'item', 'event', 'info', 'meet'];
-const PING_KINDS: PingKind[] = ['come_to_me', 'meet_halfway', 'pick_up', 'help', 'ask', 'ask_crowd'];
+const PING_KINDS: PingKind[] = ['come_to_me', 'meet_halfway', 'pick_up', 'help', 'ask', 'ask_crowd', 'share_location'];
 
 export function createWorld(building: Building): StoredWorld {
   return { buildingId: building.building.id, detected: modeFor[detectCategory(building)], version: 1, players: [], presence: [], pins: [], pings: [], skills: [], created: [] };
@@ -90,6 +90,8 @@ export function applyAction(current: StoredWorld, action: WorldAction, building:
       };
       if (presence.until <= now) throw new WorldError('That presence has already ended.');
       world.presence = [...world.presence.filter(x => x.playerId !== player.id), presence];
+      // Sharing answers any open "where are you?" requests sent to this player.
+      for (const ping of world.pings) if (ping.kind === 'share_location' && ping.to === `player:${player.id}` && (ping.status === 'sent' || ping.status === 'accepted')) ping.status = 'done';
       break;
     }
     case 'presence.clear':
@@ -171,7 +173,15 @@ export function applyAction(current: StoredWorld, action: WorldAction, building:
       if (!ping) throw new WorldError('That ping is gone.');
       const player = v.player(action.playerId);
       if (!reaches(world, ping.to, player) && ping.fromId !== player.id) throw new WorldError('That ping is not for you.');
-      if (action.status) ping.status = v.oneOf(action.status, ['sent', 'accepted', 'declined', 'done'] as const, 'status');
+      if (action.status) {
+        const status = v.oneOf(action.status, ['sent', 'accepted', 'declined', 'done'] as const, 'status');
+        if (isGroupPing(ping) && player.id !== ping.fromId) {
+          // One person's answer to a group ping must not close it for the others.
+          if (status !== 'sent') ping.responses = [...(ping.responses ?? []).filter(r => r.playerId !== player.id), { playerId: player.id, status, at: now }];
+        } else {
+          ping.status = status;
+        }
+      }
       if (action.answer !== undefined) ping.answers = [...(ping.answers ?? []), { playerId: player.id, text: v.text(action.answer, 'answer', 300), at: now }];
       break;
     }
@@ -244,6 +254,9 @@ function confirmed(pin: Pin) {
 }
 
 /** Who an audience reaches. 'team' means everyone in team and home mode, nobody else in public mode. */
+/** Pings to a group, role, the team, everyone or people nearby (not to one person). */
+export const isGroupPing = (ping: Ping) => !ping.to.startsWith('player:');
+
 function reaches(world: StoredWorld, audience: Audience | 'nearby', player: Player | undefined) {
   if (audience === 'everyone') return true;
   if (audience === 'team') return modeOf(world) !== 'public';

@@ -4,6 +4,8 @@
 
 import csv
 import os
+import re
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -12,6 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from lostfound.agent.agent import AgentConfig, BuildingQA, ChatSession
+from lostfound.api import storage
+from lostfound.ingest.assemble import assemble
+from lostfound.ingest.verify import summary as issue_summary
+from lostfound.ingest.verify import verify
 from lostfound.core import directions
 from lostfound.core.building import Building, MapError
 from lostfound.core.resolve import Resolver
@@ -34,8 +40,13 @@ def building_directories() -> dict[str, Path]:
     return directories
 
 
+def building_directory(building_id: str) -> Path | None:
+    """Dataset buildings ship with the agent; uploaded ones are fetched from Supabase Storage on first use."""
+    return building_directories().get(building_id) or storage.cached_directory(building_id)
+
+
 def load(building_id: str) -> Building:
-    directory = building_directories().get(building_id)
+    directory = building_directory(building_id)
     if directory is None:
         raise HTTPException(404, f"Unknown building '{building_id}'.")
     return Building.load(directory)
@@ -158,6 +169,7 @@ class UIChatRequest(BaseModel):
     # Earlier turns as text. Serverless instances do not keep memory, so a session that is gone is rebuilt
     # from this (the reply text is kept; edits made in a lost session are not replayed).
     history: list[dict] = []
+    location: str | None = None  # the room the person picked as "I'm here"
     model: str = DEFAULT_CHAT_MODEL
     effort: str = "low"
 
@@ -174,7 +186,7 @@ def ui_chat(request: UIChatRequest) -> dict:
     if session.building.id != request.buildingId:
         raise HTTPException(400, "Session belongs to another building.")
     session.set_world_closures(request.closed)
-    turn = session.ask(request.message)
+    turn = session.ask(request.message, request.location)
     ui = turn["ui"]
     return {
         "kind": ui["kind"],
@@ -232,9 +244,59 @@ class AskRequest(BaseModel):
 @app.post("/ask")
 def ask(request: AskRequest) -> dict:
     """Benchmark-style single answer (ends with an 'Answer:' line)."""
-    directory = building_directories().get(request.building_id)
+    directory = building_directory(request.building_id)
     if directory is None:
         raise HTTPException(404, f"Unknown building '{request.building_id}'.")
     qa = BuildingQA(AgentConfig(design=request.design, model=MODELS.get(request.model, request.model)))
     outcome = qa.answer_question(directory, request.question)
     return {"reply": outcome.reply, "path": outcome.path, "tool_calls": outcome.tool_calls, "cost": round(outcome.cost(), 4)}
+
+
+class IngestFile(BaseModel):
+    name: str
+    content: str  # SVG text
+    level: int | None = None
+
+
+class IngestRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    files: list[IngestFile] = Field(min_length=1, max_length=20)
+    created_by: str | None = None
+
+
+@app.post("/ingest")
+def ingest(request: IngestRequest) -> dict:
+    """Create a building from floor-plan SVGs (one per floor): geometry, rooms, doors, stairs and lifts, inferred
+    room types and door widths, then the verifier's list of what to check. Stored in Supabase."""
+    building_id = storage.new_building_id(request.name)
+    with tempfile.TemporaryDirectory() as scratch:
+        used: set[int] = set()
+        for index, upload in enumerate(request.files):
+            if "<svg" not in upload.content[:2000]:
+                raise HTTPException(400, f"{upload.name} is not an SVG floor plan. PNG and PDF plans are not supported yet.")
+            match = re.search(r"floor[_ -]?(-?\d+)", upload.name, re.IGNORECASE)
+            level = upload.level if upload.level is not None else int(match.group(1)) if match else index
+            if level in used:
+                raise HTTPException(400, f"Two files are for floor {level}. Name them floor_<level>.svg or set the levels.")
+            used.add(level)
+            (Path(scratch) / f"floor_{level}.svg").write_text(upload.content, encoding="utf-8")
+        try:
+            building = assemble(Path(scratch), building_id=building_id, name=request.name)
+        except Exception as error:  # noqa: BLE001 - report any parse failure to the uploader
+            raise HTTPException(422, f"Could not read the plans: {error}") from error
+    if not building["spaces"]:
+        raise HTTPException(422, "No rooms found in these plans.")
+    issues = verify(building)
+    building["ingest_report"]["issues"] = issues
+    storage.save_upload(building, request.created_by)
+    return {
+        "id": building_id,
+        "name": request.name,
+        "floors": len(building["floors"]),
+        "spaces": len(building["spaces"]),
+        "doors": len(building["openings"]),
+        "connectors": len(building["vertical_connectors"]),
+        "issues": issue_summary(issues),
+        "questions": [issue["question"] for issue in issues if issue["question"] and issue["severity"] == "high"][:5],
+        "assumptions": building["ingest_report"].get("assumptions", []),
+    }

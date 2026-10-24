@@ -30,7 +30,7 @@ export function PersonCard({ player, building, profile, world, act, onRoute, onA
   const me = player.id === profile.id;
   const walk = useMemo(() => !me && myRoom && space && presence?.precision === 'room' ? walkMinutes(building, myRoom.id, space.id) : undefined, [me, myRoom, space, presence?.precision, building]);
   const reports = world?.pins.filter(p => p.authorId === player.id).length ?? 0;
-  const where = !presence ? 'Not sharing a location'
+  const where = !presence ? (world?.online?.includes(player.id) ? 'Online · not sharing a location' : 'Not sharing a location')
     : presence.precision === 'room' ? `${space?.name ?? '?'} · ${floor?.name ?? ''}`
     : presence.precision === 'floor' ? floor?.name ?? '' : 'Somewhere in the building';
   const first = player.name.split(/\s+/)[0];
@@ -40,6 +40,12 @@ export function PersonCard({ player, building, profile, world, act, onRoute, onA
     const result = await act({ type: 'ping.send', ping: { kind: 'come_to_me', fromId: profile.id, to: `player:${player.id}`, spaceId: myRoom.id, floorId: myRoom.floor_id, expiresAt: Date.now() + 30 * 60_000 } });
     setSent(result.ok ? `Asked ${first} to come to ${myRoom.name}` : result.error);
   };
+  const askLocation = async () => {
+    const at = myRoom ?? building.spaces.find(s => s.type === 'room') ?? building.spaces[0];
+    const result = await act({ type: 'ping.send', ping: { kind: 'share_location', fromId: profile.id, to: `player:${player.id}`, spaceId: at.id, floorId: at.floor_id, expiresAt: Date.now() + 60 * 60_000 } });
+    setSent(result.ok ? `Asked ${first} to share their location` : result.error);
+  };
+  const online = world?.online?.includes(player.id);
 
   return (
     <Sheet title={me ? `${player.name} (you)` : player.name} onClose={onClose}>
@@ -66,6 +72,7 @@ export function PersonCard({ player, building, profile, world, act, onRoute, onA
           {space && <button type="button" className="button" onClick={() => { onRoute(space.id); onClose(); }}>Route there</button>}
           <button type="button" className="button button--primary" onClick={() => { onAsk(first); onClose(); }}>Ask @{first}</button>
         </div>}
+        {!me && !presence && <div className="sheet-actions"><button type="button" className="button" disabled={!!sent} onClick={() => void askLocation()}>Ask {first} for their location{online ? '' : ' (offline now)'}</button></div>}
         {!me && myRoom && <div className="sheet-actions"><button type="button" className="button" disabled={!!sent} onClick={() => void comeToMe()}>Ask {first} to come to {myRoom.name}</button></div>}
         {sent && <p className="hint">{sent}</p>}
       </section>

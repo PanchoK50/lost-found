@@ -3,6 +3,6 @@ import { defaultBuildingId, getCatalogEntry, listBuildings } from '@/lib/buildin
 
 export default async function Home({ searchParams }: PageProps<'/'>) {
   const { building } = await searchParams;
-  const entry = getCatalogEntry(typeof building === 'string' ? building : undefined) ?? getCatalogEntry(defaultBuildingId)!;
-  return <BuildingExperience key={entry.id} building={entry.building} buildings={listBuildings()} suggestions={entry.suggestions} />;
+  const entry = (await getCatalogEntry(typeof building === 'string' ? building : undefined)) ?? (await getCatalogEntry(defaultBuildingId))!;
+  return <BuildingExperience key={entry.id} building={entry.building} buildings={await listBuildings()} suggestions={entry.suggestions} />;
 }

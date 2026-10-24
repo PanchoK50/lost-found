@@ -129,6 +129,19 @@ TYPED_TOOLS = [
         ),
     },
     {
+        "name": "nearest",
+        "description": "Nearest room of a type (e.g. 'toilet', 'kitchen') or nearest thing of an asset type (e.g. 'coffee machine') "
+        "from a start room, by walking distance. Returns the place, distance and route steps. Use the person's current room as the "
+        "start when they say 'nearest', 'closest', 'here' or 'from me'.",
+        "input_schema": _schema(
+            {
+                "start": PLACE,
+                "what": _string("Room type or asset type, as the person said it, e.g. 'toilet', 'meeting room', 'printer'."),
+                "step_free": {"type": "boolean"},
+            }
+        ),
+    },
+    {
         "name": "find_assets",
         "description": "Where things of an asset type are: room, floor and position. Optionally on one floor.",
         "input_schema": _schema({"asset_type": _string("Asset type, e.g. 'lectern'."), "floor": _string("Floor, or '' for all floors.")}),
@@ -375,6 +388,31 @@ class Toolbox:
             }
         result["space_path"] = [self.building.label(s) if s in self.building.spaces else s for s in result["space_path"]]
         return self._answer("route", result)
+
+    def tool_nearest(self, start: str, what: str, step_free: bool) -> dict:
+        start_id = self._space(start)
+        distances = self.building.distances_from(start_id, step_free)
+        targets: dict[str, str] = {}  # space id -> what was found there
+        try:
+            room_type = self.resolver.room_type(what)
+            targets.update({s["id"]: s["name"] for s in self.building.spaces.values() if s["room_type"] == room_type and s["id"] != start_id})
+        except MapError:
+            room_type = None
+        try:
+            asset_type = self.resolver.asset_type(what)
+            for asset in self.building.assets.values():
+                if asset["type"] == asset_type:
+                    targets.setdefault(asset["space_id"], asset["name"])
+        except MapError:
+            asset_type = None
+        if room_type is None and asset_type is None:
+            raise MapError(f"I don't know '{what}' in this building. Room types: {', '.join(self.resolver.room_types)}.")
+        reachable = [space_id for space_id in targets if space_id in distances]
+        if not reachable:
+            raise MapError(f"No reachable {what} from {self.building.label(start_id)}.")
+        best = min(reachable, key=lambda space_id: distances[space_id])
+        result = self.tool_route(start_id, best, [], step_free, [])
+        return {"found": targets[best], "in": self.building.label(best), "distance_m": round(distances[best], 1), **result}
 
     def tool_find_assets(self, asset_type, floor) -> dict:
         result = skills.locate(self.building, self.resolver.asset_type(asset_type))

@@ -1,6 +1,7 @@
 // Server-side only: holds every player's world state (Supabase when configured, else in memory).
 import type { Building } from '@/lib/buildings/types';
 import { supabaseAdmin } from '@/lib/supabase/server';
+import { notifyChanged } from './notify';
 import { runDemo, scheduleDemo } from './demo-players';
 import { applyAction, createWorld, initialsOf, prune, type StoredWorld } from './rules';
 import type { Player, Role, WorldAction } from './types';
@@ -87,8 +88,9 @@ class SupabaseStore implements WorldStore {
     const pruned = prune(world, now);
     if (world !== loaded || pruned) {
       // Demo reactions or expiry changed the world: save it (if someone else saved first, theirs is as fresh).
-      await this.db.from('worlds').update({ state: world, version: world.version, updated_at: new Date(now).toISOString() })
-        .eq('building_id', world.buildingId).eq('version', version);
+      const { data } = await this.db.from('worlds').update({ state: world, version: world.version, updated_at: new Date(now).toISOString() })
+        .eq('building_id', world.buildingId).eq('version', version).select('version');
+      if (data?.length) await notifyChanged(world.buildingId, world.version);
     }
     return world;
   }
@@ -107,7 +109,10 @@ class SupabaseStore implements WorldStore {
         .eq('version', version)
         .select('version');
       if (error) throw new Error(`Saving the world failed: ${error.message}`);
-      if (data.length) return next;
+      if (data.length) {
+        await notifyChanged(next.buildingId, next.version);
+        return next;
+      }
     }
     throw new Error('The world is busy; try again.');
   }

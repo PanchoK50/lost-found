@@ -237,7 +237,16 @@ class WorldChat {
   whereIs(player: Player): ChatResponse {
     const p = this.presenceOf(player.id);
     const space = p && this.spaces.get(p.spaceId);
-    if (!p || !space) return this.reply(`${player.name} isn't sharing a location with you right now.`, { focus: { mode: 'building' } });
+    if (!p || !space) {
+      // Not sharing: offer to ask them (sent right away when the message @-mentions them).
+      const at = this.mySpace() ?? this.building.spaces.find(s => s.type === 'room') ?? this.building.spaces[0];
+      const proposal: Proposal = {
+        label: `Ask ${player.name}`,
+        detail: 'for their location',
+        action: { type: 'ping.send', buildingId: this.buildingId, ping: { kind: 'share_location', fromId: this.me.id, to: `player:${player.id}`, spaceId: at.id, floorId: at.floor_id, expiresAt: Date.now() + 60 * MINUTE } },
+      };
+      return { ...this.reply(`${player.name} isn't sharing a location right now. Shall I ask ${player.name.split(/\s+/)[0]} to share it?`, { focus: { mode: 'building' } }), proposals: [proposal] };
+    }
     if (p.precision === 'building') return this.reply(`${player.name} is somewhere in the building.`, { focus: { mode: 'building' } });
     if (p.precision === 'floor') return this.reply(`${player.name} is on ${this.floorName(space)}.`, { focus: this.focusOn(space) }, undefined, { title: player.name, value: this.floorName(space) });
     const mine = this.mySpace();

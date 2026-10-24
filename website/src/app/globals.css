@@ -232,3 +232,7 @@ button:disabled { cursor: default; }
 @keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px rgba(229, 72, 77, 0.18); } }
 @keyframes mic-spin { to { transform: rotate(360deg); } }
 .voice-error { margin: 8px 18px 0; font-size: 13px; color: #b5482a; }
+
+/* Building picker button in the switch bar */
+.building-switch button { border: 0; background: transparent; color: var(--muted); padding: 8px 12px; border-radius: 999px; font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.building-switch button.active { background: var(--ink); color: #fff; }
