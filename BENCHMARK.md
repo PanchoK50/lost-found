@@ -1,5 +1,21 @@
 # Benchmark run
 
+## Sunday building (challenge PDF format)
+
+```sh
+uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions.json> <answers.json> [--csv answers.csv]
+```
+
+- `<building_dir>` holds the new `building.json`.
+- `questions.json` is a list of `{id, question}` (also `{"questions": [...]}` or JSON lines). Optional structured
+  conditions (`step_free`, `closed`, `from`, `to`, `min_width`) are added to the text.
+- `answers.json` has one entry per question id: `answer` (the value of the `Answer:` line), `reply` (full text), `kind`,
+  the found `space_id` / `item_id`, the `route` as ordered space ids, `route_nodes` (spaces and the doors between them,
+  in order) and `length_m` (`reachable: false` when there is no route). The organisers have not published a schema
+  yet; see `lostfound/run_benchmark.py` to adapt the field names in one place.
+
+## Test set (CSV)
+
 One command, no manual steps between input and output:
 
 ```sh

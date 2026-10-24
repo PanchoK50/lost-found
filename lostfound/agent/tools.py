@@ -257,6 +257,7 @@ class Toolbox:
         }[design]
         self.chat = design == "chat"
         self.last_answer_line: str | None = None
+        self.last_result: dict | None = None  # structured result of the last answering tool (for answers.json)
         self.resolutions: list[dict] = []
         self.edits: list[dict] = []
         self.reset_turn()
@@ -309,6 +310,7 @@ class Toolbox:
     def _answer(self, kind: str, result: dict, ambiguous: list[str] | None = None) -> dict:
         line = answer_line(self.building, kind, result)
         self.last_answer_line = line
+        self.last_result = {"kind": kind, **result}
         output = {**result, "answer_line": line}
         if ambiguous:
             output["warning"] = f"Ambiguous room mention(s): {ambiguous}. Picked the best match; say so."
@@ -406,6 +408,7 @@ class Toolbox:
         closed_ids = self._closed(closed)
         result = skills.route(self.building, stops[0], stops[-1], step_free, closed_ids, stops[1:-1])
         self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result))
+        self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
         if not result["reachable"]:
             self.last_answer_line = "Answer: no route"
             return {**result, "answer_line": "Answer: no route"}
@@ -419,8 +422,10 @@ class Toolbox:
                 "steps": details["steps"],
                 "rooms": [self.building.label(s) for s in details["space_path"] if s in self.building.spaces],
             }
-        result["space_path"] = [self.building.label(s) if s in self.building.spaces else s for s in result["space_path"]]
-        return self._answer("route", result)
+        labelled = {**result, "space_path": [self.building.label(s) if s in self.building.spaces else s for s in result["space_path"]]}
+        output = self._answer("route", labelled)
+        self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
+        return output
 
     def tool_nearest(self, start: str, what: str, step_free: bool) -> dict:
         start_id = self._space(start)
@@ -454,6 +459,7 @@ class Toolbox:
             result["matches"] = [match for match in result["matches"] if match["floor"] == floor_name]
         result["matches"] = result["matches"][:25]
         self._scene(lambda: scene.locate(self.building, result["matches"]))
+        self.last_result = {"kind": "locate", **result}
         return result
 
     def tool_count_assets(self, asset_type, floor) -> dict:

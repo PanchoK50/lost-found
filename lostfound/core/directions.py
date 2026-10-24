@@ -35,6 +35,8 @@ def route_details(
     return {
         "length_m": round(length, 2),
         "space_path": building.spaces_passed(graph, nodes),
+        # Every node walked through, in order: spaces and the openings (doors) between them.
+        "nodes": [node.removeprefix(DOOR_PREFIX) for node in nodes],
         "polylines": _polylines(building, nodes),
         "steps": _steps(building, graph, nodes),
         "highlights": building.spaces_passed(graph, nodes),

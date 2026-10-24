@@ -13,13 +13,12 @@ export async function POST(request: Request) {
   let form: FormData;
   try { form = await request.formData(); } catch { return Response.json({ error: 'Send the plans as a form upload.' }, { status: 400 }); }
   const name = String(form.get('name') ?? '').trim();
-  const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
+  // A whole building folder may come in: keep the plans (SVG/PNG) and a building.json, skip the rest.
+  const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0 && /\.(svg|png|json)$/i.test(f.name));
   if (!name || name.length > 80) return Response.json({ error: 'Give the building a name (up to 80 characters).' }, { status: 400 });
-  if (!files.length || files.length > MAX_FILES) return Response.json({ error: `Choose 1 to ${MAX_FILES} floor plans (SVG or PNG).` }, { status: 400 });
+  if (!files.length || files.length > MAX_FILES) return Response.json({ error: `Choose 1 to ${MAX_FILES} floor plans (SVG or PNG), or a building.json.` }, { status: 400 });
   if (files.reduce((sum, f) => sum + f.size, 0) > MAX_BYTES) return Response.json({ error: 'The plans are too large together (max 4 MB).' }, { status: 413 });
   const isPng = (f: File) => /\.png$/i.test(f.name) || f.type === 'image/png';
-  const bad = files.find(f => !isPng(f) && !/\.svg$/i.test(f.name) && f.type !== 'image/svg+xml');
-  if (bad) return Response.json({ error: `${bad.name} is not an SVG or PNG floor plan.` }, { status: 400 });
 
   const payload = {
     name, created_by: user?.id ?? null,

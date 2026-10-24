@@ -89,9 +89,8 @@ def load_drawings(directory: Path, prefer: str = "svg") -> list[svg.Drawing]:
             if "_plain" not in path.name:
                 drawing = svg.parse(path)
                 by_level[drawing.level] = drawing
-    for path in sorted(directory.glob("floor_*.png")):
-        if "_plain" in path.name:
-            continue
+    # Images: the plan with furniture is better (furniture gives the scale); the plain one is the fallback.
+    for path in sorted(directory.glob("floor_*.png"), key=lambda p: "_plain" in p.name):
         level = int(re.search(r"floor_(-?\d+)", path.name).group(1))
         if level not in by_level:
             by_level[level] = raster.parse(path)

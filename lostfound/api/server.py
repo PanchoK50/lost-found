@@ -4,6 +4,7 @@
 
 import base64
 import csv
+import json
 import os
 import re
 import tempfile
@@ -279,24 +280,37 @@ class IngestRequest(BaseModel):
 def ingest(request: IngestRequest) -> dict:
     """Create a building from floor-plan SVGs (one per floor): geometry, rooms, doors, stairs and lifts, inferred
     room types and door widths, then the verifier's list of what to check. Stored in Supabase."""
+    # A ready-made building.json (the challenge format, e.g. the Sunday building) is imported as it is.
+    for upload in request.files:
+        if upload.name.lower().endswith(".json") and upload.encoding != "base64":
+            return import_building_json(upload.content, request.name, request.created_by)
     building_id = storage.new_building_id(request.name)
     with tempfile.TemporaryDirectory() as scratch:
-        used: set[int] = set()
+        written: set[str] = set()
+        floors_seen = 0
         for index, upload in enumerate(request.files):
-            match = re.search(r"floor[_ -]?(-?\d+)", upload.name, re.IGNORECASE)
+            name = upload.name.lower()
+            if not name.endswith((".svg", ".png")):
+                continue  # other files of a building folder (equipment.csv, questions …) are not plans
+            match = re.search(r"floor[_ -]?(-?\d+)", name)
             level = upload.level if upload.level is not None else int(match.group(1)) if match else index
-            if level in used:
+            plain = "_plain" in name
+            target = f"floor_{level}{'_plain' if plain else ''}.{'svg' if name.endswith('.svg') else 'png'}"
+            if target in written:
                 raise HTTPException(400, f"Two files are for floor {level}. Name them floor_<level>.svg / .png or set the levels.")
-            used.add(level)
+            written.add(target)
+            floors_seen += 1
             if upload.encoding == "base64":
                 data = base64.b64decode(upload.content)
                 if not data.startswith(b"\x89PNG"):
                     raise HTTPException(400, f"{upload.name} is not a PNG image. Use SVG or PNG floor plans.")
-                (Path(scratch) / f"floor_{level}.png").write_bytes(data)
+                (Path(scratch) / target).write_bytes(data)
             else:
                 if "<svg" not in upload.content[:2000]:
                     raise HTTPException(400, f"{upload.name} is not an SVG floor plan. Use SVG or PNG floor plans.")
-                (Path(scratch) / f"floor_{level}.svg").write_text(upload.content, encoding="utf-8")
+                (Path(scratch) / target).write_text(upload.content, encoding="utf-8")
+        if not floors_seen:
+            raise HTTPException(400, "No floor plans found. Upload floor_<level>.svg or .png files, or a building.json.")
         try:
             building = assemble(Path(scratch), building_id=building_id, name=request.name)
         except Exception as error:  # noqa: BLE001 - report any parse failure to the uploader
@@ -326,4 +340,28 @@ def ingest(request: IngestRequest) -> dict:
         "issues": issue_summary(issues),
         "questions": [issue["question"] for issue in issues if issue["question"] and issue["severity"] == "high"][:5],
         "assumptions": building["ingest_report"].get("assumptions", []),
+    }
+
+
+def import_building_json(content: str, name: str, created_by: str | None) -> dict:
+    """Import a building.json in the challenge format as it is (keeps its id, so its questions' ids still match)."""
+    try:
+        building = json.loads(content)
+        info, floors, spaces = building["building"], building["floors"], building["spaces"]
+        building.setdefault("openings", []); building.setdefault("vertical_connectors", []); building.setdefault("assets", [])
+        Building(building)  # indexes everything: fails on a broken file
+    except (ValueError, KeyError, TypeError) as error:
+        raise HTTPException(400, f"That building.json is not in the challenge format: {error}") from error
+    building_id = str(info.get("id") or storage.new_building_id(name))
+    if not re.fullmatch(r"[\w.-]{1,120}", building_id):
+        raise HTTPException(400, "The building id may only contain letters, digits, '.', '_' and '-'.")
+    if building_id in building_directories():
+        raise HTTPException(409, f"Building {building_id} already exists.")
+    info["id"] = building_id
+    info["name"] = info.get("name") or name
+    storage.save_upload(building, created_by)
+    return {
+        "id": building_id, "name": info["name"], "floors": len(floors), "spaces": len(spaces),
+        "doors": len(building["openings"]), "connectors": len(building["vertical_connectors"]),
+        "issues": {"issues": 0, "by_field": {}, "high": 0}, "questions": [], "assumptions": ["imported from building.json as it is"],
     }

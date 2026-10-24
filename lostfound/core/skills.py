@@ -77,6 +77,7 @@ def errand(
     first_leg, second_leg = from_start[pickup], from_pickup[target]
     return {
         "total_m": round(first_leg + second_leg, 2),
+        "start": start,
         "pickup": _space_summary(building, pickup),
         "first_leg_m": round(first_leg, 2),
         "target": _space_summary(building, target),
