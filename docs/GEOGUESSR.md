@@ -119,6 +119,7 @@ website/src/lib/guess/                    Reine Logik ohne React, gut testbar
 Diese Gebäude wären für das Spiel besonders lustig. Für jedes muss die `building.json` nach `website/src/data/buildings/` kopiert, im Katalog eingetragen und **"© OpenStreetMap contributors, ODbL"** angezeigt werden.
 - **Terminal 2** (`data/dev/osm-way360544293`): Lufthansa Lounge, Duty Free, Rolex, Hermès, Geldautomaten
 - **Pasing Arcaden** (`data/train/osm-way52060470`): Aldi Süd, H&M, Metzgerei Boneberger
+- **TUM-Gebäude** (alle aus `train` und `dev`): Hauptgebäude (`osm-way10053349`), Thierschbau (`osm-way61408163`), Landwirtschaftsbau (`osm-way50299720`), U-Trakt (`osm-way58216509`), Mensa Arcisstraße (`osm-way19183732`), StudiTUM (`osm-way476929995`), Institutsgebäude 3 in Garching (`osm-way27326387`) und das TUM-Monster CIT Informatik & Mathematik (`osm-way27917482`, 1.623 Räume). N3 war schon im Katalog. Arcisstraße 21 und N8 liegen in `test` und bleiben draußen.
 
 Keine Gebäude aus `data/test/` verwenden.
 

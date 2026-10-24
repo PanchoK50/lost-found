@@ -5,6 +5,14 @@ import n3 from '@/data/buildings/osm-way22744230.json';
 import factory from '@/data/buildings/proc-factory-dev-003.json';
 import terminal2 from '@/data/buildings/osm-way360544293.json';
 import pasing from '@/data/buildings/osm-way52060470.json';
+import tumMain from '@/data/buildings/osm-way10053349.json';
+import thierschbau from '@/data/buildings/osm-way61408163.json';
+import landwirtschaftsbau from '@/data/buildings/osm-way50299720.json';
+import uTrakt from '@/data/buildings/osm-way58216509.json';
+import mensa from '@/data/buildings/osm-way19183732.json';
+import studitum from '@/data/buildings/osm-way476929995.json';
+import tum4107 from '@/data/buildings/osm-way27326387.json';
+import tumCit from '@/data/buildings/osm-way27917482.json';
 
 /** A suggestion chip: short label, full question sent when tapped. */
 export interface Suggestion { label: string; question: string }
@@ -19,7 +27,7 @@ const MAX_CACHED = 40;
 
 /**
  * Bundled buildings, so the app works without Supabase: hand-written suggestions for N3 and the factory,
- * generated ones for the GeoGuessr extras (Terminal 2, Pasing Arcaden).
+ * generated ones for the GeoGuessr extras (Terminal 2, Pasing Arcaden, the TUM buildings).
  * Every other building, including uploaded ones, gets suggestions generated from its rooms and equipment.
  */
 const showcase: CatalogEntry[] = [
@@ -61,11 +69,26 @@ const showcase: CatalogEntry[] = [
     ],
   },
   // Fun buildings for the GeoGuessr game (docs/GEOGUESSR.md §7). OSM data: ODbL, attribution shown with the model.
-  { id: 'osm-way360544293', name: 'Terminal 2', building: terminal2 as unknown as Building, suggestions: suggestionsFor(terminal2 as unknown as Building) },
-  { id: 'osm-way52060470', name: 'Pasing Arcaden', building: pasing as unknown as Building, suggestions: suggestionsFor(pasing as unknown as Building) },
+  bundled('osm-way360544293', 'Terminal 2', terminal2),
+  bundled('osm-way52060470', 'Pasing Arcaden', pasing),
+  // TUM buildings from the train and dev splits (the test split stays out).
+  bundled('osm-way10053349', 'TUM Hauptgebäude', tumMain),
+  bundled('osm-way61408163', 'TUM Thierschbau', thierschbau),
+  bundled('osm-way50299720', 'TUM Landwirtschaftsbau', landwirtschaftsbau),
+  bundled('osm-way58216509', 'TUM U-Trakt', uTrakt),
+  bundled('osm-way19183732', 'TUM Mensa Arcisstraße', mensa),
+  bundled('osm-way476929995', 'StudiTUM', studitum),
+  bundled('osm-way27326387', 'TUM 4107 Institutsgebäude 3', tum4107),
+  bundled('osm-way27917482', 'TUM CIT Informatik & Mathematik', tumCit),
 ];
 
 export const defaultBuildingId = showcase[0].id;
+
+/** A bundled building with suggestions generated from its rooms and equipment. */
+function bundled(id: string, name: string, json: unknown): CatalogEntry {
+  const building = json as Building;
+  return { id, name, building, suggestions: suggestionsFor(building) };
+}
 
 const g = globalThis as { __lfBuildingList?: { at: number; list: BuildingSummary[] }; __lfBuildings?: Map<string, CatalogEntry> };
 const cache = (g.__lfBuildings ??= new Map());
