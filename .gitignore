@@ -46,3 +46,6 @@ next-env.d.ts
 /.venv/
 **/__pycache__/
 **/.ipynb_checkpoints/
+
+# Generated art working files (raw images, meshes)
+/tools/art/out/

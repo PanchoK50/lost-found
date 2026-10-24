@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Building } from '@/lib/buildings/types';
+import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
@@ -123,6 +124,13 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     }
   }
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft); };
+  // Voice goes into the box like typed text, so it can be checked before sending.
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const addTranscript = (text: string) => {
+    setVoiceError(null);
+    setDraft(current => (current.trim() ? `${current.trimEnd()} ${text}` : text));
+    requestAnimationFrame(() => { const el = input.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+  };
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
@@ -207,8 +215,10 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
           <form className="ask" onSubmit={submit}>
             <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
+            <MicButton onTranscript={addTranscript} onError={setVoiceError} />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
           </form>
+          {voiceError && <p className="voice-error" role="alert">{voiceError}</p>}
         </section>
       </div>
 

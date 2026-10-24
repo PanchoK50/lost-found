@@ -35,6 +35,8 @@ CI runs the same checks on this folder for every push and pull request. Commit `
 
 ## What's included
 
+- **Voice input**: the microphone in the chat box records speech and `/api/transcribe` turns it into text with ElevenLabs Scribe. Needs `ELEVENLABS_API_KEY` in `website/.env.local`.
+- **Generated art** in `public/art/` (not wired into the UI yet): an icon (`icons/`) and a 3D model (`models/`) for each of the 96 asset types in the dataset, plus floor and wall textures (`textures/`). The generators live in `../tools/art/`: `generate_icons.py` and `generate_textures.py` (Nano Banana on Vertex AI; pass the GCP project), and `generate_models.py` (TRELLIS.2 on the team GPU box, see `~/trellis2/install.sh` there). Each one skips work that's already done.
 - Next.js App Router, TypeScript in strict mode, Tailwind CSS, ESLint, npm lockfile.
 - Responsive SVG floor viewer with room highlighting, equipment details, and accessible form controls.
 - `GET /api/search?q=printer`: validated deterministic search over sample rooms and assets.
