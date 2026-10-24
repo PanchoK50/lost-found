@@ -15,7 +15,7 @@ type Message = { id: number; role: 'user' | 'assistant'; content: string; respon
 interface Props {
   building: Building;
   buildings: { id: string; name: string }[];
-  suggestions: string[];
+  suggestions: { label: string; question: string }[];
 }
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
@@ -191,7 +191,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             <p className="eyebrow">{building.building.name} · {building.floors.length} floors · {building.spaces.length} spaces</p>
             <h1>Ask me anything.</h1>
           </div>}
-          {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s} onClick={() => void ask(s)}>{s}</button>)}</div>}
+          {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
           <form className="ask" onSubmit={submit}>
             <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
