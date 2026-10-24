@@ -49,7 +49,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="lostfound.benchmark")
     parser.add_argument("directory", type=Path)
     parser.add_argument("--out", type=Path, default=Path("submissions") / "submission.csv")
-    parser.add_argument("--design", default="rules+", help="rules+ (default) | hybrid | typed | code")
+    parser.add_argument("--design", default="hybrid", help="hybrid (default) | typed | code")
     parser.add_argument("--model", default="opus", help="opus | sonnet | haiku")
     parser.add_argument("--effort", default="low")
     parser.add_argument("--workers", type=int, default=6)

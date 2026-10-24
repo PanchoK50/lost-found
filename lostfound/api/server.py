@@ -181,7 +181,7 @@ def edit(request: EditRequest) -> dict:
 class AskRequest(BaseModel):
     building_id: str
     question: str
-    design: str = "rules+"
+    design: str = "hybrid"
     model: str = "opus"
 
 

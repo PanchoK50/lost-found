@@ -4,7 +4,7 @@ One command, no manual steps between input and output:
 
 ```sh
 uv sync
-source .envrc            # exports ANTHROPIC_API_KEY (only needed when a question falls through to Claude)
+source .envrc            # exports ANTHROPIC_API_KEY
 uv run python -m lostfound.benchmark <questions-directory> --out submissions/<name>.csv
 ```
 
@@ -25,16 +25,20 @@ uv run python -m lostfound.benchmark data/sunday --out submissions/sunday.csv   
 
 ## What runs
 
-The default design is `rules+`, and nothing in it is specific to any building:
+The default design is `hybrid`. Every question goes to the Claude agent, and nothing in it is specific to any building:
 
-1. **Deterministic path.** A template parser recognises the known question phrasings and resolves room, floor and type mentions in code. Our geometry library (`lostfound/core`) then computes the answer. These are the same skills that reproduce all 655 labelled train and dev answers in `tests/test_skills_oracle.py`. No API call is made.
-2. **Claude path.** Any question the parser does not recognise, such as a new phrasing or a new kind, goes to the hybrid Claude agent. It has typed tools for each skill, plus `run_python` over the same verified library. A deterministic formatter guarantees the `Answer:` line.
+1. **Room resolution in code.** Room mentions in the question are resolved to space ids deterministically (names, room numbers, floor qualifiers, umlauts), and passed to Claude as hints, with ambiguities flagged.
+2. **Typed tools (main path).** Claude picks one tool per question kind (areas, errands, deliveries, reachability, stacking, shared walls, 3D distance, what-if doors, routes, assets) and fills in its arguments. The tool computes the answer with our geometry library (`lostfound/core`) and returns a ready-made `Answer:` line. These are the same skills that reproduce every labelled train and dev answer in `tests/`.
+3. **`run_python` (fallback).** For a question no tool covers, Claude writes a short Python snippet against the same verified library. It runs locally in a separate process with a timeout.
+4. **A formatter guarantees the `Answer:` line.** If the reply lacks one, the last tool's answer line is appended.
+
+No template matching is used for answers. The template parser (`lostfound/agent/rules.py`) is kept only as the no-LLM baseline in the evals.
 
 Options:
 
 | Option | Values | Default |
 |---|---|---|
-| `--design` | `rules+`, `hybrid`, `typed`, `code` | `rules+` |
+| `--design` | `hybrid`, `typed`, `code` | `hybrid` |
 | `--model` | `opus`, `sonnet`, `haiku` | `opus` |
 | `--effort` | `low`, `medium`, `high` | `low` |
 | `--workers` | number of parallel workers | 6 |
@@ -43,6 +47,6 @@ Options:
 
 ```sh
 uv run pytest                                                        # oracle tests: 655 benchmark + 2,130 warm-up answers
-uv run python -m lostfound.evals.run --variant V5 --set dev          # the default design on dev questions
+uv run python -m lostfound.evals.run --variant V4 --model opus --effort low --set dev   # the default design on dev
 uv run python -m lostfound.evals.report --set dev                    # per-kind tables in evals/results/summary.md
 ```

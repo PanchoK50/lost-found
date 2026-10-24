@@ -4,7 +4,8 @@ Designs (the eval variants):
 - typed:   resolver hints + typed tools per question kind (+ search/route)
 - code:    resolver + run_python over the verified library
 - hybrid:  typed tools first, run_python when nothing fits
-- rules+:  the no-LLM template parser when it recognises the question, else the hybrid agent
+- rules+:  the no-LLM template parser when it recognises the question, else hybrid (eval comparison only; not
+           used for answers, since hidden questions may resemble a template but mean something else)
 
 Entry point for benchmark/evaluate.py:  --agent lostfound.agent.agent:answer"""
 
@@ -27,7 +28,7 @@ from lostfound.evals.variants import Outcome
 
 DEFAULT_MODEL = os.environ.get("LOSTFOUND_MODEL", "claude-opus-5-5")
 DEFAULT_EFFORT = os.environ.get("LOSTFOUND_EFFORT", "low")
-DEFAULT_DESIGN = os.environ.get("LOSTFOUND_DESIGN", "rules+")
+DEFAULT_DESIGN = os.environ.get("LOSTFOUND_DESIGN", "hybrid")
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
 MAX_TOKENS = 16000
