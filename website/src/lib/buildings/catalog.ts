@@ -14,8 +14,10 @@ const catalog: CatalogEntry[] = [
     id: 'osm-way22744230',
     name: 'N3',
     building: n3 as unknown as Building,
-    // One example per benchmark kind (docs/answer-types.md).
+    // The two everyday questions first, then one example per benchmark kind (docs/answer-types.md).
     suggestions: [
+      { label: 'Find something', question: 'Where is the projector?' },
+      { label: 'Directions', question: 'How do I get from N2301 to N5325?' },
       { label: 'Largest room', question: 'Which is the largest generic room on floor 5, and how big is it in m²?' },
       { label: 'Total area', question: 'What is the total area of all generic rooms on floor 4?' },
       { label: 'Shared walls', question: 'We\'re soundproofing Generic room -1364. How many rooms share a wall with it?' },
@@ -32,6 +34,8 @@ const catalog: CatalogEntry[] = [
     name: 'Fertigung Ost 27',
     building: factory as unknown as Building,
     suggestions: [
+      { label: 'Find something', question: 'Where is the coordinate measuring machine?' },
+      { label: 'Directions', question: 'How do I get from Office 0.23 to Kitchen 1.08?' },
       { label: 'Largest room', question: 'Which is the largest kitchen on floor 1, and how big is it?' },
       { label: 'Total area', question: 'What is the total area of all meeting rooms on the ground floor?' },
       { label: 'Shared walls', question: 'We\'re soundproofing Assembly zone H-A2. How many rooms share a wall with it?' },
