@@ -158,7 +158,8 @@ Verteilung im Testset: `floor_area_total` 33 · `shared_walls_count` 26 · `larg
 - **Ein** Befehl, ohne Handgriffe zwischen Eingabe und Ausgabe, z. B.
   `uv run --env-file .env python -m agent.benchmark <gebäude-ordner> <fragen-datei> --out answers.csv`
 - Liest die Fragen flexibel: JSONL oder CSV, mit oder ohne `building_id`, ein Gebäude oder ein ganzer Split.
-- Schreibt UTF-8-CSV mit `question_id,answer`, höchstens 5 MB, jede ID genau einmal.
+- Schreibt UTF-8-CSV mit `question_id,answer`, höchstens 5 MB, jede ID genau einmal. Das ist das Format für die **Test-CSV**.
+- **Sonntag laut Challenge-PDF:** Die Eingabe ist `questions.json` (`id`, Text, optionale Bedingungen wie stufenlos), die Ausgabe ist **`answers.json`** mit pro ID dem gefundenen Gegenstand oder Raum, der Route als geordneter Liste von Knoten-IDs und der Länge in Metern. Beispielbefehl: `run_benchmark <building_dir> <questions.json> <answers.json>`. Schema und Beispiel sollen im data-Ordner folgen. Details stehen in [ORGANIZER_NOTES.md](ORGANIZER_NOTES.md).
 - Fragen parallel abarbeiten, mit Wiederholung bei API-Fehlern und einem Kostenlimit. Fällt die API aus, trotzdem eine Zeile für jede ID schreiben.
 - `BENCHMARK.md` dokumentiert den Befehl, die Voraussetzungen (`uv sync`, `.env`) und die erwartete Laufzeit und Kosten.
 - **Generalprobe am Samstag:** ein dev-Gebäude wie ein unbekanntes behandeln und den Befehl einmal komplett durchlaufen lassen.

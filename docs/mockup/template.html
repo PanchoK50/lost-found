@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lost & Found · UX-Mockup</title>
+<style>
+:root{--ink:#273322;--muted:#71796c;--paper:#f5f6f0;--line:#e0e4d9;--accent:#d8f578;--route:#ff6a1a;--blocked:#d64545;--pencil:#5b6b8c;--card:#fff;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;height:100%}body{background:#e9ebe3;color:var(--ink);font:14px/1.45 var(--sans)}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+b{font-weight:650}
+/* demo bar (not part of the product) */
+.demo{position:sticky;top:0;z-index:50;background:#1f2a1b;color:#e9eedf;padding:10px 18px 8px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.demo h1{font:600 13px var(--sans);margin:0;letter-spacing:.06em;text-transform:uppercase;color:#cfe88a}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}.tabs button{padding:5px 11px;border-radius:99px;background:#2e3b29;color:#dfe6d3;font-size:13px}.tabs button.on{background:var(--accent);color:var(--ink);font-weight:600}
+.cover{display:flex;gap:3px;flex-wrap:wrap;margin-left:auto}.cover span{font-size:11px;padding:2px 6px;border-radius:4px;background:#2e3b29;color:#7f8c76}.cover span.on{background:#cfe88a;color:#1f2a1b;font-weight:600}
+.demo .note{flex-basis:100%;font-size:11.5px;color:#9aa78f}
+/* product shell */
+.frame{padding:18px;display:flex;justify-content:center}
+.shell{width:min(1480px,100%);height:calc(100vh - 120px);min-height:640px;background:var(--paper);border-radius:14px;box-shadow:0 10px 40px #27332222;display:grid;grid-template-rows:58px 1fr;overflow:hidden}
+.top{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--line);background:#fbfcf8}
+.brand{font:600 19px var(--sans);letter-spacing:-.02em}.brand i{font-style:normal;color:#759c38}
+.picker{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;font-size:13px}
+.lenses{margin-left:auto;display:flex;background:#eef1e8;border-radius:10px;padding:3px}.lenses button{padding:6px 11px;border-radius:8px;font-size:13px;color:var(--muted)}.lenses button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px #0001;font-weight:600}
+.iconbtn{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--line);background:#fff}
+.main{display:grid;grid-template-columns:410px 1fr;min-height:0}
+/* chat */
+.chat{display:flex;flex-direction:column;border-right:1px solid var(--line);background:#fbfcf8;min-height:0;position:relative}
+.msgs{flex:1;overflow:auto;padding:18px 16px 8px;display:flex;flex-direction:column;gap:14px}
+.user{align-self:flex-end;max-width:82%;background:var(--ink);color:#f3f6ec;padding:9px 13px;border-radius:14px 14px 4px 14px}
+.user small{display:block;font-size:11px;opacity:.65}
+.agent{max-width:100%;display:flex;flex-direction:column;gap:8px}
+.agent .who{font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.say{font:16.5px/1.45 var(--serif)}
+.status{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:7px}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--route);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.dots span{display:inline-block;width:6px;height:6px;margin-right:4px;border-radius:50%;background:var(--muted);animation:pulse 1s infinite}.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+.und{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 9px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.und .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);width:100%}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:3px 9px;font-size:12.5px;background:#eef1e8;border:1px solid transparent}
+.chip.edit:after{content:"▾";font-size:9px;color:var(--muted)}.chip .x{color:var(--muted);font-size:11px;margin-left:2px}
+.chip.c-start{background:#fff3ea;border-color:#ffd2b5}.chip.c-dest{background:var(--accent)}.chip.c-con{background:#e7eef8}.chip.c-clo{background:#fbe6e6;color:#8b2a2a}.chip.c-chg{background:#eceef6;border:1px dashed var(--pencil);color:var(--pencil)}.chip.c-q{background:#fff;border:1px dashed var(--muted)}
+.arrow{color:var(--muted)}
+.mem-note{font-size:12px;color:#5c7a2c;background:#eef6dc;border-radius:8px;padding:4px 9px;align-self:flex-start}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:6px}.opt{text-align:left;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;display:flex;gap:9px;align-items:center}
+.opt:hover,.opt.hv{border-color:var(--ink);box-shadow:0 0 0 2px var(--accent)}.opt .n{width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;display:grid;place-items:center;flex:none}.opt small{display:block;color:var(--muted);font-size:11.5px}.opt.off{opacity:.4}.opt.pick{border-color:var(--ink);background:#f7fbe9}
+.opt.loc{border-style:dashed}
+.steps{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px}
+.step{display:flex;gap:10px;align-items:flex-start;padding:7px 8px;border-radius:8px;cursor:default}.step:hover,.step.hv{background:#fff3ea}
+.step .num{font-size:11px;color:var(--muted);width:12px;padding-top:3px}.step .ic{width:26px;height:26px;border-radius:7px;background:#eef1e8;display:grid;place-items:center;flex:none;font-size:14px}
+.step.up .ic,.step.down .ic{background:#fff3ea;color:var(--route);font-weight:700}.step.arrive .ic{background:var(--accent)}
+.dur{display:flex;align-items:center;gap:10px;padding:8px 8px 4px;border-top:1px solid var(--line);margin-top:4px}.dur strong{font-size:20px}.dur span{color:var(--muted)}.dur .sp{flex:1}
+.link{font-size:12.5px;color:#3d5a1c;text-decoration:underline;text-underline-offset:3px}
+.card{border-radius:12px;padding:11px 12px;background:#fff;border:1px solid var(--line)}
+.card.prev{border:1.5px dashed var(--pencil);background:#f6f7fb}.card .h{font-weight:650;display:flex;gap:6px;align-items:center}.card .tag{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--pencil);font-weight:600}
+.card p{margin:4px 0 9px;color:#4a5544;font-size:13px}.card .row{display:flex;gap:8px;justify-content:flex-end}
+.btn{padding:7px 13px;border-radius:9px;border:1px solid var(--line);background:#fff;font-weight:550}.btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+.card.ok{background:#f2f8e6;border-color:#cfe2a8}.card.err{background:#fdf3f2;border-color:#f1cdca}.card.err .h{color:#8b2a2a}
+.foot-actions{display:flex;gap:14px}
+.memory{border-top:1px solid var(--line);padding:9px 14px 4px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px}.memory .t{color:var(--muted);margin-right:2px}.memory .clear{margin-left:auto;color:var(--muted);font-size:11.5px;text-decoration:underline}
+.memory .chip{background:#fff;border-color:var(--line)}.memory .chip.flash{animation:flash 1.2s 2}
+@keyframes flash{50%{background:var(--accent)}}
+.sugg{padding:4px 14px;display:flex;gap:6px;overflow:hidden}.sugg button{white-space:nowrap;font-size:12.5px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;background:#fff}
+.composer{display:flex;gap:8px;padding:8px 14px 14px;align-items:center}.composer .in{flex:1;border:1px solid #cdd5c4;border-radius:12px;padding:11px 13px;background:#fff;color:var(--muted)}
+.mic{width:46px;height:46px;border-radius:50%;background:var(--route);color:#fff;font-size:19px;display:grid;place-items:center;box-shadow:0 3px 10px #ff6a1a55}.mic.live{animation:ring 1.1s infinite}
+@keyframes ring{0%{box-shadow:0 0 0 0 #ff6a1a88}100%{box-shadow:0 0 0 16px #ff6a1a00}}
+.send{width:40px;height:40px;border-radius:12px;background:var(--ink);color:#fff}
+.listen{position:absolute;left:14px;right:14px;bottom:76px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 8px 30px #0002}
+.listen .wave{display:flex;gap:3px;align-items:center;height:26px;margin:6px 0}.listen .wave i{width:4px;border-radius:2px;background:var(--route);animation:wave .9s infinite ease-in-out}
+@keyframes wave{50%{transform:scaleY(.3)}}
+/* stage */
+.stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:radial-gradient(circle at 50% 40%,#fbfcf7,#eef0e8)}
+.stage-top{position:absolute;top:14px;left:84px;right:16px;display:flex;gap:10px;align-items:center;z-index:5}
+.seg{display:flex;background:#fff;border:1px solid var(--line);border-radius:10px;padding:3px}.seg button{padding:5px 12px;border-radius:7px;font-size:13px;color:var(--muted)}.seg button.on{background:var(--ink);color:#fff}
+.ttl{font-size:12px;color:var(--muted)}.ttl b{color:var(--ink);font-size:14px;display:block}
+.legend{margin-left:auto;background:#fffd;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:11.5px;display:flex;gap:10px;flex-wrap:wrap}.legend span{display:flex;align-items:center;gap:5px}.legend i{width:14px;height:10px;border-radius:2px;display:inline-block}
+.rail{position:absolute;left:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:5px;z-index:5}
+.rail button{width:52px;height:42px;border-radius:10px;background:#fff;border:1px solid var(--line);font-weight:600;position:relative;font-size:13px}.rail button.on{background:var(--ink);color:#fff}.rail button.has:after{content:"";position:absolute;right:5px;top:5px;width:7px;height:7px;border-radius:50%;background:var(--route)}
+.rail .line{position:absolute;left:-7px;width:3px;border-radius:2px;background:var(--route)}
+.map{position:absolute;inset:64px 20px 20px 84px;display:grid;place-items:center}
+.map svg{width:100%;height:100%}
+svg.plan text{font-family:var(--sans);pointer-events:none}
+.draw .rt{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .9s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.rt.hv{stroke-width:var(--hw)}
+.pinpulse{animation:pinp .9s infinite}@keyframes pinp{50%{opacity:.35}}
+.doll{position:absolute;inset:60px 0 0 60px;perspective:2200px;display:grid;place-items:center}
+.doll-in{position:relative;width:74%;aspect-ratio:var(--ar);transform-style:preserve-3d;transform:rotateX(57deg) rotateZ(-36deg) translateZ(-60px)}
+.plate{position:absolute;inset:0;transform-style:preserve-3d;transition:opacity .3s}
+.plate svg{width:100%;height:100%;filter:drop-shadow(0 14px 10px #27332240)}
+.plate.dim{opacity:.5}
+.plate .tagf{position:absolute;left:-46px;top:0;font-weight:700;font-size:15px;background:#fff;border-radius:6px;padding:2px 7px;border:1px solid var(--line)}
+.guide{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:min(520px,80%);background:var(--ink);color:#f4f7ee;border-radius:18px;padding:16px 18px;box-shadow:0 14px 40px #0004;z-index:6}
+.guide .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#cfe88a}.guide .tx{font:22px/1.3 var(--serif);margin:6px 0 12px}.guide .tx b{color:#ffb98c}
+.guide .row{display:flex;gap:8px;align-items:center}.guide button{padding:9px 14px;border-radius:10px;background:#3a4934}.guide button.pri{background:var(--route);color:#fff;font-weight:600;margin-left:auto}.guide .hint{font-size:12px;color:#aab79f}
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 14px;border-radius:12px;display:flex;gap:14px;align-items:center;z-index:9;box-shadow:0 10px 30px #0003}.toast button{color:var(--accent);text-decoration:underline}
+.attr{position:absolute;right:14px;bottom:8px;font-size:10.5px;color:var(--muted)}
+.hovercard{position:absolute;right:20px;bottom:30px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:12.5px;box-shadow:0 6px 20px #0001;z-index:6}
+/* mobile */
+.phones{display:flex;gap:40px;justify-content:center;padding:26px;flex-wrap:wrap}
+.phone-wrap{text-align:center}.phone-wrap h3{font:600 13px var(--sans);color:#4a5544;margin:0 0 10px}
+.phone{width:390px;height:800px;border-radius:46px;border:12px solid #1d1f1c;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 20px 50px #0003;text-align:left}
+.phone .ptop{position:absolute;top:0;left:0;right:0;height:92px;padding:44px 16px 0;display:flex;align-items:center;gap:8px;z-index:4;background:linear-gradient(#f5f6f0,#f5f6f0dd 70%,#f5f6f000)}
+.phone .pmap{position:absolute;inset:90px 56px 390px 8px}.phone .pmap svg{width:100%;height:100%}
+.phone .prail{position:absolute;right:10px;top:110px;display:flex;flex-direction:column;gap:4px;z-index:4}.phone .prail button{width:44px;height:44px;border-radius:10px;background:#fff;border:1px solid var(--line);font-weight:600;font-size:11px;white-space:nowrap}.phone .prail button.on{background:var(--ink);color:#fff}
+.swipe{position:absolute;left:14px;right:14px;bottom:226px;background:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 8px 24px #0002;z-index:4}
+.swipe .tx{font:18px/1.3 var(--serif);margin:4px 0 10px}.swipe .row{display:flex;align-items:center;justify-content:space-between}.swipe button{width:44px;height:44px;border-radius:12px;background:#eef1e8;font-size:16px}.swipe .dotsrow{display:flex;gap:5px}.swipe .dotsrow i{width:7px;height:7px;border-radius:50%;background:#cdd5c4}.swipe .dotsrow i.on{background:var(--route);width:18px;border-radius:4px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fbfcf8;border-radius:22px 22px 0 0;box-shadow:0 -6px 24px #0002;z-index:5;padding:8px 0 22px}
+.sheet .grab{width:44px;height:5px;border-radius:3px;background:#cdd5c4;margin:2px auto 8px}
+.sheet .composer .mic{width:56px;height:56px;font-size:22px}
+.sheet.full{top:96px;display:flex;flex-direction:column}.sheet.full .msgs{padding:8px 14px}
+/* import */
+.imp{width:min(1300px,100%);background:var(--paper);border-radius:14px;box-shadow:0 10px 40px #27332222;padding:22px 26px;min-height:calc(100vh - 140px)}
+.stepper{display:flex;gap:6px;margin:6px 0 22px}.stepper button{flex:1;text-align:left;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid var(--line);color:var(--muted)}.stepper button b{display:block;color:var(--ink)}.stepper button.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--accent)}.stepper button.done b:before{content:"✓ ";color:#759c38}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;position:relative}
+.panel h4{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.panel img{width:100%;border-radius:8px;display:block}
+.drop{border:2px dashed #cdd5c4;border-radius:14px;padding:30px;text-align:center;color:var(--muted)}
+.checks li{list-style:none;padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:9px}.checks li:before{content:"✓";color:#fff;background:#759c38;border-radius:50%;width:20px;height:20px;display:grid;place-items:center;font-size:12px;flex:none}.checks li.warn:before{content:"!";background:#d9a33b}
+.checks{padding:0;margin:0}
+</style>
+</head>
+<body>
+<div class="demo">
+  <h1>Lost & Found · UX-Mockup</h1>
+  <div class="tabs" id="tabs"></div>
+  <div class="cover" id="cover"></div>
+  <div class="note" id="note"></div>
+</div>
+<div class="frame" id="app"></div>
+<script>
+const D = /*__DATA__*/null;
+const B = D.building;
+const S = Object.fromEntries(B.spaces.map(s => [s.id, s]));
+const FL = Object.fromEntries(B.floors.map(f => [f.id, f]));
+const UN = {U1:'Chat',U2:'Karte',U3:'Route',U4:'Verstanden',U5:'Rückfrage',U6:'Wegbeschreibung',U7:'Gemerkt',U8:'Vorschau',U9:'Fehler',U10:'Sprache',U11:'Mobil',U12:'Import'};
+
+// Bounding box over all floors, so floors do not jump when switching.
+let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+for (const s of B.spaces) for (const [x,y] of s.polygon) { minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); }
+const W = maxX-minX, H = maxY-minY, SU = Math.max(W,H)/100, MG = SU*4;
+const SVB = `${minX-MG} ${-maxY-MG} ${W+2*MG} ${H+2*MG}`;
+const P = ([x,y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`;
+
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const md = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+const plain = t => t.replace(/\*\*/g, '');
+
+function fillFor(s) {
+  const t = s.type, r = s.room_type;
+  if (['corridor','stair','lift'].includes(t) || ['lobby','stairwell','corridor'].includes(r)) return '#e4e7df';
+  if (['office','meeting_room','seminar_room','lecture_hall','library'].includes(r)) return '#eef1e8';
+  if (['production_zone','assembly_zone','additive_zone','makerspace','lab','quality_lab'].includes(r) || t === 'hall') return '#f1ead8';
+  if (['warehouse_zone','logistics_zone','storage'].includes(r)) return '#e9e1d0';
+  if (['kitchen','canteen','toilet','bathroom','locker_room'].includes(r)) return '#e3ece6';
+  if (['server_room','technical_room','print_room'].includes(r)) return '#e6e4ec';
+  if (['bedroom','living_room'].includes(r)) return '#f4efe6';
+  if (t === 'outdoor' || r === 'balcony') return '#f9faf6';
+  return '#f9faf6';
+}
+
+const state = { key: 'route', floor: null, view: 'plan', phase: 'done', statusIdx: 0, streamN: 1e9, applied: {}, hoverStep: null, hoverOpt: null, chosen: {}, voiceStep: 0, mStep: 0, importStep: 3, toast: null, lastDrawn: null, timers: [] };
+const sc = () => { const s = D.scenarios.find(s => s.key === state.key); return s.ref ? { ...D.scenarios.find(x => x.key === s.ref), ...s, key: s.key } : s; };
+const focusMsg = s => [...(s.messages || [])].reverse().find(m => m.role === 'agent');
+const lastIndex = s => (s.messages || []).length - 1;
+
+function changesOf(m, s) {
+  return (m?.changes || []).map(c => ({ ...c, status: state.applied[s.key] ? 'applied' : c.status }));
+}
+
+// ---------- map ----------
+function frame(fid) {
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for (const s of B.spaces) if (s.floor_id === fid) for (const [x,y] of s.polygon) { x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
+  const u = Math.max(x1-x0, y1-y0)/100, mg = u*5;
+  return { U: u, VB: `${x0-mg} ${-y1-mg} ${x1-x0+2*mg} ${y1-y0+2*mg}` };
+}
+function floorSvg(fid, o = {}) {
+  const s = o.sc, m = o.msg && o.overlays ? o.msg : null;
+  const { U, VB } = o.shared ? { U: SU, VB: SVB } : frame(fid);
+  const hl = {}; const cands = [];
+  for (const h of m?.highlights || []) { hl[h.space_id] = h.role; if (h.role === 'candidate') cands.push(h.space_id); }
+  const ch = changesOf(m, s);
+  const sw = U*0.12;
+  let g = `<svg class="plan" viewBox="${VB}" preserveAspectRatio="xMidYMid meet" style="--hw:${U*1.1}">
+  <defs>
+   <pattern id="hg" width="${U*1.2}" height="${U*1.2}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="100%" height="100%" fill="#d9dcd3"/><line x1="0" y1="0" x2="0" y2="${U*1.2}" stroke="#b9bdb2" stroke-width="${U*0.35}"/></pattern>
+   <pattern id="hr" width="${U*1}" height="${U*1}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="100%" height="100%" fill="#fbe1e1"/><line x1="0" y1="0" x2="0" y2="${U}" stroke="#d64545" stroke-width="${U*0.3}"/></pattern>
+   <pattern id="hp" width="${U*1}" height="${U*1}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="100%" height="100%" fill="#eef0f7"/><line x1="0" y1="0" x2="0" y2="${U}" stroke="#5b6b8c" stroke-width="${U*0.18}"/></pattern>
+  </defs>`;
+  const spaces = B.spaces.filter(x => x.floor_id === fid);
+  const closedPrev = new Set(), closedApplied = new Set();
+  for (const c of ch) if (c.op === 'close') for (const id of c.space_ids || []) (c.status === 'applied' ? closedApplied : closedPrev).add(id);
+  for (const x of spaces) {
+    const role = hl[x.id];
+    let fill = fillFor(x), stroke = '#66725e', w = sw, dash = '';
+    if (role === 'target') { fill = 'var(--accent)'; stroke = 'var(--ink)'; w = sw*2.2; }
+    if (role === 'candidate') { fill = '#e9f8b8'; stroke = 'var(--ink)'; w = sw*1.6; }
+    if (role === 'unreachable') fill = 'url(#hg)';
+    if (role === 'changed') { stroke = 'var(--pencil)'; w = sw*2; dash = `stroke-dasharray="${U*0.8} ${U*0.5}"`; }
+    if (closedApplied.has(x.id)) { fill = 'url(#hr)'; stroke = 'var(--blocked)'; w = sw*2; }
+    if (closedPrev.has(x.id)) { fill = 'url(#hp)'; stroke = 'var(--pencil)'; w = sw*2; dash = `stroke-dasharray="${U*0.8} ${U*0.5}"`; }
+    g += `<polygon data-space="${x.id}" points="${x.polygon.map(P).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${w}" ${dash} stroke-linejoin="round"/>`;
+  }
+  for (const d of B.openings.filter(d => d.floor_id === fid)) g += `<circle cx="${d.position[0]}" cy="${-d.position[1]}" r="${U*0.32}" fill="#58684c"/>`;
+  if (o.labels !== false) for (const x of spaces) {
+    if (x.type === 'corridor') continue;
+    const [ax, ay] = x.anchor, fs = U*1.25, xs = x.polygon.map(p => p[0]), ys = x.polygon.map(p => p[1]);
+    const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys), nm = x.name.replace(' '+x.ref, '');
+    const big = nm.length*fs*0.6 < bw*0.92 && bh > fs*2.8, mid = !big && x.ref.length*fs*0.85*0.6 < bw*0.9 && bh > fs*1.4;
+    if (x.type === 'lift' || x.type === 'stair') g += `<text x="${ax}" y="${-ay+fs*0.4}" font-size="${fs*1.3}" text-anchor="middle" fill="#4a5544">${x.type === 'lift' ? '⇅' : '▤'}</text>`;
+    else if (big) g += `<text x="${ax}" y="${-ay}" font-size="${fs}" text-anchor="middle" fill="#273322" font-weight="600">${esc(nm)}<tspan x="${ax}" dy="${fs*1.15}" font-size="${fs*0.85}" font-weight="400" fill="#71796c">${esc(x.ref)}</tspan></text>`;
+    else if (mid) g += `<text x="${ax}" y="${-ay+fs*0.35}" font-size="${fs*0.85}" text-anchor="middle" fill="#4a5544">${esc(x.ref)}</text>`;
+  }
+  for (const id of [...closedApplied, ...closedPrev]) if (S[id]?.floor_id === fid) { const [ax, ay] = S[id].anchor; g += `<text x="${ax}" y="${-ay-U*1.6}" font-size="${U*1.8}" text-anchor="middle">🔒</text>`; }
+  for (const c of ch) if (c.op === 'add_door' && c.floor_id === fid) {
+    const [x, y] = c.position, applied = c.status === 'applied';
+    g += `<circle cx="${x}" cy="${-y}" r="${U*1.3}" fill="${applied ? '#58684c' : '#fff'}" stroke="var(--pencil)" stroke-width="${U*0.25}" ${applied ? '' : `stroke-dasharray="${U*0.5} ${U*0.35}"`}/>
+          <text x="${x}" y="${-y-U*2.2}" font-size="${U*1.3}" text-anchor="middle" fill="var(--pencil)" font-weight="600">${applied ? 'Tür' : 'neue Tür?'}</text>`;
+  }
+  const r = m?.route;
+  if (r) {
+    r.legs.forEach((leg, i) => {
+      if (leg.floor_id !== fid) return;
+      const pts = leg.points.map(P).join(' ');
+      const hv = o.hoverLeg === i ? 'hv' : '';
+      g += `<polyline points="${pts}" fill="none" stroke="#fff" stroke-width="${U*1.15}" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline class="rt ${hv}" pathLength="1" points="${pts}" fill="none" stroke="var(--route)" stroke-width="${U*0.65}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      const d = 'M' + leg.points.map(P).join(' L');
+      g += `<circle r="${U*0.55}" fill="#fff" stroke="var(--route)" stroke-width="${U*0.3}"><animateMotion dur="${Math.max(2.5, leg.points.length*0.6)}s" begin="0.9s" repeatCount="indefinite" path="${d}"/></circle>`;
+      if (i === 0) { const [x, y] = leg.points[0]; g += `<circle cx="${x}" cy="${-y}" r="${U*1.1}" fill="var(--route)" stroke="#fff" stroke-width="${U*0.35}"/>`; }
+    });
+    for (const st of r.steps) if (st.landmark && st.landmark.floor_id === fid) {
+      const [x, y] = st.landmark.position;
+      g += `<circle cx="${x}" cy="${-y}" r="${U*0.6}" fill="var(--ink)"/><text x="${x+U}" y="${-y-U*0.6}" font-size="${U*1.1}" fill="var(--ink)" font-weight="600">${esc(st.landmark.name)}</text>`;
+    }
+    for (const fc of r.floor_changes) if (fc.floor_id === fid) {
+      const [x, y] = fc.at, t = `${fc.kind === 'lift' ? '⇅' : '▤'} ${fc.name} → ${FL[fc.to_floor].short}`, fs = U*1.3, w = t.length*fs*0.56 + U*2;
+      g += `<g data-act="floor" data-floor="${fc.to_floor}" style="cursor:pointer"><rect x="${x-w/2}" y="${-y+U*1.6}" width="${w}" height="${fs*2}" rx="${fs}" fill="var(--ink)"/><text x="${x}" y="${-y+U*1.6+fs*1.35}" font-size="${fs}" text-anchor="middle" fill="#fff" font-weight="600">${esc(t)}</text></g>`;
+    }
+  }
+  for (const id of Object.keys(hl)) if (hl[id] === 'target' && S[id].floor_id === fid) {
+    const [x, y] = S[id].anchor;
+    g += `<g transform="translate(${x},${-y})"><path d="M0,0 C${-U*1.8},${-U*2.4} ${-U*1.8},${-U*4.6} 0,${-U*4.6} C${U*1.8},${-U*4.6} ${U*1.8},${-U*2.4} 0,0Z" fill="var(--ink)"/><circle cy="${-U*3.2}" r="${U*0.75}" fill="var(--accent)"/></g>`;
+  }
+  cands.forEach((id, i) => {
+    if (S[id].floor_id !== fid) return;
+    const [x, y] = S[id].anchor, pulse = state.hoverOpt === id ? 'pinpulse' : '';
+    g += `<g class="${pulse}"><circle cx="${x}" cy="${-y}" r="${U*1.7}" fill="var(--ink)" stroke="#fff" stroke-width="${U*0.3}"/><text x="${x}" y="${-y+U*0.6}" font-size="${U*1.7}" text-anchor="middle" fill="#fff" font-weight="700">${i+1}</text></g>`;
+  });
+  return g + '</svg>';
+}
+
+function floorsWithContent(m) {
+  const f = new Set();
+  if (!m) return f;
+  for (const h of m.highlights || []) f.add(S[h.space_id].floor_id);
+  for (const l of m.route?.legs || []) f.add(l.floor_id);
+  return f;
+}
+
+// ---------- chat ----------
+function understood(u) {
+  if (!u) return '';
+  const c = [];
+  if (u.start) c.push(`<span class="chip c-start edit">📍 ${esc(S[u.start].label)}</span>`);
+  if (u.destination) c.push(`${u.start ? '<span class="arrow">→</span>' : ''}<span class="chip c-dest edit">◎ ${esc(S[u.destination].label)}</span>`);
+  if (u.destination_kind) c.push(`<span class="chip c-dest edit">◎ ${esc(u.destination_kind)}</span><span class="chip c-q">📍 Standort ?</span>`);
+  for (const k of u.constraints || []) c.push(`<span class="chip c-con">${k === 'step_free' ? '♿ stufenlos' : esc(k)}<span class="x">✕</span></span>`);
+  for (const k of u.closures || []) c.push(`<span class="chip c-clo">⛔ ${esc(k)}<span class="x">✕</span></span>`);
+  if (u.change) c.push(`<span class="chip c-chg">✎ ${esc(u.change)}</span>`);
+  return `<div class="und"><span class="lbl">Verstanden</span>${c.join('')}</div>`;
+}
+
+function agentMsg(m, s, idx, live) {
+  const isLast = idx === lastIndex(s);
+  if (isLast && live && state.phase === 'status') return `<div class="agent"><span class="who">Werk</span>${(m.status || []).length ? `<div class="status">${esc(m.status[Math.min(state.statusIdx, m.status.length-1)])}</div>` : '<div class="dots"><span></span><span></span><span></span></div>'}</div>`;
+  const streaming = isLast && live && state.phase === 'stream';
+  let h = `<div class="agent"><span class="who">${esc(B.name)}</span>`;
+  if (!streaming) h += understood(m.understood);
+  if (m.text) { const words = m.text.split(' '); h += `<div class="say">${esc(streaming ? words.slice(0, state.streamN).join(' ') : m.text)}${streaming ? ' ▍' : ''}</div>`; }
+  if (streaming) return h + '</div>';
+  if (m.memorised) h += `<div class="mem-note">✓ gemerkt: ♿ stufenlos · 📍 Standort</div>`;
+  if (m.clarification) {
+    const c = m.clarification, picked = state.chosen[s.key + idx];
+    h += `<div class="opts">${c.options.map((o, i) => `<button class="opt ${picked ? (picked === o.space_id ? 'pick' : 'off') : ''} ${state.hoverOpt === o.space_id ? 'hv' : ''}" data-opt="${o.space_id}" data-act="choose" data-k="${s.key + idx}"><span class="n">${i+1}</span><span>${esc(o.label)}<small>${esc(o.floor)}</small></span></button>`).join('')}${c.locate ? `<button class="opt loc"><span class="n" style="background:var(--route)">📍</span><span>Auf der Karte zeigen<small>wo ich gerade bin</small></span></button>` : ''}</div>`;
+  }
+  if (m.route) {
+    const r = m.route;
+    h += `<div class="steps">${r.steps.map((st, i) => `<div class="step ${st.direction} ${state.hoverStep === i ? 'hv' : ''}" data-step="${i}"><span class="num">${i+1}</span><span class="ic">${{straight:'↑',left:'↰',right:'↱',up:'⇡',down:'⇣',arrive:'◎'}[st.direction]}</span><span>${md(st.text)}</span></div>`).join('')}
+      <div class="dur"><strong>${r.minutes} Min</strong><span>${Math.round(r.length_m)} m</span><span class="sp"></span><button class="link">Warum diese Route?</button><button class="link">🔊 Vorlesen</button></div></div>`;
+  }
+  for (const c of changesOf(m, s)) {
+    if (!c.label) continue;
+    h += c.status === 'preview'
+      ? `<div class="card prev"><div class="tag">✎ Vorschau</div><div class="h">${esc(c.label)}</div><p>${esc(c.impact)}</p><div class="row"><button class="btn">Verwerfen</button><button class="btn pri" data-act="apply">Übernehmen ✓</button></div></div>`
+      : `<div class="card ok"><div class="h">✓ ${esc(c.label.replace(' sperren', ' ist gesperrt'))}</div><div class="row"><button class="btn" data-act="undo">Rückgängig</button></div></div>`;
+  }
+  if (m.error) h += `<div class="card err"><div class="h">🚫 ${esc(m.error.title)}</div><p>${esc(m.error.reason)}</p><div class="row">${m.error.actions.map((a, i) => `<button class="btn ${i ? '' : 'pri'}" data-act="toast" data-t="${esc(a)}: würde jetzt neu fragen">${esc(a)}</button>`).join('')}</div></div>`;
+  return h + '</div>';
+}
+
+function messagesHtml(s, live = true) {
+  const msgs = s.messages || [];
+  if (!msgs.length) return `<div class="agent"><span class="who">${esc(B.name)}</span><div class="say">Ich bin <b>${esc(B.name)}</b>. Frag mich nach Räumen, Wegen oder Maschinen.</div></div>`;
+  const out = [];
+  msgs.forEach((m, i) => {
+    const lastUser = i === msgs.length - 2, last = i === msgs.length - 1;
+    if (live && state.phase === 'listening' && (lastUser || last)) return;
+    out.push(m.role === 'user' ? `<div class="user">${m.spoken ? '<small>🎤 gesprochen</small>' : ''}${esc(m.text)}</div>` : agentMsg(m, s, i, live));
+  });
+  return out.join('');
+}
+
+function memoryHtml(s) {
+  const mem = [...(s.memory || [])];
+  const m = focusMsg(s);
+  if (m && changesOf(m, s).some(c => c.status === 'applied' && c.op === 'close') && !mem.some(x => x.icon === '⛔')) mem.push({ icon: '⛔', label: plain(m.changes[0].label).replace(' sperren', ''), fresh: true });
+  return `<div class="memory"><span class="t">Gemerkt:</span>${mem.length ? mem.map(x => `<span class="chip ${x.fresh || (s.key === 'route' && x.icon === '♿') ? 'flash' : ''}">${x.icon} ${esc(x.label)} <span class="x">✕</span></span>`).join('') : '<span class="t">noch nichts</span>'}${mem.length ? '<button class="clear">Alles vergessen</button>' : ''}</div>`;
+}
+
+const LENSES = [['walk','🚶 Zu Fuß'],['wheel','♿ Rollstuhl'],['fork','🚜 Stapler'],['fac','📐 Facility'],['xray','🔍 Röntgen']];
+
+function desktop(s) {
+  const m = focusMsg(s), overlays = state.phase === 'done';
+  const content = overlays ? floorsWithContent(m) : new Set();
+  const floorsDesc = [...B.floors].reverse();
+  const hoverLeg = state.hoverStep != null && m?.route ? m.route.steps[state.hoverStep].leg_index : (s.voice && m?.route ? m.route.steps[state.voiceStep].leg_index : null);
+  const drawKey = `${s.key}|${state.floor}|${state.view}|${overlays}`;
+  const draw = overlays && state.lastDrawn !== drawKey ? 'draw' : '';
+  state.lastDrawn = overlays ? drawKey : null;
+  const routeFloors = m?.route ? floorsDesc.map((f, i) => content.has(f.id) && m.route.legs.some(l => l.floor_id === f.id) ? i : -1).filter(i => i >= 0) : [];
+  let stage;
+  if (state.view === 'doll') {
+    const n = B.floors.length, gap = Math.min(150, 420 / Math.max(1, n - 1));
+    stage = `<div class="doll ${draw}"><div class="doll-in" style="--ar:${(W+2*MG)/(H+2*MG)}">${B.floors.map((f, i) => `<div class="plate ${f.id === state.floor ? '' : 'dim'}" style="transform:translateZ(${i*gap}px)" data-act="floor" data-floor="${f.id}">${floorSvg(f.id, { sc: s, msg: m, overlays, labels: false, shared: true, hoverLeg })}</div>`).join('')}</div></div>`;
+  } else {
+    stage = `<div class="map ${draw}" ${s.voice && overlays ? 'style="bottom:200px"' : ''}>${floorSvg(state.floor, { sc: s, msg: m, overlays, hoverLeg })}</div>`;
+  }
+  const guide = s.voice && overlays && m?.route ? (() => { const st = m.route.steps[state.voiceStep]; return `<div class="guide"><div class="k">🔊 Sprach-Navigation · Schritt ${state.voiceStep+1} von ${m.route.steps.length}</div><div class="tx">${md(st.text)}</div><div class="row"><button data-act="vstep" data-d="-1">◀ zurück</button><button data-act="vstep" data-d="0">🔁 nochmal</button><span class="hint">Sag „weiter“</span><button class="pri" data-act="vstep" data-d="1">weiter ▶</button></div></div>`; })() : '';
+  const sugg = ['Wo krieg ich Kaffee?', 'Wo ist die Toilette?', 'Lift ist gesperrt', 'Wie groß ist die größte Halle?'];
+  return `<div class="shell">
+   <header class="top"><span class="brand">◈ lost <i>&</i> found</span><span class="picker">🏭 ${esc(B.name)} ▾</span>
+     <div class="lenses">${LENSES.map(([k, l]) => `<button class="${(s.lens || 'walk') === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+     <button class="iconbtn" title="Vorlesen an">🔊</button><button class="iconbtn" title="Einstellungen, Änderungen, Kontrast">⚙</button></header>
+   <div class="main">
+    <aside class="chat"><div class="msgs" id="msgs">${messagesHtml(s)}</div>
+      ${state.phase === 'listening' ? `<div class="listen"><div style="font-weight:600">◉ Ich höre zu …</div><div class="wave">${Array.from({length: 34}, (_, i) => `<i style="height:${8 + (i*37 % 18)}px;animation-delay:${(i%7)*0.1}s"></i>`).join('')}</div><div style="font:15px var(--serif)">„${esc(s.messages[0].text)}“</div></div>` : ''}
+      ${memoryHtml(s)}
+      <div class="sugg">${sugg.map(t => `<button>${t}</button>`).join('')}</div>
+      <div class="composer"><span class="in">${m?.clarification ? 'oder schreib es …' : 'Frag dein Gebäude …'}</span><button class="mic ${state.phase === 'listening' ? 'live' : ''}" title="Gedrückt halten zum Sprechen (oder Leertaste)">🎤</button><button class="send">${['status','stream'].includes(state.phase) ? '■' : '➤'}</button></div>
+    </aside>
+    <section class="stage">
+      <div class="rail">${routeFloors.length > 1 ? `<span class="line" style="top:${Math.min(...routeFloors)*47+20}px;height:${(Math.max(...routeFloors)-Math.min(...routeFloors))*47}px"></span>` : ''}${floorsDesc.map(f => `<button class="${f.id === state.floor ? 'on' : ''} ${content.has(f.id) ? 'has' : ''}" data-act="floor" data-floor="${f.id}" title="${esc(f.name)}">${esc(f.short)}</button>`).join('')}</div>
+      <div class="stage-top"><div class="seg"><button class="${state.view === 'plan' ? 'on' : ''}" data-act="view" data-v="plan">Plan</button><button class="${state.view === 'doll' ? 'on' : ''}" data-act="view" data-v="doll">Puppenhaus</button></div>
+        <div class="ttl"><b>${esc(FL[state.floor].name)}</b>${esc(B.name)}</div>
+        <div class="legend"><span><i style="background:var(--route);height:4px"></i>Route</span><span><i style="background:var(--accent);outline:1.5px solid var(--ink)"></i>Ziel</span><span><i style="background:#e9f8b8;outline:1px solid var(--ink)"></i>Kandidat</span><span><i style="background:repeating-linear-gradient(45deg,#b9bdb2 0 2px,#d9dcd3 2px 5px)"></i>unerreichbar</span><span><i style="background:repeating-linear-gradient(45deg,#d64545 0 2px,#fbe1e1 2px 5px)"></i>gesperrt</span><span><i style="border:1.5px dashed var(--pencil)"></i>Vorschau</span></div></div>
+      ${stage}${guide}
+      ${state.toast ? `<div class="toast">${esc(state.toast)}<button data-act="undo">Rückgängig</button></div>` : ''}
+      <div class="attr">${esc(B.name)} · ${esc(B.source)} ${B.attribution ? '· ' + esc(B.attribution) : ''} · Route berechnet mit building_map.py</div>
+    </section>
+   </div></div>`;
+}
+
+function mobile(s) {
+  const m = focusMsg(s), r = m.route, st = r.steps[state.mStep];
+  const fid = st.floor_id;
+  const draw = state.lastDrawn !== 'm' + fid ? 'draw' : ''; state.lastDrawn = 'm' + fid;
+  const svg = floorSvg(fid, { sc: s, msg: m, overlays: true, hoverLeg: st.leg_index });
+  const top = `<div class="ptop"><span class="brand" style="font-size:16px">◈</span><span class="picker" style="font-size:12px">${esc(B.name)} ▾</span><span style="flex:1"></span><button class="iconbtn" style="background:#e7eef8">♿</button></div>`;
+  const rail = `<div class="prail">${[...B.floors].reverse().map(f => `<button class="${f.id === fid ? 'on' : ''}">${esc(f.short)}</button>`).join('')}</div>`;
+  const comp = `<div class="composer"><span class="in">Frag dein Gebäude …</span><button class="mic">🎤</button></div>`;
+  return `<div class="phones">
+   <div class="phone-wrap"><h3>Route aktiv · Schritte wischen</h3><div class="phone">${top}<div class="pmap ${draw}">${svg}</div>${rail}
+     <div class="swipe"><div style="font-size:11px;color:var(--muted)">SCHRITT ${state.mStep+1} VON ${r.steps.length} · ${r.minutes} Min</div><div class="tx">${md(st.text)}</div><div class="row"><button data-act="mstep" data-d="-1">◀</button><div class="dotsrow">${r.steps.map((_, i) => `<i class="${i === state.mStep ? 'on' : ''}"></i>`).join('')}</div><button data-act="mstep" data-d="1">▶</button></div></div>
+     <div class="sheet"><div class="grab"></div>${memoryHtml(s)}${comp}</div></div></div>
+   <div class="phone-wrap"><h3>Chat ausgeklappt · Bottom-Sheet</h3><div class="phone">${top}<div class="pmap" style="opacity:.5">${floorSvg(fid, { sc: s, msg: m, overlays: true })}</div>
+     <div class="sheet full"><div class="grab"></div><div class="msgs">${messagesHtml(s, false)}</div>${memoryHtml(s)}${comp}</div></div></div>
+  </div>`;
+}
+
+function importView(s) {
+  const steps = [['Bild', 'hochladen'], ['Maßstab', 'bestimmen'], ['Erkannt', 'Bleistift-Overlay'], ['Korrigieren', 'per Chat'], ['Prüfen', 'und übernehmen']];
+  const fid = s.floor, spaces = B.spaces.filter(x => x.floor_id === fid), doors = B.openings.filter(d => d.floor_id === fid);
+  const { U, VB } = frame(fid);
+  const pencil = `<svg class="plan" viewBox="${VB}">${spaces.map(x => `<polygon points="${x.polygon.map(P).join(' ')}" fill="${state.importStep >= 5 ? fillFor(x) : '#f6f7fb'}" stroke="var(--pencil)" stroke-width="${U*0.18}" ${state.importStep >= 5 ? '' : `stroke-dasharray="${U*0.9} ${U*0.45}"`}/>`).join('')}${doors.map(d => `<circle cx="${d.position[0]}" cy="${-d.position[1]}" r="${U*0.4}" fill="var(--pencil)"/>`).join('')}${spaces.filter(x => x.area > U*U*25 && x.type !== 'corridor').map((x, i) => `<text x="${x.anchor[0]}" y="${-x.anchor[1]}" font-size="${U*1.2}" text-anchor="middle" fill="var(--pencil)">${state.importStep >= 4 ? esc(x.name.replace(' ' + x.ref, '')) : 'Raum ' + (i+1)}</text>`).join('')}</svg>`;
+  const img = D.importImage ? `<img src="${D.importImage}" alt="Hochgeladener Grundriss">` : '<div class="drop">Grundriss</div>';
+  let body;
+  if (state.importStep === 1) body = `<div class="cols"><div class="panel"><h4>Grundriss hochladen</h4><div class="drop">⬆<br><b>Bild hierher ziehen</b> oder <u>Datei wählen</u><br><small>PNG, JPG, PDF-Seite · mobil: 📷 Foto</small></div><p class="ttl" style="margin-top:12px">Oder <u>Beispiel aus dem Datensatz ausprobieren</u></p></div><div class="panel"><h4>Hochgeladen · ${esc(FL[fid].name)}</h4>${img}</div></div>`;
+  else if (state.importStep === 2) body = `<div class="cols"><div class="panel"><h4>Maßstab</h4>${img}<div style="position:absolute;left:20%;right:40%;top:46%;border-top:3px solid var(--route)"></div><div style="position:absolute;left:38%;top:40%;background:var(--route);color:#fff;border-radius:6px;padding:1px 7px;font-size:12px">? m</div></div><div class="panel"><h4>Wie groß ist das?</h4><div class="say">Ich habe keine Maßstabsleiste gefunden. Ich nehme an, die Türen sind 0,9 m breit. Damit ist das Gebäude etwa <b>${W.toFixed(0)} × ${H.toFixed(0)} m</b>.</div><p></p><div class="row" style="display:flex;gap:8px"><button class="btn pri">Passt</button><button class="btn">Strecke messen</button></div></div></div>`;
+  else if (state.importStep === 3) body = `<div class="cols"><div class="panel"><h4>Original</h4>${img}</div><div class="panel"><h4>Das habe ich erkannt · ${spaces.length} Räume, ${doors.length} Türen</h4>${pencil}</div></div>`;
+  else if (state.importStep === 4) body = `<div class="cols"><div class="panel"><h4>Erkannt, mit Korrekturen</h4>${pencil}</div><div class="panel"><h4>Korrigieren</h4><div class="msgs" style="padding:0"><div class="user">Raum 1 ist die Produktion, Raum 3 die Montage.</div><div class="agent"><div class="say">Erledigt. Ich habe die Räume benannt.</div><div class="card prev"><div class="tag">✎ Vorschau</div><div class="h">2 Räume umbenannt</div><div class="row"><button class="btn">Verwerfen</button><button class="btn pri">Übernehmen ✓</button></div></div></div><div class="user">Hier fehlt eine Tür. <small>📍 Stelle auf dem Plan markiert</small></div><div class="agent"><div class="say">Die Wand ist gemeinsam, ich setze dort eine Tür, 0,9 m.</div></div></div></div></div>`;
+  else body = `<div class="cols"><div class="panel"><h4>Ergebnis</h4>${pencil}</div><div class="panel"><h4>Prüfbericht</h4><ul class="checks"><li>Alle ${spaces.length} Polygone gültig</li><li>${doors.length} Türen auf gemeinsamen Wänden</li><li>Alle Räume erreichbar</li><li>Mindestens ein Eingang</li><li class="warn">2 Räume ohne Namen, als „Raum“ übernommen</li></ul><p></p><button class="btn pri">Gebäude übernehmen →</button></div></div>`;
+  return `<div class="imp"><div class="brand">◈ Grundriss importieren</div><div class="stepper">${steps.map(([a, b], i) => `<button class="${state.importStep === i+1 ? 'on' : ''} ${state.importStep > i+1 ? 'done' : ''}" data-act="istep" data-i="${i+1}"><b>${i+1} ${a}</b>${b}</button>`).join('')}</div>${body}</div>`;
+}
+
+// ---------- render & play ----------
+function render() {
+  const s = sc();
+  document.getElementById('tabs').innerHTML = D.scenarios.map(x => `<button class="${x.key === state.key ? 'on' : ''}" data-act="tab" data-k="${x.key}">${esc(x.title)}</button>`).join('') + `<button data-act="replay" title="Antwort nochmal abspielen">▶ nochmal</button>`;
+  document.getElementById('cover').innerHTML = Object.keys(UN).map(u => `<span class="${s.covers.includes(u) ? 'on' : ''}" title="${UN[u]}">${u} ${UN[u]}</span>`).join('');
+  document.getElementById('note').textContent = `Echte Geometrie aus data/: ${B.name} (${B.floors.length} Etagen, ${B.spaces.length} Räume). Routen und Erreichbarkeit mit starter_agent/building_map.py berechnet, Agententexte gemockt im T20-Format. Hover über Schritte und Rückfrage-Buttons, Etagen und Puppenhaus klicken.`;
+  const app = document.getElementById('app');
+  app.innerHTML = s.import ? importView(s) : s.mobile ? mobile(s) : desktop(s);
+  const box = document.getElementById('msgs'); if (box) box.scrollTop = box.scrollHeight;
+}
+
+function later(ms, fn) { state.timers.push(setTimeout(() => { fn(); render(); }, ms)); }
+
+function play() {
+  state.timers.forEach(clearTimeout); state.timers = [];
+  const s = sc(), m = focusMsg(s);
+  Object.assign(state, { hoverStep: null, hoverOpt: null, voiceStep: 0, mStep: 0, toast: null, lastDrawn: null });
+  delete state.applied[s.key];
+  for (const k of Object.keys(state.chosen)) if (k.startsWith(s.key)) delete state.chosen[k];
+  const firstFloor = s.floor || m?.route?.legs[0].floor_id || (m?.highlights?.[0] && S[m.highlights[0].space_id].floor_id) || B.floors[0].id;
+  state.floor = firstFloor;
+  if (s.mobile || s.import || !m) { state.phase = 'done'; return render(); }
+  let t = 0;
+  if (s.voice) { state.phase = 'listening'; t = 1700; later(t, () => { state.phase = 'status'; state.statusIdx = 0; }); }
+  else { state.phase = 'status'; state.statusIdx = 0; }
+  (m.status || ['']).forEach((_, i) => { if (i) later(t + i*700, () => { state.statusIdx = i; }); });
+  t += Math.max(1, (m.status || []).length) * 700;
+  const words = (m.text || '').split(' ').length;
+  later(t, () => { state.phase = 'stream'; state.streamN = 0; });
+  for (let i = 1; i <= words; i++) later(t + i*55, () => { state.streamN = i; });
+  t += words*55 + 150;
+  later(t, () => { state.phase = 'done'; });
+  const legs = m.route?.legs || [];
+  legs.forEach((l, i) => { if (i) later(t + i*1500, () => { state.floor = l.floor_id; }); });
+  render();
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, s = sc(), m = focusMsg(s);
+  if (a === 'tab') { state.key = el.dataset.k; state.view = 'plan'; history.replaceState(null, '', '#' + state.key); return play(); }
+  if (a === 'replay') return play();
+  if (a === 'floor') state.floor = el.dataset.floor;
+  if (a === 'view') state.view = el.dataset.v;
+  if (a === 'apply') { state.applied[s.key] = true; state.toast = '✓ Übernommen.'; later(6000, () => { state.toast = null; }); }
+  if (a === 'undo') { delete state.applied[s.key]; state.toast = null; }
+  if (a === 'toast') { state.toast = el.dataset.t; later(3000, () => { state.toast = null; }); }
+  if (a === 'choose') { state.chosen[el.dataset.k] = el.dataset.opt; state.floor = S[el.dataset.opt].floor_id; }
+  if (a === 'vstep') { const n = m.route.steps.length; state.voiceStep = el.dataset.d === '0' ? state.voiceStep : Math.max(0, Math.min(n-1, state.voiceStep + +el.dataset.d)); state.floor = m.route.steps[state.voiceStep].floor_id; }
+  if (a === 'mstep') { const n = m.route.steps.length; state.mStep = Math.max(0, Math.min(n-1, state.mStep + +el.dataset.d)); }
+  if (a === 'istep') state.importStep = +el.dataset.i;
+  render();
+});
+document.addEventListener('mouseover', e => {
+  if (state.phase !== 'done') return;
+  const st = e.target.closest('[data-step]'), op = e.target.closest('[data-opt]');
+  const s = sc(), m = focusMsg(s);
+  const hs = st ? +st.dataset.step : null, ho = op ? op.dataset.opt : null;
+  if (hs === state.hoverStep && ho === state.hoverOpt) return;
+  state.hoverStep = hs; state.hoverOpt = ho;
+  if (hs != null && m?.route) state.floor = m.route.steps[hs].floor_id;
+  if (ho) state.floor = S[ho].floor_id;
+  render();
+});
+const fromHash = location.hash.slice(1).split('&');
+if (D.scenarios.some(x => x.key === fromHash[0])) state.key = fromHash[0];
+if (fromHash.includes('doll')) state.view = 'doll';
+play();
+</script>
+</body>
+</html>
