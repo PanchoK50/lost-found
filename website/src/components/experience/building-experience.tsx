@@ -131,10 +131,20 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     }
   }
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft); };
+  // "Route here" on a tapped room: walk from the room set under "Where are you?", or ask for it first.
+  const askRef = useRef(ask);
+  useEffect(() => { askRef.current = ask; });
+  const myRoom = profile?.rooms[building.building.id];
+  const routeTo = useCallback((spaceId: string) => {
+    const from = building.spaces.find(s => s.id === myRoom), to = building.spaces.find(s => s.id === spaceId);
+    if (!to) return;
+    if (!from) { setSheet('settings'); return; }
+    void askRef.current(from.id === to.id ? `Show ${to.name}` : `How do I get from ${from.name} to ${to.name}?`);
+  }, [building, myRoom]);
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} /></div>
+      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onRoute={routeTo} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">

@@ -398,3 +398,45 @@ function unique(values: string[]) {
 function escape(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Answers about the building know nothing of reports. Mark what people reported broken: its marker says so,
+ * its room drops to a muted highlight, and the headline points at a working one instead.
+ */
+export function markBroken(building: Building, response: ChatResponse, world: WorldState): ChatResponse {
+  const broken = world.pins.filter(p => p.kind === 'broken');
+  if (!broken.length || !response.scene.markers?.length) return response;
+  const assets = new Map(building.assets.map(a => [a.id, a]));
+  const brokenAssets = broken.map(p => p.assetId && assets.get(p.assetId)).filter(a => !!a);
+  const brokenSpaces = new Set(broken.filter(p => !p.assetId).map(p => p.spaceId));
+  const assetAt = (m: { floorId: string; position: [number, number] }) => building.assets.find(a => a.floor_id === m.floorId && a.position[0] === m.position[0] && a.position[1] === m.position[1]);
+  const isBroken = (m: { floorId: string; position: [number, number] }) => {
+    const asset = assetAt(m);
+    return !!asset && (brokenAssets.some(b => b.id === asset.id) || brokenSpaces.has(asset.space_id));
+  };
+  const markers = response.scene.markers.map(m => isBroken(m) ? { ...m, label: `${m.label} · reported broken` } : m);
+  const hits = response.scene.markers.filter(isBroken);
+  if (!hits.length) return response;
+  // A highlighted room is muted when every marker inside it is broken.
+  const inSpace = new Map<string, boolean[]>();
+  for (const m of response.scene.markers) { const a = assetAt(m); if (a) inSpace.set(a.space_id, [...(inSpace.get(a.space_id) ?? []), isBroken(m)]); }
+  const dead = new Set([...inSpace].filter(([, flags]) => flags.every(Boolean)).map(([id]) => id));
+  const highlights = response.scene.highlights?.map(h => dead.has(h.spaceId) ? { spaceId: h.spaceId, tone: 'muted' as const } : h);
+  const spaces = new Map(building.spaces.map(s => [s.id, s]));
+  const floors = new Map(building.floors.map(f => [f.id, f]));
+  let answer = response.answer;
+  const headline = building.spaces.find(s => s.name === answer?.title);
+  if (answer && headline && dead.has(headline.id)) {
+    const workingId = highlights?.find(h => h.tone === 'primary' && !dead.has(h.spaceId))?.spaceId
+      ?? response.scene.markers.map(assetAt).find(a => a && !dead.has(a.space_id))?.space_id;
+    const space = workingId ? spaces.get(workingId) : undefined;
+    if (space) answer = { ...answer, title: space.name, value: floors.get(space.floor_id)?.name };
+  }
+  const names = hits.map(m => m.label);
+  return {
+    ...response,
+    reply: `${response.reply} ${names.join(' and ')} ${names.length === 1 ? 'is' : 'are'} reported broken. Tap a room on the map for a route.`,
+    answer,
+    scene: { ...response.scene, markers, highlights },
+  };
+}

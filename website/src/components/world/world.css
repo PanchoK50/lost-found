@@ -107,3 +107,8 @@
   .skill-chips button { min-height: 34px; font-size: 12px; }
   .skill-chips button:hover { background: #fff; }
 }
+
+/* Tapped room: the tip gets a "Route here" action */
+.scene-tip.scene-tip--actions button { margin-top: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; }
+/* The tapped room's tip stays above people and pins so its button can be tapped. */
+.scene-anchor:has(.scene-tip--actions) { z-index: 3; }

@@ -4,7 +4,7 @@ import { WalkGraph } from '@/lib/buildings/walk';
 import { turnByTurn } from '@/lib/buildings/turns';
 import type { ChatRequest, ChatResponse } from '@/lib/chat/contract';
 import { resolveDemo } from '@/lib/chat/demo-resolver';
-import { offerAskCrowd, resolveWorld } from '@/lib/world/chat';
+import { markBroken, offerAskCrowd, resolveWorld } from '@/lib/world/chat';
 import { activeClosures, viewFor } from '@/lib/world/rules';
 import { worldStore } from '@/lib/world/store';
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const input = { world: viewFor(world, playerId), playerId, skillId: typeof body.skillId === 'string' ? body.skillId : undefined, history: Array.isArray(body.history) ? body.history : undefined, closed: worldClosed };
   const fromWorld = resolveWorld(entry.building, message, input);
   if (fromWorld?.usedSkill && playerId) await worldStore.apply(entry.building, { type: 'skill.use', buildingId: entry.building.building.id, skillId: fromWorld.usedSkill, playerId }, Date.now()).catch(() => undefined);
-  const resolved: ChatResponse = fromWorld?.response ?? offerAskCrowd(entry.building, message, input, resolveDemo(entry.building, message, { closed: worldClosed }));
+  const resolved: ChatResponse = fromWorld?.response ?? markBroken(entry.building, offerAskCrowd(entry.building, message, input, resolveDemo(entry.building, message, { closed: worldClosed })), input.world);
   const response = resolved.scene.routes?.length && worldClosed.length
     ? { ...resolved, scene: { ...resolved.scene, closed: [...new Set([...(resolved.scene.closed ?? []), ...worldClosed])] } }
     : resolved;
