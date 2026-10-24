@@ -96,8 +96,18 @@ export function layoutFloors(model: BuildingModel, focus: SceneFocus): Map<strin
     }
     return poses;
   }
-  // Stack: pull the chosen floors apart, hide the rest.
   const chosen = model.floors.filter(f => focus.floorIds.includes(f.floor.id));
+  if (focus.spacing === 'true') {
+    // Real heights: the chosen floors stay where they are; upper ones turn see-through so lower ones show.
+    for (const f of model.floors) {
+      const index = chosen.indexOf(f);
+      poses.set(f.floor.id, index < 0
+        ? { y: elevation(f.floor) + (f.floor.level > (chosen.at(-1)?.floor.level ?? 0) ? 40 : 0), opacity: 0, flat: 1, interactive: false }
+        : { y: elevation(f.floor), opacity: index === 0 ? 1 : 0.55, flat: 1, interactive: index === 0 });
+    }
+    return poses;
+  }
+  // Stack: pull the chosen floors apart, hide the rest.
   const base = chosen[0]?.floor.elevation_m ?? 0;
   const span = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
   const gap = Math.max(10, Math.min(span * 0.5, 40));
@@ -128,6 +138,22 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
     const [x, z] = model.toWorld(focus.around);
     const y = poses.get(focus.floorId)?.y ?? 0;
     return new THREE.Box3(new THREE.Vector3(x - 9, y, z - 9), new THREE.Vector3(x + 9, y + 1, z + 9));
+  }
+  if (focus.mode === 'stack' && focus.spacing === 'true' && frame.length) {
+    // Real-height stacks (3D distances): frame the answer's spaces across their floors, at least 30 m wide.
+    const box = new THREE.Box3();
+    for (const id of frame) {
+      const m = model.spaces.get(id);
+      if (!m) continue;
+      const y = poses.get(m.space.floor_id)?.y ?? 0;
+      m.geometry.computeBoundingBox();
+      box.union(m.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, y, 0)));
+    }
+    if (!box.isEmpty()) {
+      const c = box.getCenter(new THREE.Vector3());
+      const half = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 30) / 2;
+      return new THREE.Box3(new THREE.Vector3(c.x - half, box.min.y, c.z - half), new THREE.Vector3(c.x + half, box.max.y, c.z + half));
+    }
   }
   if (focus.mode === 'floor') {
     const floor = model.floors.find(f => f.floor.id === focus.floorId);

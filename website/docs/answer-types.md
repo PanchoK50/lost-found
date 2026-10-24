@@ -81,16 +81,21 @@ Open points:
 
 | Kind | Test | Headline | Scene |
 |---|---|---|---|
-| `straight_line_3d` | 15 | `13.06 m` | `focus: stack` (or `floor` if same floor); both rooms `primary`; `links: [{ from, to, label }]` between centroids |
+| `straight_line_3d` | 15 | `13.06 m` · `11.6 m across · 6.0 m up` | `focus: { mode: 'stack', spacing: 'true' }` (real floor heights, so the line is to scale; `floor` if same floor); both rooms `primary`, labelled by ref; `links: [{ from, to, label, breakdown: true }]` draws the line plus dashed across/up legs |
 
-- Room centre = polygon centroid at the floor's `elevation_m`.
+- Room centre = polygon centroid at the floor's `elevation_m`. Checked: 30/30 train/dev within 2%.
 
 ## 5. Where things are (assets)
 
 | Kind | Test | Headline | Scene |
 |---|---|---|---|
-| `locate` (warm-up) | — | `Quality lab 0.21` · `Ground floor` | `focus: floor`; containing room `primary`; item `markers` |
-| `count` (warm-up) | — | `7` · `Meeting tables on Ground floor` | Items as `markers`; their rooms `secondary` |
+| `locate` (warm-up) | — | `Quality lab 0.21` · `Coordinate measuring machine 0.21` | Item box lit lime (`assets: [id]`), its room `secondary`, a pin labelled "item · room"; action **Get directions** |
+| locate, several | — | `3 CNC mills` · `1 floor` | All items lit, their rooms `secondary` (labelled with a count if several share a room); floors `stack`ed when on 2–3 floors; action **Find the nearest** |
+| locate, nearest | — | `Kitchen 0.28` · `≈ 21 m from 0.38` | "I'm in X. Where is the nearest …" picks by walking distance; your room `muted` ("You · …"); action **Show me the way** |
+| `count` (warm-up) | — | `7` · `Meeting tables on Ground floor` | Every counted item lit, rooms `secondary` with `×n` badges when some room has more than one |
+
+- Items are matched by full name ("CNC mill H-A1-B"), by type, or by name without its number ("seating row" → `lecture_seating_row`). Checked: locate 553/553, count 239/239.
+- `actions` on a response add follow-up buttons; `send: false` pre-fills the input so the user adds their room ("How do I get to Quality lab 0.21 from …").
 
 ## Conventions
 

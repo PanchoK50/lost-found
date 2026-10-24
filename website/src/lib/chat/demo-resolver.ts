@@ -36,9 +36,10 @@ export function resolveDemo(building: Building, message: string): ChatResponse {
   if (rooms.length >= 2 && /\b(distance|straight[- ]line|far apart)\b/.test(text)) return straightLine(ctx, rooms[0], rooms[1]);
   if (/\b(largest|biggest|smallest)\b/.test(text)) return largestRoom(ctx);
   if (/\b(total|sum|added together|combined)\b/.test(text) && /\barea\b/.test(text)) return totalArea(ctx);
-  const assetType = ctx.mentionedAssetType();
+  const named = ctx.mentionedAsset();
+  const assetType = named?.type ?? ctx.mentionedAssetType();
   if (assetType && /\bhow many\b/.test(text)) return countAssets(ctx, assetType);
-  if (assetType) return locateAssets(ctx, assetType);
+  if (assetType) return locateAssets(ctx, assetType, named);
   if (rooms.length) return showSpace(ctx, rooms[0]);
   const floor = ctx.mentionedFloor();
   if (floor) return { kind: 'show', reply: `Here is ${floor.name}.`, answer: { title: floor.name, value: `${ctx.spacesOn(floor).length} spaces` }, scene: { focus: { mode: 'floor', floorId: floor.id } } };
@@ -104,6 +105,9 @@ class Context {
     }
     const closedNames = new Set(closed.map(c => c.name.toLowerCase()));
     const stops = this.mentionedSpaces().filter(space => !closedSpaces.has(space.id) && !closedNames.has(space.name.toLowerCase()));
+    // "How do I get to X from Y": the start is named last.
+    const to = this.text.search(/\bto\b/), from = this.text.search(/\bfrom\b/);
+    if (stops.length === 2 && to >= 0 && from > to) stops.reverse();
     return { stops, closed };
   }
 
@@ -146,12 +150,24 @@ class Context {
       .find(({ label }) => new RegExp(`\\b${escape(label)}(s|es)?\\b`).test(text))?.type;
   }
 
+  /** A specific item named in full, e.g. "CNC mill H-A1-B" (longest name wins). */
+  mentionedAsset(): Asset | undefined {
+    return this.building.assets
+      .filter(a => a.name.length > 3 && new RegExp(`(?<![\\w.-])${escape(a.name.toLowerCase())}(?![\\w-]|\\.\\d)`).test(this.text))
+      .sort((a, b) => b.name.length - a.name.length)[0];
+  }
+
+  /** Item type named in the message, by type ("lecture seating row") or by name without its number ("seating row"). */
   mentionedAssetType(): string | undefined {
-    const types = [...new Set(this.building.assets.map(asset => asset.type))];
-    return types
-      .map(type => ({ type, label: type.replaceAll('_', ' ') }))
-      .sort((a, b) => b.label.length - a.label.length)
-      .find(({ label }) => new RegExp(`\\b${escape(label)}(s|es)?\\b`).test(this.text))?.type;
+    const labels = new Map<string, string>();
+    for (const asset of this.building.assets) {
+      labels.set(asset.type.replaceAll('_', ' '), asset.type);
+      const stem = asset.name.toLowerCase().split(' ').filter((word, i, words) => !/\d/.test(word) && words.slice(0, i).every(w => !/\d/.test(w))).join(' ');
+      if (stem.length > 2 && !labels.has(stem)) labels.set(stem, asset.type);
+    }
+    return [...labels]
+      .sort((a, b) => b[0].length - a[0].length)
+      .find(([label]) => new RegExp(`\\b${escape(label)}(s|es)?\\b`).test(this.text))?.[1];
   }
 }
 
@@ -201,41 +217,104 @@ function totalArea(ctx: Context): ChatResponse {
   };
 }
 
-function locateAssets(ctx: Context, type: string): ChatResponse {
+/** Floors to show for things spread over the building: one floor, a few stacked, or the whole building. */
+function focusFor(ctx: Context, floorIds: string[]): ChatResponse['scene']['focus'] {
+  const unique = [...new Set(floorIds)];
+  if (unique.length === 1) return { mode: 'floor', floorId: unique[0] };
+  if (unique.length <= 3) return { mode: 'stack', floorIds: unique };
+  return { mode: 'building' };
+}
+
+/** How the building names an item type, e.g. "CNC mill" for cnc_mill: an asset name minus its number. */
+function itemName(ctx: Context, type: string) {
+  const words = (ctx.building.assets.find(a => a.type === type)?.name ?? '').split(' ');
+  const stem = words.slice(0, Math.max(0, words.findIndex(w => /\d/.test(w)))).join(' ') || words.join(' ');
+  if (stem.length < 3) return type.replaceAll('_', ' ');
+  // Lower-case the first word for use mid-sentence, unless it's an acronym like "CNC".
+  return /^[A-Z]{2,}\b/.test(stem) ? stem : stem[0].toLowerCase() + stem.slice(1);
+}
+
+const capitalise = (text: string) => text[0].toUpperCase() + text.slice(1);
+
+function locateAssets(ctx: Context, type: string, named?: Asset): ChatResponse {
   const floor = ctx.mentionedFloor();
-  const assets = ctx.building.assets.filter(asset => asset.type === type && (!floor || asset.floor_id === floor.id));
-  const label = type.replaceAll('_', ' ');
-  if (!assets.length) return notFound(`I couldn't find a ${label}${floor ? ` on ${floor.name}` : ''}.`, floor);
+  const label = itemName(ctx, type);
+  let candidates = named ? [named] : ctx.building.assets.filter(asset => asset.type === type && (!floor || asset.floor_id === floor.id));
+  if (!candidates.length) return notFound(`I couldn't find a ${label}${floor ? ` on ${floor.name}` : ''}.`, floor);
   const spaces = new Map(ctx.building.spaces.map(space => [space.id, space]));
-  const first = assets[0];
-  const firstSpace = spaces.get(first.space_id);
-  const listed = assets.slice(0, 5).map(asset => `${asset.name} in ${spaces.get(asset.space_id)?.name ?? 'an unknown space'} (${ctx.floors.get(asset.floor_id)?.name})`);
+  const where = (asset: Asset) => `${spaces.get(asset.space_id)?.name ?? 'an unknown space'} (${ctx.floors.get(asset.floor_id)?.name})`;
+
+  // "Nearest … to me" with a named start: pick by walking distance, offer the way there.
+  const start = ctx.mentionedSpaces()[0];
+  if (start && !named && candidates.length > 1) {
+    const dist = walkGraph(ctx.building, {}).distancesFrom(start.id);
+    candidates = [...candidates].filter(a => dist.has(a.space_id)).sort((a, b) => dist.get(a.space_id)! - dist.get(b.space_id)!);
+    const nearest = candidates[0];
+    if (nearest) {
+      const room = spaces.get(nearest.space_id)!;
+      const metres = dist.get(room.id)!;
+      return {
+        kind: 'locate',
+        reply: `The nearest ${label} to ${start.name} is ${nearest.name} in ${where(nearest)}, about ${metres.toFixed(0)} m away. There ${candidates.length === 2 ? 'is 1 other' : `are ${candidates.length - 1} others`} in the building.`,
+        answer: { title: nearest.name, value: room.name, detail: `${ctx.floors.get(room.floor_id)?.name} · ≈ ${metres.toFixed(0)} m from ${start.ref}` },
+        scene: {
+          focus: focusFor(ctx, [start.floor_id, room.floor_id]),
+          // The item is the answer (lit, with the label); its room is context.
+          highlights: [{ spaceId: room.id, tone: 'secondary' }, ...(room.id === start.id ? [] : [{ spaceId: start.id, tone: 'muted' as const, label: `You · ${start.name}` }])],
+          markers: [{ ...assetMarker(nearest), label: `${nearest.name} · ${room.name}` }],
+          assets: [nearest.id],
+        },
+        actions: [{ label: 'Show me the way', message: `How do I get from ${start.name} to ${room.name}?`, send: true }],
+      };
+    }
+  }
+
+  const first = candidates[0];
+  const firstRoom = spaces.get(first.space_id);
+  const floorIds = candidates.map(a => a.floor_id);
+  const rooms = [...new Set(candidates.map(a => a.space_id))];
+  const many = candidates.length > 1;
   return {
     kind: 'locate',
-    reply: assets.length === 1 ? `The ${label} is in ${firstSpace?.name}, ${ctx.floors.get(first.floor_id)?.name}.` : `I found ${assets.length} ${label}s. ${listed.join('; ')}${assets.length > 5 ? '; …' : '.'}`,
-    answer: { title: firstSpace?.name ?? first.name, value: ctx.floors.get(first.floor_id)?.name, detail: assets.length > 1 ? `${assets.length} matches · showing the first floor` : first.name },
+    reply: many
+      ? `There are ${candidates.length} ${label}s${floor ? ` on ${floor.name}` : ''}: ${candidates.slice(0, 5).map(where).join('; ')}${candidates.length > 5 ? '; …' : '.'} Tell me where you are and I'll pick the nearest.`
+      : `${named ? first.name : `The ${label}`} is in ${where(first)}.`,
+    answer: many
+      ? { title: `${candidates.length} ${label}s`, value: `${new Set(floorIds).size} floor${new Set(floorIds).size === 1 ? '' : 's'}`, detail: `In ${rooms.length} room${rooms.length === 1 ? '' : 's'}` }
+      : { title: first.name, value: firstRoom?.name ?? '', detail: ctx.floors.get(first.floor_id)?.name },
     scene: {
-      focus: { mode: 'floor', floorId: first.floor_id },
-      highlights: [...new Set(assets.filter(asset => asset.floor_id === first.floor_id).map(asset => asset.space_id))].map(spaceId => ({ spaceId, tone: 'primary' as const })),
-      markers: assets.map(asset => assetMarker(asset)),
+      focus: focusFor(ctx, floorIds),
+      // One label per place: the item itself when it's alone in its room, else the room with a count.
+      highlights: rooms.slice(0, 12).map(spaceId => {
+        const n = candidates.filter(a => a.space_id === spaceId).length;
+        return { spaceId, tone: 'secondary' as const, label: n > 1 && rooms.length <= 6 ? `${spaces.get(spaceId)?.name} · ${n}` : undefined };
+      }),
+      markers: candidates.length <= 12 ? candidates.map(a => ({ ...assetMarker(a), label: candidates.filter(b => b.space_id === a.space_id).length > 1 ? '' : many ? a.name : `${a.name} · ${spaces.get(a.space_id)?.name}` })) : [],
+      assets: candidates.map(a => a.id),
     },
+    actions: many
+      ? [{ label: 'Find the nearest', message: `Where is the nearest ${label}? I'm in `, send: false }]
+      : [{ label: 'Get directions', message: `How do I get to ${firstRoom?.name} from `, send: false }],
   };
 }
 
 function countAssets(ctx: Context, type: string): ChatResponse {
   const floor = ctx.mentionedFloor();
   const assets = ctx.building.assets.filter(asset => asset.type === type && (!floor || asset.floor_id === floor.id));
-  const label = type.replaceAll('_', ' ');
+  const label = itemName(ctx, type);
   const where = floor ? ` on ${floor.name}` : ' in the building';
-  const floorIds = [...new Set(assets.map(asset => asset.floor_id))];
+  const spaces = new Map(ctx.building.spaces.map(space => [space.id, space]));
+  const perRoom = [...assets.reduce((m, a) => m.set(a.space_id, (m.get(a.space_id) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1]);
+  const breakdown = perRoom.slice(0, 5).map(([id, n]) => `${n} in ${spaces.get(id)?.name}`).join(', ');
   return {
     kind: 'count',
-    reply: `There ${assets.length === 1 ? 'is' : 'are'} ${assets.length} ${label}${assets.length === 1 ? '' : 's'}${where}.`,
-    answer: { title: `${label[0].toUpperCase()}${label.slice(1)}s${where}`, value: String(assets.length) },
+    reply: `There ${assets.length === 1 ? 'is' : 'are'} ${assets.length} ${label}${assets.length === 1 ? '' : 's'}${where}${perRoom.length > 1 ? `: ${breakdown}${perRoom.length > 5 ? ', …' : ''}` : perRoom.length ? `, in ${spaces.get(perRoom[0][0])?.name}` : ''}.`,
+    answer: { title: `${capitalise(label)}s${where}`, value: String(assets.length), detail: perRoom.length ? `In ${perRoom.length} room${perRoom.length === 1 ? '' : 's'}` : undefined },
     scene: {
-      focus: floor ? { mode: 'floor', floorId: floor.id } : floorIds.length === 1 ? { mode: 'floor', floorId: floorIds[0] } : { mode: 'building' },
-      highlights: [...new Set(assets.map(asset => asset.space_id))].map(spaceId => ({ spaceId, tone: 'muted' as const })),
-      markers: assets.map(asset => assetMarker(asset)),
+      focus: floor ? { mode: 'floor', floorId: floor.id } : focusFor(ctx, assets.map(a => a.floor_id)),
+      // Count badges on the rooms when there are few enough to read and they add something (not all ×1).
+      highlights: perRoom.map(([spaceId, n]) => ({ spaceId, tone: 'secondary' as const, label: perRoom.length <= 10 && perRoom.some(([, k]) => k > 1) ? `×${n}` : undefined })),
+      assets: assets.map(a => a.id),
     },
   };
 }
@@ -287,17 +366,20 @@ function stacked(ctx: Context, source: Space): ChatResponse {
 
 function straightLine(ctx: Context, a: Space, b: Space): ChatResponse {
   const ca = polygonCentroid(a.polygon), cb = polygonCentroid(b.polygon);
-  const dz = ctx.floorOf(a).elevation_m - ctx.floorOf(b).elevation_m;
-  const distance = Math.hypot(ca[0] - cb[0], ca[1] - cb[1], dz);
+  const across = Math.hypot(ca[0] - cb[0], ca[1] - cb[1]);
+  const up = Math.abs(ctx.floorOf(a).elevation_m - ctx.floorOf(b).elevation_m);
+  const distance = Math.hypot(across, up);
   const value = `${distance.toFixed(2)} m`;
   return {
     kind: 'straight_line_3d',
-    reply: `The straight line between the centres of ${a.name} and ${b.name} is ${value}.`,
-    answer: { title: `${a.ref} ↔ ${b.ref}`, value, detail: 'Centroid to centroid, at floor elevation' },
+    reply: `The straight line between the centres of ${a.name} and ${b.name} is ${value}: ${across.toFixed(1)} m across the floor plan${up > 0 ? ` and ${up.toFixed(1)} m up, from ${ctx.floorOf(a).name} to ${ctx.floorOf(b).name}` : ''}.`,
+    answer: { title: `${a.ref} ↔ ${b.ref}`, value, detail: up > 0 ? `${across.toFixed(1)} m across · ${up.toFixed(1)} m up` : 'Centre to centre, same floor' },
     scene: {
-      focus: a.floor_id === b.floor_id ? { mode: 'floor', floorId: a.floor_id } : { mode: 'stack', floorIds: [a.floor_id, b.floor_id] },
-      highlights: [{ spaceId: a.id, tone: 'primary', label: a.name }, { spaceId: b.id, tone: 'primary', label: b.name }],
-      links: [{ from: ctx.centre(a), to: ctx.centre(b), label: value }],
+      // Real floor heights so the line is drawn to scale.
+      focus: a.floor_id === b.floor_id ? { mode: 'floor', floorId: a.floor_id } : { mode: 'stack', floorIds: [a.floor_id, b.floor_id], spacing: 'true' },
+      // Short labels: the two rooms are often close in plan; the across/up numbers are in the answer card.
+      highlights: [{ spaceId: a.id, tone: 'primary', label: a.ref }, { spaceId: b.id, tone: 'primary', label: b.ref }],
+      links: [{ from: ctx.centre(a), to: ctx.centre(b), label: value, breakdown: up > 0 }],
     },
   };
 }

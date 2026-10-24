@@ -153,6 +153,18 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                       </button>
                     )}
                     <p>{withoutAnswerLine(message.content)}</p>
+                    {message.response?.actions?.length ? (
+                      <div className="answer-actions">
+                        {message.response.actions.map(action => (
+                          <button type="button" key={action.label} onClick={() => {
+                            if (action.send) { void ask(action.message); return; }
+                            // Pre-fill and let the user finish the sentence, e.g. "… from " + their room.
+                            setDraft(action.message);
+                            requestAnimationFrame(() => { const el = input.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+                          }}>{action.label}</button>
+                        ))}
+                      </div>
+                    ) : null}
                     {message.response && (
                       <DirectionsPanel
                         building={building}

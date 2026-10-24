@@ -50,6 +50,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
+  const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
   const overview = directive.focus.mode === 'building';
   const directiveKey = useMemo(() => JSON.stringify(directive), [directive]);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -75,7 +76,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         <directionalLight position={[60, 120, 40]} intensity={1.5} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} overview={overview} onPick={onFocusFloor} onInspect={inspect} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} onPick={onFocusFloor} onInspect={inspect} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
@@ -172,13 +173,15 @@ interface FloorViewProps {
   toWorld: BuildingModel['toWorld'];
   pose: FloorPose;
   tones: Map<string, Tone>;
+  /** Assets whose boxes turn lime (the answer to "where is …"). */
+  litAssets: Set<string>;
   overview: boolean;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, overview, onPick, onInspect }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, onInspect }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -193,6 +196,7 @@ function FloorView({ model, toWorld, pose, tones, overview, onPick, onInspect }:
   }, []);
   useEffect(() => () => Object.values(materials).forEach(m => m.dispose()), [materials]);
   const assets = useMemo(() => buildAssets(model, toWorld), [model, toWorld]);
+  useEffect(() => { if (assets) colorAssets(assets, model, litAssets); }, [assets, model, litAssets]);
 
   useFrame((_, delta) => {
     const s = state.current;
@@ -207,7 +211,7 @@ function FloorView({ model, toWorld, pose, tones, overview, onPick, onInspect }:
       const g = raised.current[tone];
       if (g) g.scale.y = blockHeight(model.storey, s.flat, lift[tone]);
     }
-    applyFade(materials, assets, s, overview);
+    applyFade(materials, assets, s, overview, blockHeight(model.storey, s.flat, lift.secondary) + 0.02);
   });
 
   const plain = model.spaces.filter(m => !tones.has(m.space.id));
@@ -244,7 +248,7 @@ function FloorView({ model, toWorld, pose, tones, overview, onPick, onInspect }:
 }
 
 /** Per-frame fade of a floor's shared materials (three.js objects are mutated imperatively). */
-function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null, s: { opacity: number; flat: number }, overview: boolean) {
+function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null, s: { opacity: number; flat: number }, overview: boolean, assetBase: number) {
   const ghost = s.opacity < 0.6;
   for (const key of ['room', 'hall', 'corridor', 'core', 'primary', 'secondary', 'muted'] as const) {
     materials[key].opacity = s.opacity * (overview ? 0.94 : 1);
@@ -252,7 +256,11 @@ function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null
   }
   materials.edge.opacity = Math.min(1, s.opacity * 1.6) * 0.85;
   materials.asset.opacity = s.opacity * s.flat;
-  if (assets) assets.visible = s.flat > 0.3 && s.opacity > 0.5;
+  if (assets) {
+    assets.visible = s.flat > 0.3 && s.opacity > 0.5;
+    // Items stand on top of the room blocks (plain, muted or sage); only raised lime rooms rise above them.
+    assets.position.y = assetBase;
+  }
 }
 
 function surfaceFor(type: string): 'room' | 'hall' | 'corridor' | 'core' {
@@ -267,7 +275,8 @@ const assetHeight: Record<string, number> = { furniture: 0.75, fixture: 0.9, mac
 /** One instanced mesh per floor: a small box per asset footprint. */
 function buildAssets(model: FloorModel, toWorld: BuildingModel['toWorld']) {
   if (!model.assets.length) return null;
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: palette.asset, roughness: 0.9, transparent: true }), model.assets.length);
+  // White base material: each instance gets its own colour (grey, or lime when it's the answer).
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, transparent: true }), model.assets.length);
   const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   model.assets.forEach((asset, i) => {
     const h = assetHeight[asset.category] ?? 0.8;
@@ -278,7 +287,16 @@ function buildAssets(model: FloorModel, toWorld: BuildingModel['toWorld']) {
   });
   mesh.castShadow = true;
   mesh.raycast = () => {};
+  colorAssets(mesh, model, new Set());
   return mesh;
+}
+
+const assetGrey = new THREE.Color(palette.asset), assetLit = new THREE.Color(palette.primary);
+
+/** Per-instance colours; three.js objects are updated imperatively. */
+function colorAssets(mesh: THREE.InstancedMesh, model: FloorModel, lit: Set<string>) {
+  model.assets.forEach((asset, i) => mesh.setColorAt(i, lit.has(asset.id) ? assetLit : assetGrey));
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 
 function Ground({ y }: { y: number }) {
@@ -293,6 +311,12 @@ function Ground({ y }: { y: number }) {
 /** Overlays only belong on floors that are actually shown (not ghosted or lifted away). */
 function shown(poses: Map<string, FloorPose>, floorId: string) {
   return (poses.get(floorId)?.opacity ?? 0) > 0.5;
+}
+
+/** Right-angle corner for a 3D link: below the higher end, at the lower end's height. */
+function linkCorner(a: [number, number, number], b: [number, number, number]): [number, number, number] {
+  const [low, high] = a[1] <= b[1] ? [a, b] : [b, a];
+  return [high[0], low[1], high[2]];
 }
 
 function worldAt(model: BuildingModel, poses: Map<string, FloorPose>, point: FloorPoint, above: number): [number, number, number] {
@@ -318,12 +342,12 @@ function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, dire
     const position: [number, number, number] = end ? worldAt(model, poses, end, ROUTE_HEIGHT) : [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]];
     anchors.push({ key: `hl-${h.spaceId}`, position, placement: 'above', content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
   }
-  const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId) && marker.tone !== 'muted');
+  const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId) && marker.tone !== 'muted' && marker.label);
   if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 2.9), placement: 'above', content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
   (directive.links ?? []).forEach((link, i) => {
-    if (!link.label || !shown(poses, link.from.floorId) || !shown(poses, link.to.floorId)) return;
+    if (!shown(poses, link.from.floorId) || !shown(poses, link.to.floorId)) return;
     const a = worldAt(model, poses, link.from, 1.2), b = worldAt(model, poses, link.to, 1.2);
-    anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1, (a[2] + b[2]) / 2], content: <div className="scene-label scene-label--primary">{link.label}</div> });
+    if (link.label) anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.6, (a[2] + b[2]) / 2], placement: 'above', content: <div className="scene-label scene-label--primary">{link.label}</div> });
   });
   (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), placement: 'above', content: <div className="scene-label scene-label--closed">Closed</div> }));
   return anchors;
@@ -371,8 +395,10 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
     })}
     {(directive.links ?? []).filter(link => visible([link.from, link.to])).map((link, i) => {
       const a = at(link.from, 1.2), b = at(link.to, 1.2);
+      const corner = linkCorner(a, b);
       return <group key={i}>
         <RouteLine points={[a, b]} />
+        {link.breakdown && <Line points={[a[1] <= b[1] ? a : b, corner, a[1] <= b[1] ? b : a]} color={palette.edge} lineWidth={1.5} dashed dashSize={0.5} gapSize={0.4} transparent opacity={0.9} depthTest={false} renderOrder={4} />}
         {[a, b].map((p, j) => <mesh key={j} position={p}><sphereGeometry args={[0.5, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>)}
       </group>;
     })}

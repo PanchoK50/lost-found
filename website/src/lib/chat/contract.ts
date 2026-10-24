@@ -29,6 +29,8 @@ export interface ChatResponse {
   /** Headline shown on the answer card, e.g. { title: 'Generic room N5325', value: '79.48 m²' }. */
   answer?: { title: string; value?: string; detail?: string };
   scene: SceneDirective;
+  /** Follow-up buttons under the answer. `send: false` puts the text in the input for the user to finish. */
+  actions?: { label: string; message: string; send?: boolean }[];
 }
 
 /** A point on a specific floor, in building metres (Y up). */
@@ -54,8 +56,11 @@ export type SceneFocus =
   | { mode: 'building' }
   /** One floor in 2.5D; floors above lift away, floors below are ghosted. `around` zooms to a point (e.g. a route step). */
   | { mode: 'floor'; floorId: string; around?: Point }
-  /** Several floors pulled apart so they can be compared (stacked rooms, multi-floor routes). */
-  | { mode: 'stack'; floorIds: string[] };
+  /**
+   * Several floors shown together. `spread` (default) pulls them apart so they can be compared;
+   * `true` keeps their real heights, e.g. for 3D distances.
+   */
+  | { mode: 'stack'; floorIds: string[]; spacing?: 'spread' | 'true' };
 
 export type Tone = 'primary' | 'secondary' | 'muted';
 
@@ -75,8 +80,10 @@ export interface SceneDirective {
    * `spacePath` with the walking model (lib/buildings/walk.ts). Points on different floors draw a vertical hop.
    */
   routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string }[];
-  /** Straight 3D lines, e.g. sensor links between room centroids. */
-  links?: { from: FloorPoint; to: FloorPoint; label?: string }[];
+  /** Straight 3D lines, e.g. sensor links between room centroids. `breakdown` also draws the across and up legs (dashed). */
+  links?: { from: FloorPoint; to: FloorPoint; label?: string; breakdown?: boolean }[];
+  /** Asset ids to light up (their footprint boxes turn lime). */
+  assets?: string[];
   /** Opening or vertical-connector ids to mark as closed. */
   closed?: string[];
 }
