@@ -18,8 +18,9 @@ const palette = {
   edge: '#7d837b',
   asset: '#c3c7bf',
   primary: '#c3ef2d',
-  secondary: '#f1f7dc',
-  muted: '#e4e5df',
+  secondary: '#93a08c',
+  muted: '#eef3df',
+  warning: '#e5484d',
   route: '#1f2a1b',
 };
 const lift: Record<Tone, number> = { primary: 1, secondary: 0.2, muted: 0.1 };
@@ -99,12 +100,14 @@ function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObje
 function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; poses: Map<string, FloorPose>; directive: SceneDirective; insets: SceneInsets }) {
   const controls = useRef<CameraControls>(null);
   const { size, camera } = useThree();
-  const focusKey = JSON.stringify(directive.focus);
+  // Frame the answer: the spaces it names or counts and its reference room, not the background candidates.
+  const frame = useMemo(() => (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId), [directive.highlights]);
+  const focusKey = JSON.stringify([directive.focus, frame]);
   const first = useRef(true);
   useEffect(() => {
     const c = controls.current;
     if (!c || !(camera instanceof THREE.PerspectiveCamera)) return;
-    const box = focusBox(model, poses, directive.focus);
+    const box = focusBox(model, poses, directive.focus, frame);
     const centre = box.getCenter(new THREE.Vector3());
     const extent = box.getSize(new THREE.Vector3());
     const radius = Math.max(4, 0.5 * Math.hypot(extent.x, extent.z, directive.focus.mode === 'floor' ? 0 : extent.y));
@@ -277,7 +280,7 @@ function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, dire
     const pose = poses.get(f.floor.id)!;
     anchors.push({ key: `hl-${h.spaceId}`, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]], content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
   }
-  const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId));
+  const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId) && marker.tone !== 'muted');
   if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 3.6), content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
   (directive.links ?? []).forEach((link, i) => {
     if (!link.label || !shown(poses, link.from.floorId) || !shown(poses, link.to.floorId)) return;
@@ -310,7 +313,9 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
   const at = (point: FloorPoint, above: number) => worldAt(model, poses, point, above);
   const visible = (points: FloorPoint[]) => points.every(point => shown(poses, point.floorId));
   return <>
-    {(directive.markers ?? []).filter(marker => shown(poses, marker.floorId)).map((marker, i) => (
+    {(directive.markers ?? []).filter(marker => shown(poses, marker.floorId)).map((marker, i) => marker.tone === 'muted' ? (
+      <mesh key={i} position={at(marker, 1.15)}><cylinderGeometry args={[0.45, 0.45, 0.12, 20]} /><meshStandardMaterial color={palette.warning} /></mesh>
+    ) : (
       <group key={i} position={at(marker, 0)}>
         <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>
         <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.route} /></mesh>

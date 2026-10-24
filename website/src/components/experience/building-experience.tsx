@@ -148,7 +148,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
                       </button>
                     )}
-                    <p>{message.content}</p>
+                    <p>{withoutAnswerLine(message.content)}</p>
                   </article>)}
               {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
               <div ref={transcriptEnd} />
@@ -172,6 +172,11 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
   );
+}
+
+/** Benchmark replies end with an "Answer: …" line; the headline card already shows it. */
+function withoutAnswerLine(reply: string) {
+  return reply.replace(/\n*^\s*Answer:.*$/gim, '').trim();
 }
 
 function floorShort(level: number) {

@@ -1,5 +1,6 @@
-import type { Asset, Building, Floor, Space } from '@/lib/buildings/types';
-import { bounds, pointInPolygon, polygonArea, polygonCentroid } from '@/lib/buildings/geometry';
+import type { Asset, Building, Floor, Opening, Space } from '@/lib/buildings/types';
+import { bounds, pointInPolygon, polygonArea, polygonCentroid, sharedWall } from '@/lib/buildings/geometry';
+import { buildGraph, doorOf, isDoorNode, OUTSIDE, pathTo, representativePoint, shortestPaths, type GraphOptions } from '@/lib/buildings/graph';
 import type { ChatResponse, FloorPoint } from './contract';
 
 /**
@@ -11,6 +12,13 @@ export function resolveDemo(building: Building, message: string): ChatResponse {
   const ctx = new Context(building, message);
   const text = ctx.text;
   const rooms = ctx.mentionedSpaces();
+  const loadWidth = text.match(/(\d+(?:\.\d+)?)\s*m(?:etres?|eters?)?\s+wide\b/);
+
+  // Type 2: a number over a set of rooms. Checked first: their wording overlaps with routes ("walk out").
+  if (rooms.length >= 2 && /\b(what if|add a door|new door)\b/.test(text)) return whatIfDoor(ctx, rooms[0], rooms[1]);
+  if (loadWidth && rooms.length >= 1) return wideDelivery(ctx, ctx.spaceAfter('into') ?? rooms[0], Number(loadWidth[1]));
+  if (rooms.length >= 1 && /\b(wheelchair|step[- ]free)\b/.test(text) && /\bhow many\b/.test(text)) return stepFreeReachable(ctx, ctx.spaceAfter('into') ?? rooms[0]);
+  if (rooms.length >= 1 && /\b(share|shares|sharing|shared)\b[^.?]*\bwalls?\b|\bneighbou?r(s|ing)?\b|\badjacent\b/.test(text)) return sharedWalls(ctx, rooms[0]);
 
   if (rooms.length >= 2 && /\b(get|route|way|go|walk|directions?|path)\b/.test(text)) return route(ctx, rooms);
   if (rooms.length >= 1 && /\b(below|beneath|under(neath)?|above|over)\b/.test(text)) return stacked(ctx, rooms[0]);
@@ -42,8 +50,13 @@ class Context {
   area(space: Space) { return polygonArea(space.polygon); }
   centre(space: Space): FloorPoint { return { floorId: space.floor_id, position: polygonCentroid(space.polygon) }; }
 
+  /** The floor a question is about. Floor notes after room names, like "(Floor 2)", are ignored unless nothing else names a floor. */
   mentionedFloor(): Floor | undefined {
-    const t = this.text;
+    const stripped = this.text.replace(/\((?:ground floor|floor\s*-?\d+|basement\s*\d*)\)/g, ' ');
+    return this.parseFloor(stripped) ?? this.parseFloor(this.text);
+  }
+
+  private parseFloor(t: string): Floor | undefined {
     let level: number | undefined;
     if (/\bground floor\b/.test(t)) level = 0;
     const basement = t.match(/\bbasement\s*(\d+)?/);
@@ -55,6 +68,21 @@ class Context {
 
   /** Spaces named by ref or full name, in the order they appear in the message. */
   mentionedSpaces(): Space[] {
+    return this.mentions().map(hit => hit.space);
+  }
+
+  /** First space mentioned after a word, e.g. the room after "into" in "comes in through the entrance into …". */
+  spaceAfter(word: string): Space | undefined {
+    const at = this.text.search(new RegExp(`\\b${escape(word)}\\b`));
+    return at < 0 ? undefined : this.mentions().find(hit => hit.index > at)?.space;
+  }
+
+  /** Stairs or lifts named in the message, e.g. "Lift 1 is out of service". */
+  mentionedConnectors() {
+    return this.building.vertical_connectors.filter(c => new RegExp(`\\b${escape(c.name.toLowerCase())}\\b`).test(this.text));
+  }
+
+  private mentions() {
     const hits: { index: number; length: number; space: Space }[] = [];
     for (const space of this.building.spaces) {
       for (const needle of [space.name, space.ref]) {
@@ -65,11 +93,11 @@ class Context {
     }
     // Drop hits nested inside a longer hit (e.g. ref "0.23" inside "Office 0.23").
     hits.sort((a, b) => a.index - b.index || b.length - a.length);
-    const result: Space[] = [];
+    const result: typeof hits = [];
     let end = -1;
     for (const hit of hits) {
-      if (hit.index < end || result.includes(hit.space)) continue;
-      result.push(hit.space); end = hit.index + hit.length;
+      if (hit.index < end || result.some(r => r.space === hit.space)) continue;
+      result.push(hit); end = hit.index + hit.length;
     }
     return result;
   }
@@ -111,7 +139,7 @@ function largestRoom(ctx: Context): ChatResponse {
       focus: { mode: 'floor', floorId: winner.floor_id },
       highlights: [
         { spaceId: winner.id, tone: 'primary', label: `${winner.name} · ${area}` },
-        ...candidates.slice(1).filter(space => space.floor_id === winner.floor_id).map(space => ({ spaceId: space.id, tone: 'secondary' as const })),
+        ...candidates.slice(1).filter(space => space.floor_id === winner.floor_id).map(space => ({ spaceId: space.id, tone: 'muted' as const })),
       ],
     },
   };
@@ -170,7 +198,7 @@ function countAssets(ctx: Context, type: string): ChatResponse {
     answer: { title: `${label[0].toUpperCase()}${label.slice(1)}s${where}`, value: String(assets.length) },
     scene: {
       focus: floor ? { mode: 'floor', floorId: floor.id } : floorIds.length === 1 ? { mode: 'floor', floorId: floorIds[0] } : { mode: 'building' },
-      highlights: [...new Set(assets.map(asset => asset.space_id))].map(spaceId => ({ spaceId, tone: 'secondary' as const })),
+      highlights: [...new Set(assets.map(asset => asset.space_id))].map(spaceId => ({ spaceId, tone: 'muted' as const })),
       markers: assets.map(asset => assetMarker(asset)),
     },
   };
@@ -239,48 +267,42 @@ function straightLine(ctx: Context, a: Space, b: Space): ChatResponse {
 }
 
 function route(ctx: Context, rooms: Space[]): ChatResponse {
-  const { building } = ctx;
   const stepFree = /\b(step[- ]free|wheelchair|no stairs|without stairs|accessible)\b/.test(ctx.text);
-  const closed = /\b(closed|out of service|maintenance|blocked|broken)\b/.test(ctx.text)
-    ? building.vertical_connectors.filter(connector => ctx.text.includes(connector.name.toLowerCase())).map(connector => connector.id)
-    : [];
-  const centres = new Map(building.spaces.map(space => [space.id, polygonCentroid(space.polygon)]));
-  type Edge = { to: string; cost: number; via: FloorPoint[] };
-  const graph = new Map<string, Edge[]>();
-  const add = (from: string, edge: Edge) => graph.set(from, [...(graph.get(from) ?? []), edge]);
-  for (const opening of building.openings) {
-    const [a, b] = opening.space_ids;
-    if (a === 'outside' || b === 'outside' || (stepFree && !opening.step_free)) continue;
-    const ca = centres.get(a), cb = centres.get(b);
-    if (!ca || !cb) continue;
-    const cost = Math.hypot(ca[0] - opening.position[0], ca[1] - opening.position[1]) + Math.hypot(cb[0] - opening.position[0], cb[1] - opening.position[1]);
-    const via = [{ floorId: opening.floor_id, position: opening.position }];
-    add(a, { to: b, cost, via }); add(b, { to: a, cost, via });
-  }
-  const levels = new Map(building.floors.map(floor => [floor.id, floor.level]));
-  for (const connector of building.vertical_connectors) {
-    if (closed.includes(connector.id) || (stepFree && (!connector.step_free || connector.kind === 'stairs'))) continue;
-    connector.space_ids.forEach((a, i) => connector.space_ids.forEach((b, j) => {
-      if (i === j) return;
-      const floors = Math.abs((levels.get(connector.floor_ids[i]) ?? 0) - (levels.get(connector.floor_ids[j]) ?? 0));
-      add(a, { to: b, cost: connector.kind === 'lift' ? 15 + 6 * floors : 12 * floors, via: [] });
-    }));
-  }
+  const closed = /\b(closed|out of service|maintenance|blocked|broken)\b/.test(ctx.text) ? ctx.mentionedConnectors().map(c => c.id) : [];
+  const graph = buildGraph(ctx.building, { stepFree, closed });
+  const openings = new Map(ctx.building.openings.map(o => [o.id, o]));
+  const spaces = new Map(ctx.building.spaces.map(sp => [sp.id, sp]));
+  const kind = closed.length ? 'route_with_closure' : stepFree ? 'route_step_free' : rooms.length > 2 ? 'tour' : 'route';
   const legs: { path: FloorPoint[]; length: number }[] = [];
   for (let i = 0; i < rooms.length - 1; i++) {
-    const leg = dijkstra(graph, rooms[i].id, rooms[i + 1].id);
-    if (!leg) return notFound(`I couldn't find a${stepFree ? ' step-free' : ''} route from ${rooms[i].name} to ${rooms[i + 1].name}.`, ctx.floorOf(rooms[i]));
-    const spaceFloor = new Map(building.spaces.map(space => [space.id, space.floor_id]));
-    const path: FloorPoint[] = [ctx.centre(rooms[i])];
-    leg.steps.forEach(step => { path.push(...step.via, { floorId: spaceFloor.get(step.to)!, position: centres.get(step.to)! }); });
-    legs.push({ path, length: leg.length });
+    const { dist, prev } = shortestPaths(graph, [rooms[i].id]);
+    const nodes = pathTo(prev, [rooms[i].id], rooms[i + 1].id);
+    if (!nodes) {
+      const why = closed.length ? ` with ${ctx.mentionedConnectors().map(c => c.name).join(' and ')} closed` : stepFree ? ' without stairs or steps' : '';
+      return {
+        kind,
+        reply: `There is no${stepFree ? ' step-free' : ''} route from ${rooms[i].name} to ${rooms[i + 1].name}${why}.`,
+        answer: { title: `${rooms[i].ref} → ${rooms[i + 1].ref}`, value: stepFree ? 'No step-free route' : 'No route', detail: why.trim() || undefined },
+        scene: {
+          focus: rooms[i].floor_id === rooms[i + 1].floor_id ? { mode: 'floor', floorId: rooms[i].floor_id } : { mode: 'stack', floorIds: [rooms[i].floor_id, rooms[i + 1].floor_id] },
+          highlights: [{ spaceId: rooms[i].id, tone: 'secondary', label: rooms[i].name }, { spaceId: rooms[i + 1].id, tone: 'primary', label: rooms[i + 1].name }],
+          closed,
+        },
+      };
+    }
+    const path = nodes.filter(node => node !== OUTSIDE).map((node): FloorPoint => {
+      if (isDoorNode(node)) { const o = openings.get(doorOf(node))!; return { floorId: o.floor_id, position: o.position }; }
+      const space = spaces.get(node)!;
+      return { floorId: space.floor_id, position: representativePoint(space.polygon) };
+    });
+    legs.push({ path, length: dist.get(rooms[i + 1].id)! });
   }
   const total = legs.reduce((sum, leg) => sum + leg.length, 0);
   const floorIds = [...new Set(legs.flatMap(leg => leg.path.map(point => point.floorId)))];
-  const value = `≈ ${total.toFixed(0)} m`;
+  const value = `${total.toFixed(2)} m`;
   return {
-    kind: closed.length ? 'route_with_closure' : stepFree ? 'route_step_free' : rooms.length > 2 ? 'tour' : 'route',
-    reply: `From ${rooms[0].name} to ${rooms.at(-1)!.name} is about ${total.toFixed(0)} m${stepFree ? ', step-free' : ''}${floorIds.length > 1 ? `, across ${floorIds.length} floors` : ''}.${closed.length ? ' I avoided the closed connector.' : ''}`,
+    kind,
+    reply: `From ${rooms[0].name} to ${rooms.at(-1)!.name} is ${value}${stepFree ? ', step-free' : ''}${floorIds.length > 1 ? `, across ${floorIds.length} floors` : ''}.${closed.length ? ' I avoided the closed connector.' : ''}`,
     answer: { title: `${rooms[0].ref} → ${rooms.at(-1)!.ref}`, value, detail: `${stepFree ? 'Step-free · ' : ''}${floorIds.length} floor${floorIds.length === 1 ? '' : 's'}` },
     scene: {
       focus: floorIds.length === 1 ? { mode: 'floor', floorId: floorIds[0] } : { mode: 'stack', floorIds },
@@ -291,24 +313,116 @@ function route(ctx: Context, rooms: Space[]): ChatResponse {
   };
 }
 
-function dijkstra(graph: Map<string, { to: string; cost: number; via: FloorPoint[] }[]>, from: string, to: string) {
-  const dist = new Map<string, number>([[from, 0]]);
-  const prev = new Map<string, { from: string; to: string; via: FloorPoint[] }>();
-  const done = new Set<string>();
-  while (true) {
-    let current: string | undefined, best = Infinity;
-    for (const [node, d] of dist) if (!done.has(node) && d < best) { best = d; current = node; }
-    if (current === undefined) return undefined;
-    if (current === to) break;
-    done.add(current);
-    for (const edge of graph.get(current) ?? []) {
-      const next = best + edge.cost;
-      if (next < (dist.get(edge.to) ?? Infinity)) { dist.set(edge.to, next); prev.set(edge.to, { from: current, to: edge.to, via: edge.via }); }
-    }
-  }
-  const steps: { to: string; via: FloorPoint[] }[] = [];
-  for (let node = to; node !== from; node = prev.get(node)!.from) steps.unshift(prev.get(node)!);
-  return { steps, length: dist.get(to)! };
+// ---------- Type 2: a number over a set of rooms ----------
+
+/** Rooms that can share a wall: rooms and halls, never corridors, stairwells or lifts. */
+function isWalledRoom(space: Space) {
+  return (space.type === 'room' || space.type === 'hall') && !['corridor', 'stairwell', 'lift'].includes(space.room_type);
+}
+
+/** Destinations for reachability counts ("how many rooms can it reach"): rooms only, not halls, lobbies or corridors. */
+function isDestinationRoom(space: Space) {
+  return space.type === 'room';
+}
+
+function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/** Rooms on `floor` reachable from `start` under the given constraints (the start counts if it is a room). */
+function reachableRooms(ctx: Context, start: Space, floor: Floor, options: GraphOptions) {
+  const { dist } = shortestPaths(buildGraph(ctx.building, options), [start.id]);
+  return { dist, rooms: ctx.spacesOn(floor).filter(space => isDestinationRoom(space) && dist.has(space.id)) };
+}
+
+function sharedWalls(ctx: Context, target: Space): ChatResponse {
+  const floor = ctx.floorOf(target);
+  const neighbours = ctx.spacesOn(floor)
+    .filter(space => space.id !== target.id && isWalledRoom(space))
+    .map(space => ({ space, length: Math.max(sharedWall(target.polygon, space.polygon).length, sharedWall(space.polygon, target.polygon).length) }))
+    .filter(entry => entry.length >= 1)
+    .sort((a, b) => b.length - a.length);
+  const n = neighbours.length;
+  return {
+    kind: 'shared_walls_count',
+    reply: `${plural(n, 'room')} on ${floor.name} share at least 1 m of wall with ${target.name}${n ? `: ${neighbours.map(e => `${e.space.name} (${e.length.toFixed(1)} m)`).join(', ')}` : ''}. Corridors, stairwells and lifts are not counted.`,
+    answer: { title: `Rooms sharing a wall with ${target.name}`, value: String(n), detail: `${floor.name} · at least 1 m of shared wall` },
+    scene: {
+      focus: { mode: 'floor', floorId: floor.id },
+      highlights: [
+        { spaceId: target.id, tone: 'secondary', label: target.name },
+        ...neighbours.map(e => ({ spaceId: e.space.id, tone: 'primary' as const })),
+      ],
+    },
+  };
+}
+
+function wideDelivery(ctx: Context, start: Space, width: number): ChatResponse {
+  const floor = ctx.mentionedFloor() ?? ctx.floorOf(start);
+  const { dist, rooms } = reachableRooms(ctx, start, floor, { stepFree: true, minWidth: width });
+  // Doors on this floor that stop the load: too narrow, with only one side reachable.
+  const blocking = ctx.building.openings.filter(o => o.floor_id === floor.id && o.width_m < width && o.space_ids.some(id => dist.has(id)) && o.space_ids.some(id => id !== OUTSIDE && !dist.has(id)));
+  const n = rooms.length;
+  return {
+    kind: 'wide_delivery_count',
+    reply: `A ${width} m wide load coming in at ${start.name} can reach ${plural(n, 'room')} on ${floor.name}, avoiding stairs and steps and only using doors at least ${width} m wide.${blocking.length ? ` ${plural(blocking.length, 'door')} on this floor ${blocking.length === 1 ? 'is' : 'are'} too narrow and block the rest.` : ''}`,
+    answer: { title: `Rooms a ${width} m load can reach on ${floor.name}`, value: String(n), detail: `From ${start.name} · no steps · doors ≥ ${width} m` },
+    scene: {
+      focus: { mode: 'floor', floorId: floor.id },
+      highlights: [
+        ...rooms.filter(space => space.id !== start.id).map(space => ({ spaceId: space.id, tone: 'primary' as const })),
+        { spaceId: start.id, tone: rooms.some(space => space.id === start.id) ? 'primary' : 'secondary', label: `Entry · ${start.name}` },
+      ],
+      markers: blocking.map(o => ({ floorId: o.floor_id, position: o.position, label: `${o.width_m} m door`, tone: 'muted' as const })),
+    },
+  };
+}
+
+function stepFreeReachable(ctx: Context, start: Space): ChatResponse {
+  const floor = ctx.mentionedFloor() ?? ctx.floorOf(start);
+  const closed = /\b(closed|out of service|maintenance|broken)\b/.test(ctx.text) ? ctx.mentionedConnectors() : [];
+  const { rooms } = reachableRooms(ctx, start, floor, { stepFree: true, closed: closed.map(c => c.id) });
+  const n = rooms.length;
+  const closedNames = closed.map(c => c.name).join(' and ');
+  return {
+    kind: 'step_free_reachable_count',
+    reply: `Coming in at ${start.name}, a wheelchair user can reach ${plural(n, 'room')} on ${floor.name} without stairs or steps${closed.length ? ` while ${closedNames} ${closed.length === 1 ? 'is' : 'are'} out of service` : ''}.`,
+    answer: { title: `Step-free rooms on ${floor.name}`, value: String(n), detail: closed.length ? `${closedNames} closed · from ${start.name}` : `From ${start.name}` },
+    scene: {
+      focus: { mode: 'floor', floorId: floor.id },
+      highlights: rooms.map(space => ({ spaceId: space.id, tone: 'primary' as const })),
+      closed: closed.map(c => c.id),
+    },
+  };
+}
+
+function whatIfDoor(ctx: Context, a: Space, b: Space): ChatResponse {
+  const doorFloor = ctx.floorOf(a);
+  const floor = ctx.mentionedFloor() ?? doorFloor;
+  const middle = sharedWall(a.polygon, b.polygon).middle ?? sharedWall(b.polygon, a.polygon).middle;
+  if (a.floor_id !== b.floor_id || !middle) return notFound(`${a.name} and ${b.name} don't share a wall, so a door can't go between them.`, doorFloor);
+  const door: Opening = { id: 'what-if-door', floor_id: a.floor_id, space_ids: [a.id, b.id], kind: 'door', position: middle, width_m: 0.9, step_free: true, synthetic: true };
+  const before = shortestPaths(buildGraph(ctx.building), [OUTSIDE]).dist;
+  const after = shortestPaths(buildGraph(ctx.building, { extraOpenings: [door] }), [OUTSIDE]).dist;
+  const improved = ctx.spacesOn(floor)
+    .filter(space => isDestinationRoom(space) && after.has(space.id) && (before.get(space.id) ?? Infinity) - after.get(space.id)! > 1)
+    .map(space => ({ space, saved: (before.get(space.id) ?? Infinity) - after.get(space.id)! }));
+  const n = improved.length;
+  const best = [...improved].sort((x, y) => y.saved - x.saved)[0];
+  return {
+    kind: 'what_if_door',
+    reply: `A new door between ${a.name} and ${b.name} would give ${plural(n, 'room')} on ${floor.name} a walk out of the building that is more than 1 m shorter.${best && Number.isFinite(best.saved) ? ` The biggest saving is ${best.saved.toFixed(1)} m, for ${best.space.name}.` : ''}`,
+    answer: { title: `Rooms on ${floor.name} with a shorter way out`, value: String(n), detail: `New door: ${a.ref} ↔ ${b.ref} · saving > 1 m` },
+    scene: {
+      focus: floor.id === doorFloor.id ? { mode: 'floor', floorId: floor.id } : { mode: 'stack', floorIds: [doorFloor.id, floor.id] },
+      highlights: [
+        ...improved.map(e => ({ spaceId: e.space.id, tone: 'primary' as const })),
+        { spaceId: a.id, tone: 'secondary' },
+        { spaceId: b.id, tone: 'secondary' },
+      ],
+      markers: [{ floorId: door.floor_id, position: door.position, label: 'New door' }],
+    },
+  };
 }
 
 function assetMarker(asset: Asset) {

@@ -46,9 +46,13 @@ export type Tone = 'primary' | 'secondary' | 'muted';
 
 export interface SceneDirective {
   focus: SceneFocus;
-  /** Spaces to colour. `primary` is the answer; `secondary` is supporting context (neighbours, candidates). */
+  /**
+   * Spaces to colour. `primary`: what the answer names or counts (lime, raised).
+   * `secondary`: the reference room the question is about, e.g. the start, entry or target (sage).
+   * `muted`: background candidates, e.g. the runners-up for "largest room" (faint tint).
+   */
   highlights?: { spaceId: string; tone: Tone; label?: string }[];
-  /** Pins for assets or arbitrary points. */
+  /** Pins for assets or points. `muted` markers draw as small flat warnings (e.g. doors that are too narrow). */
   markers?: (FloorPoint & { label: string; tone?: Tone })[];
   /** Polylines through the building. Consecutive points on different floors draw a vertical hop. */
   routes?: { points: FloorPoint[]; label?: string }[];

@@ -118,7 +118,27 @@ export function blockHeight(storey: number, flat: number, lift = 0) {
   return full + (cut - full) * flat;
 }
 
-export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, focus: SceneFocus) {
+/**
+ * World box the camera should frame. On a single floor, `frame` (the answer's spaces) narrows the view to
+ * those spaces, but never tighter than 45% of the floor or 30 m, so the surroundings stay readable.
+ */
+export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, focus: SceneFocus, frame: string[] = []) {
+  if (focus.mode === 'floor') {
+    const floor = model.floors.find(f => f.floor.id === focus.floorId);
+    const spaces = frame.map(id => model.spaces.get(id)).filter(m => m && m.space.floor_id === focus.floorId);
+    if (floor && spaces.length) {
+      const y = poses.get(floor.floor.id)!.y;
+      const box = new THREE.Box3();
+      for (const m of spaces) {
+        m!.geometry.computeBoundingBox();
+        box.union(m!.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, y, 0)));
+      }
+      const centre = box.getCenter(new THREE.Vector3());
+      const span = Math.max(floor.box.maxX - floor.box.minX, floor.box.maxZ - floor.box.minZ);
+      const half = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, span * 0.45, 30) / 2;
+      return new THREE.Box3(new THREE.Vector3(centre.x - half, y, centre.z - half), new THREE.Vector3(centre.x + half, y + 1, centre.z + half));
+    }
+  }
   const box = new THREE.Box3();
   const visible = model.floors.filter(f => focus.mode === 'building' || (poses.get(f.floor.id)?.opacity ?? 0) > 0.5);
   for (const f of visible.length ? visible : model.floors) {
