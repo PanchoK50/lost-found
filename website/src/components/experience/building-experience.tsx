@@ -78,12 +78,24 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   useEffect(() => { transcriptEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, busy, expanded]);
 
   const showOverview = useCallback(() => setDirective(overview), []);
+  /** Back to the start screen: whole building, "Ask me anything", suggestions. */
+  const startOver = useCallback(() => {
+    setMessages([]);
+    setDirective(overview);
+    setDraft('');
+    setExpanded(false);
+    setActiveStep(undefined);
+  }, []);
   const focusFloor = useCallback((floorId: string) => setDirective(current => ({ ...current, focus: { mode: 'floor', floorId } })), []);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') showOverview(); };
+    // Esc: first back to the whole building, then (pressed again) back to the start screen.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (directive.focus.mode !== 'building') showOverview(); else startOver();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showOverview]);
+  }, [showOverview, startOver, directive.focus.mode]);
 
   async function ask(text: string) {
     const message = text.trim();
@@ -118,7 +130,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
-          <Link className="brand" href="/" aria-label="lost & found home">◈ <span>lost & found</span></Link>
+          <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
+          {started && <button type="button" className="back-overview" onClick={startOver}>← Overview</button>}
           <nav className="building-switch" aria-label="Building">
             {buildings.map(b => <Link key={b.id} href={`/?building=${b.id}`} className={b.id === building.building.id ? 'active' : ''} aria-current={b.id === building.building.id ? 'page' : undefined}>{b.name}</Link>)}
           </nav>

@@ -34,6 +34,11 @@ button:disabled { cursor: default; }
 .hud-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .brand { text-decoration: none; color: var(--ink); font-size: 20px; letter-spacing: -1px; display: flex; gap: 8px; align-items: center; min-height: 44px; }
 .brand span { font-size: 16px; font-weight: 700; }
+.back-overview { flex: none; min-height: 40px; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 600; box-shadow: var(--shadow); }
+/* On phones, while a conversation is open: logo mark + "← Overview" on the left, in the usual "back" spot. */
+.experience--started .building-switch { display: none; }
+.experience--started .hud-bar { justify-content: flex-start; }
+.experience--started .brand span { display: none; }
 .building-switch { display: flex; gap: 2px; padding: 3px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 999px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .building-switch a { text-decoration: none; color: var(--muted); padding: 8px 12px; border-radius: 999px; font-size: 13px; white-space: nowrap; }
 .building-switch a.active { background: var(--ink); color: #fff; }
@@ -140,6 +145,9 @@ button:disabled { cursor: default; }
   body { font-size: 14px; }
   .hud-top { padding: 20px 24px 0; }
   .hud-bar { justify-content: flex-start; gap: 20px; }
+  .experience--started .building-switch { display: flex; }
+  .experience--started .brand span { display: inline; }
+  .back-overview { order: 3; }
   .brand { font-size: 22px; }
   .brand span { font-size: 17px; }
   .building-switch a { padding: 6px 12px; font-size: 12px; }
