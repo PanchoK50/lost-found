@@ -1,6 +1,7 @@
 import { getCatalogEntry } from '@/lib/buildings/catalog';
 import type { Building } from '@/lib/buildings/types';
 import { WalkGraph } from '@/lib/buildings/walk';
+import { turnByTurn } from '@/lib/buildings/turns';
 import type { ChatRequest, ChatResponse } from '@/lib/chat/contract';
 import { resolveDemo } from '@/lib/chat/demo-resolver';
 
@@ -16,13 +17,23 @@ export async function POST(request: Request) {
   return Response.json(withRoutePoints(entry.building, response));
 }
 
-/** Backends may return routes as a space list only (what the route check scores); draw them with the walking model. */
+/**
+ * Backends may return routes as a space list only (what the route check scores). Fill in the drawn path and
+ * turn-by-turn steps with the walking model.
+ */
 function withRoutePoints(building: Building, response: ChatResponse): ChatResponse {
   const routes = response.scene.routes;
-  if (!routes?.some(r => r.spacePath && !r.points)) return response;
+  if (!routes?.some(r => r.spacePath && (!r.points || !r.steps))) return response;
   const graph = new WalkGraph(building, { closed: response.scene.closed });
   return {
     ...response,
-    scene: { ...response.scene, routes: routes.map(r => (r.points || !r.spacePath ? r : { ...r, points: graph.measure(r.spacePath)?.points ?? [] })) },
+    scene: {
+      ...response.scene,
+      routes: routes.map(r => {
+        if (!r.spacePath || (r.points && r.steps)) return r;
+        const leg = graph.measure(r.spacePath);
+        return { ...r, points: r.points ?? leg?.points ?? [], steps: r.steps ?? (leg ? turnByTurn(building, leg.segments, r.spacePath) : []) };
+      }),
+    },
   };
 }

@@ -23,10 +23,24 @@ export interface WalkRules {
   closed?: Iterable<string>;
 }
 
+/** One piece of a walk: inside a space, through a door/opening/entrance, or riding stairs or a lift. */
+export interface WalkSegment {
+  kind: 'walk' | 'door' | 'ride';
+  /** The space walked in, entered through the door, or arrived at by the ride. */
+  spaceId: string;
+  floorId: string;
+  points: Point[];
+  length: number;
+  /** Opening or connector id for doors and rides. */
+  via?: string;
+}
+
 export interface WalkLeg {
   spacePath: string[];
   /** Polyline through the building, floor by floor. */
   points: { floorId: string; position: Point }[];
+  /** The same walk split into pieces, for turn-by-turn directions. */
+  segments: WalkSegment[];
   length: number;
 }
 
@@ -147,11 +161,13 @@ export class WalkGraph {
   private readonly edges = new Map<Node, Edge[]>();
   private readonly spaceOf = new Map<Node, string>();
   private readonly floorOf: Map<string, string>;
+  private readonly connectors: Set<string>;
 
   constructor(readonly building: Building, rules: WalkRules = {}) {
     const closed = new Set(rules.closed ?? []);
     const spaces = new Map(building.spaces.filter(s => !closed.has(s.id)).map(s => [s.id, s]));
     this.floorOf = new Map(building.spaces.map(s => [s.id, s.floor_id]));
+    this.connectors = new Set(building.vertical_connectors.map(c => c.id));
     const rooms = new Map<string, Room>();
     const room = (s: Space) => { let r = rooms.get(s.id); if (!r) { r = new Room(s.polygon); rooms.set(s.id, r); } return r; };
     const ports = new Map<string, { node: Node; at: Point }[]>(); // per space: its door entries and special points
@@ -258,23 +274,25 @@ export class WalkGraph {
     for (let k = end; found.prev.has(k); k = found.prev.get(k)!.key) steps.unshift(found.prev.get(k)!.edge);
     const spacePath = [from];
     const points: WalkLeg['points'] = [];
+    const segments: WalkSegment[] = [];
     let current = from;
     for (const edge of steps) {
       const next = this.spaceOf.get(edge.to)!;
-      if (edge.points.length) {
-        // Door crossings belong to the space entered; walks inside a space to that space.
-        const floor = this.floorOf.get(edge.via ? next : current) ?? this.floorOf.get(current)!;
-        for (const p of edge.points) points.push({ floorId: floor, position: p });
-      }
+      const kind = !edge.via ? 'walk' : this.connectors.has(edge.via) ? 'ride' : 'door';
+      // Door crossings and rides belong to the space entered; walks inside a space to that space.
+      const spaceId = kind === 'walk' ? current : next;
+      const floorId = this.floorOf.get(spaceId) ?? this.floorOf.get(current)!;
+      if (edge.points.length) for (const p of edge.points) points.push({ floorId, position: p });
+      segments.push({ kind, spaceId, floorId, points: edge.points, length: edge.cost, via: edge.via });
       if (next !== spacePath.at(-1)) spacePath.push(next);
       current = next;
     }
-    return { spacePath, points, length };
+    return { spacePath, points, segments, length };
   }
 
   /** Best route between the start points of two spaces, or undefined if the rules allow none. */
   route(from: string, to: string): WalkLeg | undefined {
-    if (from === to) return { spacePath: [from], points: [], length: 0 };
+    if (from === to) return { spacePath: [from], points: [], segments: [], length: 0 };
     return this.leg(from, to, this.search(from));
   }
 
@@ -291,7 +309,7 @@ export class WalkGraph {
    * doesn't go through a real door, opening, stair or lift that the rules allow.
    */
   measure(spacePath: string[]): WalkLeg | undefined {
-    if (spacePath.length < 2) return spacePath.length ? { spacePath, points: [], length: 0 } : undefined;
+    if (spacePath.length < 2) return spacePath.length ? { spacePath, points: [], segments: [], length: 0 } : undefined;
     const last = spacePath.length - 1;
     const found = this.search(spacePath[0], (space, index, next) => {
       if (next === spacePath[index]) return index;

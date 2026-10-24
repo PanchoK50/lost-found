@@ -71,6 +71,9 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
+        {directive.focus.mode === 'floor' && directive.focus.around && (
+          <Cursor key={`cursor-${directiveKey}`} position={worldAt(model, poses, { floorId: directive.focus.floorId, position: directive.focus.around }, 1.7)} />
+        )}
         <Projector anchors={anchors} elements={elements} />
       </Canvas>
       <div className="scene-anchors" key={directiveKey}>
@@ -330,6 +333,23 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
       </group>;
     })}
   </>;
+}
+
+/** Pulsing ring that marks where a route step happens. */
+function Cursor({ position }: { position: [number, number, number] }) {
+  const ring = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ring.current) return;
+    const t = (clock.elapsedTime % 1.4) / 1.4;
+    ring.current.scale.setScalar(0.6 + t * 1.6);
+    (ring.current.material as THREE.MeshBasicMaterial).opacity = 1 - t;
+  });
+  return (
+    <group position={position}>
+      <mesh rotation-x={-Math.PI / 2} renderOrder={7}><circleGeometry args={[0.55, 32]} /><meshBasicMaterial color={palette.route} depthTest={false} /></mesh>
+      <mesh ref={ring} rotation-x={-Math.PI / 2} renderOrder={7}><ringGeometry args={[0.7, 0.95, 40]} /><meshBasicMaterial color={palette.primary} transparent depthTest={false} /></mesh>
+    </group>
+  );
 }
 
 function RouteLine({ points }: { points: [number, number, number][] }) {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Building } from '@/lib/buildings/types';
-import { directions } from '@/lib/buildings/directions';
+import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
 
@@ -36,6 +36,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // The route step the camera is showing: `${messageId}:${leg}-${step}`.
+  const [activeStep, setActiveStep] = useState<string>();
   const [insets, setInsets] = useState<SceneInsets>({ top: 0, left: 0, bottom: 0 });
   const wide = useWide();
   const nextId = useRef(0);
@@ -100,6 +102,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
       const response = data as ChatResponse;
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
       setDirective(response.scene);
+      setActiveStep(undefined);
     } catch (error) {
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: error instanceof Error ? error.message : 'Something went wrong.', error: true }]);
     } finally {
@@ -143,14 +146,27 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                 ? <p key={message.id} className="bubble bubble--user">{message.content}</p>
                 : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
                     {message.response?.answer && (
-                      <button type="button" className="answer-card" onClick={() => setDirective(message.response!.scene)} aria-label={`Show ${message.response.answer.title} on the model`}>
+                      <button type="button" className="answer-card" onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
                         <span className="answer-title">{message.response.answer.title}</span>
                         {message.response.answer.value && <span className="answer-value">{message.response.answer.value}</span>}
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
                       </button>
                     )}
                     <p>{withoutAnswerLine(message.content)}</p>
-                    {message.response && <RouteSteps building={building} response={message.response} open={wide} />}
+                    {message.response && (
+                      <DirectionsPanel
+                        building={building}
+                        response={message.response}
+                        open={wide}
+                        active={activeStep?.startsWith(`${message.id}:`) ? activeStep.slice(`${message.id}:`.length) : undefined}
+                        onStep={(step, key) => {
+                          // Fly to the maneuver on its floor, keeping the route and labels of this answer.
+                          setDirective({ ...message.response!.scene, focus: { mode: 'floor', floorId: step.at.floorId, around: step.at.position } });
+                          setActiveStep(`${message.id}:${key}`);
+                        }}
+                        onOverview={() => { setDirective(message.response!.scene); setActiveStep(undefined); }}
+                      />
+                    )}
                   </article>)}
               {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
               <div ref={transcriptEnd} />
@@ -173,22 +189,6 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
-  );
-}
-
-/** Numbered, followable steps for each route leg. Collapsed on phones to keep the model in view. */
-function RouteSteps({ building, response, open }: { building: Building; response: ChatResponse; open: boolean }) {
-  const legs = (response.scene.routes ?? []).filter(r => r.spacePath && r.spacePath.length > 1);
-  if (!legs.length) return null;
-  const steps = legs.flatMap((leg, i) => {
-    const list = directions(building, leg.spacePath!);
-    return i === 0 ? list : list.slice(1); // a leg starts where the previous one arrived
-  });
-  return (
-    <details className="steps" open={open || undefined}>
-      <summary>{steps.length} steps</summary>
-      <ol>{steps.map((step, i) => <li key={i} className={`step step--${step.kind}`}>{step.text}</li>)}</ol>
-    </details>
   );
 }
 

@@ -2,6 +2,7 @@ import type { Asset, Building, Floor, Opening, Space } from '@/lib/buildings/typ
 import { bounds, pointInPolygon, polygonArea, polygonCentroid, sharedWall } from '@/lib/buildings/geometry';
 import { buildGraph, OUTSIDE, shortestPaths, type GraphOptions } from '@/lib/buildings/graph';
 import { WalkGraph, type WalkLeg, type WalkRules } from '@/lib/buildings/walk';
+import { turnByTurn } from '@/lib/buildings/turns';
 import type { ChatResponse, FloorPoint } from './contract';
 
 /**
@@ -428,7 +429,7 @@ function routeResponse(ctx: Context, kind: ChatResponse['kind'], stops: Space[],
         ...passed.map(id => ({ spaceId: id, tone: 'muted' as const })),
       ],
       // Draw only the floors on view: rides through intermediate floors become one vertical hop.
-      routes: legs.map(leg => ({ spacePath: leg.spacePath, points: leg.points.filter(p => floorIds.includes(p.floorId)) })),
+      routes: legs.map((leg, i) => ({ spacePath: leg.spacePath, points: leg.points.filter(p => floorIds.includes(p.floorId)), steps: turnByTurn(ctx.building, leg.segments, leg.spacePath, { endsAt: i < legs.length - 1 ? 'stop' : 'destination' }) })),
       closed: closed.map(c => c.id),
     },
   };

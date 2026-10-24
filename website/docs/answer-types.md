@@ -66,7 +66,9 @@ The answer is a path. Show the distance, draw the way and list the steps. For no
 
 `src/lib/buildings/walk.ts` implements this model (`WalkGraph.route`, `.measure` to check and measure a given space list, `.distancesFrom`). Checked on all 1,098 train/dev warm-up routes: reachability matches every time (including all 121 "no route" cases), every expected sequence is valid, and ours is never longer under this model. 861 are identical; the rest are equal or shorter.
 
-**Contract:** a backend may return only `spacePath` per leg; the API (`src/app/api/chat/route.ts`) fills in `points` with the walking model. The UI turns `spacePath` into numbered steps (`src/lib/buildings/directions.ts`).
+**Contract:** a backend may return only `spacePath` per leg; the API (`src/app/api/chat/route.ts`) fills in `points` (the drawn path) and `steps` (turn-by-turn directions) with the walking model.
+
+**Turn-by-turn directions** (`src/lib/buildings/turns.ts`, shown by `directions-panel.tsx`), Google Maps style: origin, maneuvers with a turn icon and the distance to the next one, stops, destination. A turn is the change of heading at a door (direction walked when reaching it vs. after it): straight under 25°, bear 25–60°, turn 60–135°, sharp 135–165°, else turn around. Straight steps are kept only into corridors, halls, stairwells and lifts; consecutive rides on one stair or lift merge ("Take Stairs 1 up to Floor 5"). The last step says which side the destination door is on. Tapping a step flies the camera to that point (`focus.around`) with a pulsing marker; "Whole route" zooms back out.
 
 **No route:** shown as a result, not an error. The resolver re-checks without each rule to explain why ("The only way is through Office lift, which is closed", "Every way there needs Stairs 2"), marks the blockers, highlights start and destination, and tints how far you can get from the start.
 

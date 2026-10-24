@@ -73,16 +73,35 @@ button:disabled { cursor: default; }
 .answer-title { font-size: 13px; color: var(--muted); }
 .answer-value { font-size: 26px; font-weight: 600; letter-spacing: -.03em; }
 .answer-detail { font-size: 12px; color: var(--muted); }
-.steps { margin-top: 8px; font-size: 13px; }
-.steps summary { cursor: pointer; color: var(--muted); font-weight: 600; padding: 8px 0; min-height: 36px; list-style: none; display: flex; align-items: center; gap: 6px; }
-.steps summary::before { content: "▸"; transition: transform .2s; }
-.steps[open] summary::before { transform: rotate(90deg); }
-.steps ol { margin: 0; padding: 0; list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 2px; }
-.step { counter-increment: step; position: relative; padding: 6px 0 6px 30px; color: #3d4638; line-height: 1.35; }
-.step::before { content: counter(step); position: absolute; left: 0; top: 5px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid var(--line); font-size: 11px; display: grid; place-items: center; color: var(--muted); }
-.step--start::before, .step--arrive::before { background: var(--ink); border-color: var(--ink); color: #fff; }
-.step--arrive::before { background: var(--accent); border-color: var(--accent); color: var(--ink); }
-.step--floor { font-weight: 600; color: var(--ink); }
+.directions { margin-top: 6px; border-top: 1px solid var(--line); }
+/* Open directions get more of the sheet; the model keeps the top part of the screen. */
+.transcript:has(.directions[open]) { max-height: 56dvh; }
+.directions summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.directions summary::-webkit-details-marker { display: none; }
+.directions summary > span::before { content: "▸"; display: inline-block; margin-right: 6px; transition: transform .2s; }
+.directions[open] summary > span::before { transform: rotate(90deg); }
+.directions-overview { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--ink); }
+.place { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
+.place strong { display: block; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--ink); }
+.place small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.place-dot { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 3px solid var(--ink); background: #fff; }
+.place--stop .place-dot { border-color: var(--accent); background: var(--ink); }
+.place--destination .place-dot { border: 0; background: var(--accent); box-shadow: inset 0 0 0 6px var(--ink); }
+.maneuvers { list-style: none; margin: 0; padding: 0; }
+.maneuver { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 6px; margin: 0 -6px; border: 0; border-radius: 10px; background: transparent; text-align: left; font-size: 14px; line-height: 1.4; color: var(--ink); transition: background .15s; }
+.maneuver:active, .maneuver--active { background: #f1f6df; }
+.turn-icon { flex: none; color: var(--ink); margin-top: -1px; }
+.maneuver-text { display: flex; flex-direction: column; gap: 4px; }
+.maneuver-note { display: flex; align-items: center; gap: 6px; color: #2f6f2a; font-weight: 600; font-size: 13px; }
+.maneuver-note i { font-style: normal; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #2f6f2a; color: #fff; font-size: 11px; font-weight: 700; }
+.maneuver-distance { display: flex; align-items: center; gap: 10px; padding-left: 34px; font-size: 12px; color: var(--muted); }
+.maneuver-distance span { white-space: nowrap; }
+.maneuver-distance hr { flex: 1; border: 0; border-top: 1px solid var(--line); margin: 0; }
+@media (min-width: 900px) {
+  .directions { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; margin-top: 10px; }
+  .transcript:has(.directions[open]) { max-height: none; }
+  .maneuver:hover { background: #f6f8f0; }
+}
 .bubble--thinking { display: flex; gap: 4px; padding: 6px 2px; }
 .bubble--thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
 .bubble--thinking i:nth-child(2) { animation-delay: .15s; }

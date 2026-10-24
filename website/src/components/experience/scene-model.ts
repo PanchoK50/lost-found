@@ -123,6 +123,12 @@ export function blockHeight(storey: number, flat: number, lift = 0) {
  * those spaces, but never tighter than 45% of the floor or 30 m, so the surroundings stay readable.
  */
 export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, focus: SceneFocus, frame: string[] = []) {
+  if (focus.mode === 'floor' && focus.around) {
+    // A single point, e.g. a route step: frame about 18 m around it.
+    const [x, z] = model.toWorld(focus.around);
+    const y = poses.get(focus.floorId)?.y ?? 0;
+    return new THREE.Box3(new THREE.Vector3(x - 9, y, z - 9), new THREE.Vector3(x + 9, y + 1, z + 9));
+  }
   if (focus.mode === 'floor') {
     const floor = model.floors.find(f => f.floor.id === focus.floorId);
     const spaces = frame.map(id => model.spaces.get(id)).filter(m => m && m.space.floor_id === focus.floorId);

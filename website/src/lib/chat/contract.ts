@@ -34,11 +34,26 @@ export interface ChatResponse {
 /** A point on a specific floor, in building metres (Y up). */
 export interface FloorPoint { floorId: string; position: Point }
 
+/** One maneuver in turn-by-turn directions, Google Maps style. */
+export interface RouteStep {
+  action: 'straight' | 'slight-left' | 'left' | 'sharp-left' | 'slight-right' | 'right' | 'sharp-right' | 'u-turn'
+    | 'stairs-up' | 'stairs-down' | 'lift-up' | 'lift-down' | 'outside' | 'inside';
+  text: string;
+  /** Extra hint, e.g. "The destination is the door on your left." */
+  note?: string;
+  /** Metres walked after this step until the next one. */
+  distance: number;
+  /** Floors ridden, for stairs and lifts. */
+  floors?: number;
+  /** Where the maneuver happens; tapping a step flies the camera here. */
+  at: FloorPoint;
+}
+
 export type SceneFocus =
   /** Whole building, all floors stacked. */
   | { mode: 'building' }
-  /** One floor in 2.5D; floors above lift away, floors below are ghosted. */
-  | { mode: 'floor'; floorId: string }
+  /** One floor in 2.5D; floors above lift away, floors below are ghosted. `around` zooms to a point (e.g. a route step). */
+  | { mode: 'floor'; floorId: string; around?: Point }
   /** Several floors pulled apart so they can be compared (stacked rooms, multi-floor routes). */
   | { mode: 'stack'; floorIds: string[] };
 
@@ -55,11 +70,11 @@ export interface SceneDirective {
   /** Pins for assets or points. `muted` markers draw as small flat warnings (e.g. doors that are too narrow). */
   markers?: (FloorPoint & { label: string; tone?: Tone })[];
   /**
-   * Routes, one entry per leg. `spacePath` is the ordered list of spaces walked through (what the route check
+   * Routes, one entry per leg. `steps` are turn-by-turn directions (filled in by the API when omitted). `spacePath` is the ordered list of spaces walked through (what the route check
    * scores) and drives the step list. `points` is the drawn polyline; if omitted, the API fills it in from
    * `spacePath` with the walking model (lib/buildings/walk.ts). Points on different floors draw a vertical hop.
    */
-  routes?: { spacePath?: string[]; points?: FloorPoint[]; label?: string }[];
+  routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string }[];
   /** Straight 3D lines, e.g. sensor links between room centroids. */
   links?: { from: FloorPoint; to: FloorPoint; label?: string }[];
   /** Opening or vertical-connector ids to mark as closed. */
