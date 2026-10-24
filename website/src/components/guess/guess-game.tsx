@@ -9,7 +9,7 @@ import type { SceneDirective, SceneFocus } from '@/lib/chat/contract';
 import type { SceneInsets } from '@/components/experience/building-scene';
 import { WalkGraph } from '@/lib/buildings/walk';
 import { representativePoint } from '@/lib/buildings/graph';
-import { hashSeed, mulberry32, randomSeed } from '@/lib/guess/random';
+import { dailyDay, dailySeed, hashSeed, mulberry32, randomSeed } from '@/lib/guess/random';
 import { pickRounds, roomName, type Difficulty } from '@/lib/guess/rooms';
 import { emojiFor, guessDistance, MAX_POINTS, points, scoreScale } from '@/lib/guess/score';
 import { detectiveClues, type Clue, type ClueKind } from '@/lib/guess/clues';
@@ -68,6 +68,7 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
   const answer = rounds[index];
   const guess = guessId ? spaces.get(guessId) : undefined;
   const total = outcomes.reduce((sum, o) => sum + o.points, 0);
+  const day = dailyDay(seed, id);
   const penalty = clues.filter(c => bought.includes(c.kind)).reduce((sum, c) => sum + c.cost, 0);
   const angle = useMemo(() => seed ? mulberry32(hashSeed(`${seed}|turn|${index}`))() * Math.PI * 2 : 0, [seed, index]);
 
@@ -156,7 +157,7 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
         {phase === 'round' || phase === 'reveal'
           ? <div className={styles.stats}>
               <span><small>Building</small>{buildingName}</span>
-              <span><small>Round</small>{index + 1} / {rounds.length}</span>
+              <span><small>{day ? 'Daily round' : 'Round'}</small>{index + 1} / {rounds.length}</span>
               <span><small>Score</small>{total.toLocaleString('en')}</span>
             </div>
           : <span className={styles.logo}>Geo<b>Guessr</b></span>}
@@ -226,8 +227,9 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
             </div>
           </div>
           {empty && <p className={styles.warning}>This building has no rooms to guess. Try another one.</p>}
-          <button type="button" className={styles.primary} onClick={() => start(seed ?? randomSeed(), difficulty)}>Play · 5 rounds</button>
-          {sharedSeed && <p className={styles.seed}>Challenge seed <code>{sharedSeed}</code>: same rooms as your friend.</p>}
+          <button type="button" className={styles.primary} onClick={() => start(seed ?? randomSeed(), difficulty)}>{dailyDay(sharedSeed, id) ? 'Play the daily challenge' : sharedSeed ? 'Play the challenge' : 'Play · 5 rounds'}</button>
+          {!dailyDay(sharedSeed, id) && <button type="button" className={styles.secondary} onClick={() => start(dailySeed(id), difficulty)}>📅 Daily challenge</button>}
+          {sharedSeed && <p className={styles.seed}>{dailyDay(sharedSeed, id) ? <>Daily challenge of <code>{dailyDay(sharedSeed, id)}</code>: the same 5 rooms for everyone today.</> : <>Challenge seed <code>{sharedSeed}</code>: same rooms as your friend.</>}</p>}
         </section>
       )}
 
@@ -239,7 +241,7 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
 
       {phase === 'end' && (
         <aside className={styles.panel} ref={panel}>
-          <GameSummary outcomes={outcomes} buildingName={buildingName} shareUrl={shareUrl} onAgain={() => start(randomSeed(), difficulty)} onReplay={() => seed && start(seed, difficulty)} />
+          <GameSummary outcomes={outcomes} buildingName={buildingName} shareUrl={shareUrl} day={day} onAgain={() => start(randomSeed(), difficulty)} onReplay={() => seed && start(seed, difficulty)} />
         </aside>
       )}
     </main>

@@ -46,18 +46,33 @@ export function emojiFor(score: number): string {
   return '🟥';
 }
 
-/** The building comments on your guess, in the first person (§5). */
-export function verdict(score: number, metres: number, sameFloor: boolean, cluesBought = false): string {
-  if (metres <= 0) return 'You know me better than my caretaker.';
-  if (cluesBought) return 'Cheating is allowed. But I\'ll remember.';
-  if (!sameFloor) return 'Cold. Very cold. Wrong floor entirely.';
-  if (metres > 100) return 'That\'s not even the same wing.';
-  if (score >= 4000) return 'So close I can feel it.';
-  if (score >= 2000) return 'Right neighbourhood, wrong door.';
-  return 'Lukewarm. Have you ever been here?';
+export interface VerdictInput {
+  points: number;
+  metres: number;
+  /** Floor names of the guess and the answer. */
+  guessFloor: string;
+  answerFloor: string;
+  cluesBought: boolean;
+  /** Varies the line between rounds without randomness. */
+  round: number;
 }
 
-export function shareText(buildingName: string, scores: number[], url?: string): string {
+const pick = (lines: string[], round: number) => lines[round % lines.length];
+
+/** The building comments on your guess, in the first person (§5). */
+export function verdict({ points: score, metres, guessFloor, answerFloor, cluesBought, round }: VerdictInput): string {
+  if (metres <= 0) return pick(['You know me better than my caretaker.', 'Bullseye. Have you been sleeping here?', 'Exactly here. I\'m flattered.'], round);
+  if (cluesBought) return 'Cheating is allowed. But I\'ll remember.';
+  if (guessFloor !== answerFloor) return `Cold. Very cold. You're on ${guessFloor}, I meant ${answerFloor}.`;
+  if (metres > 100) return 'That\'s not even the same wing.';
+  if (score >= 4000) return pick(['So close I can feel it.', 'One wall away. Almost.', 'Warm. Very warm.'], round);
+  if (score >= 2000) return pick(['Right neighbourhood, wrong door.', 'You\'d hear me from there.', 'Lukewarm, leaning warm.'], round);
+  return pick(['Lukewarm. Have you ever been here?', 'Did you take the scenic route?', 'Not quite. Try following the coffee smell.'], round);
+}
+
+/** Wordle-style result: `Lost & Found GeoGuessr · Terminal 2 · 18,400 / 25,000 · 🟩🟨🟩🟥🟩`. */
+export function shareText(buildingName: string, scores: number[], url?: string, day?: string): string {
   const total = scores.reduce((a, b) => a + b, 0);
-  return [`Lost & Found GeoGuessr · ${buildingName} · ${total.toLocaleString('en')} / ${(scores.length * MAX_POINTS).toLocaleString('en')} · ${scores.map(emojiFor).join('')}`, url].filter(Boolean).join('\n');
+  const head = ['Lost & Found GeoGuessr', buildingName, day && `Daily ${day}`, `${total.toLocaleString('en')} / ${(scores.length * MAX_POINTS).toLocaleString('en')}`, scores.map(emojiFor).join('')];
+  return [head.filter(Boolean).join(' · '), url].filter(Boolean).join('\n');
 }

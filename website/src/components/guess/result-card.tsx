@@ -62,7 +62,7 @@ export function RoundResult({ outcome, round, rounds, floorName, onNext }: Round
           : <>Your guess was <b>{metres(outcome.distance.metres)}</b> {outcome.distance.walked ? 'away on foot' : 'away (no walking route, 1.5× straight line)'}.</>}
       </p>
       <p className={styles.resultAnswer}>It was <b>{roomName(outcome.answer)}</b> · {floorName(outcome.answer.floor_id)}</p>
-      <blockquote className={styles.quip}>“{verdict(outcome.points, outcome.distance.metres, outcome.sameFloor, outcome.penalty > 0)}” <cite>— the building</cite></blockquote>
+      <blockquote className={styles.quip}>“{verdict({ points: outcome.points, metres: outcome.distance.metres, guessFloor: floorName(outcome.guess.floor_id), answerFloor: floorName(outcome.answer.floor_id), cluesBought: outcome.penalty > 0, round })}” <cite>— the building</cite></blockquote>
       <button type="button" className={styles.primary} onClick={onNext} autoFocus>{last ? 'See results' : 'Next round'} <kbd>↵</kbd></button>
     </section>
   );
@@ -72,17 +72,19 @@ interface SummaryProps {
   outcomes: RoundOutcome[];
   buildingName: string;
   shareUrl: string;
+  /** Set for the daily challenge ("2026-10-25"). */
+  day?: string;
   onAgain(): void;
   onReplay(): void;
 }
 
-export function GameSummary({ outcomes, buildingName, shareUrl, onAgain, onReplay }: SummaryProps) {
+export function GameSummary({ outcomes, buildingName, shareUrl, day, onAgain, onReplay }: SummaryProps) {
   const total = outcomes.reduce((sum, o) => sum + o.points, 0);
   const max = outcomes.length * MAX_POINTS;
   const shown = useCountUp(total, 1600);
   const [copied, setCopied] = useState(false);
   const share = async () => {
-    const text = shareText(buildingName, outcomes.map(o => o.points), shareUrl);
+    const text = shareText(buildingName, outcomes.map(o => o.points), shareUrl, day);
     try {
       if (navigator.share) await navigator.share({ text });
       else { await navigator.clipboard.writeText(text); setCopied(true); }
@@ -90,7 +92,7 @@ export function GameSummary({ outcomes, buildingName, shareUrl, onAgain, onRepla
   };
   return (
     <section className={styles.summary} aria-live="polite">
-      <p className={styles.eyebrow}>{buildingName} · game over</p>
+      <p className={styles.eyebrow}>{buildingName} · {day ? `daily ${day}` : 'game over'}</p>
       <p className={styles.total}><strong>{shown.toLocaleString('en')}</strong><span> / {max.toLocaleString('en')}</span></p>
       <div className={styles.bar} aria-hidden><span style={{ width: `${(shown / max) * 100}%` }} /></div>
       <p className={styles.rank}>{rank(total / max)}</p>

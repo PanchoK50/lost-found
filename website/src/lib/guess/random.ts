@@ -24,9 +24,20 @@ export function hashSeed(text: string): number {
   return h >>> 0;
 }
 
-/** Everyone playing the same building on the same day gets the same rooms. */
+/** Everyone playing the same building on the same day gets the same rooms. Uses the local calendar day. */
 export function dailySeed(buildingId: string, date = new Date()): string {
-  return `${buildingId}:${date.toISOString().slice(0, 10)}`;
+  return `${buildingId}:${localDay(date)}`;
+}
+
+/** The day of a daily seed ("2026-10-25"), or undefined for any other seed. */
+export function dailyDay(seed: string | undefined, buildingId: string): string | undefined {
+  const match = seed?.match(/^(.+):(\d{4}-\d{2}-\d{2})$/);
+  return match && match[1] === buildingId ? match[2] : undefined;
+}
+
+function localDay(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /** A short, shareable seed for a fresh game. */
