@@ -112,3 +112,25 @@
 .scene-tip.scene-tip--actions button { margin-top: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; }
 /* The tapped room's tip stays above people and pins so its button can be tapped. */
 .scene-anchor:has(.scene-tip--actions) { z-index: 3; }
+
+/* Demo account picker (components/auth/demo-login.tsx) */
+.sheet-hint { margin: 0 0 12px; opacity: 0.75; }
+.sheet-error { color: #d32f2f; margin-top: 10px; }
+.demo-users { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.demo-users button {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 10px;
+  border-radius: 14px; border: 1px solid rgba(127, 127, 127, 0.25); background: rgba(127, 127, 127, 0.08);
+  font: inherit; color: inherit; cursor: pointer;
+}
+.demo-users button[aria-pressed='true'] { outline: 2px solid currentColor; }
+.demo-users button:disabled { opacity: 0.6; cursor: wait; }
+.demo-users small { opacity: 0.65; }
+.demo-initial {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(127, 127, 127, 0.2); font-weight: 600; font-size: 1.1rem;
+}
+.demo-signout, .demo-switch {
+  margin-top: 12px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(127, 127, 127, 0.3);
+  background: transparent; font: inherit; color: inherit; cursor: pointer;
+}
+.demo-switch { margin: 0 0 10px; width: 100%; text-align: left; }

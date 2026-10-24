@@ -25,6 +25,8 @@ export interface ChatRequest {
   history?: { role: 'user' | 'assistant'; content: string }[];
   /** Backend conversation id from the previous response; keeps follow-ups and edits in one session. */
   sessionId?: string;
+  /** Saved chat thread (Supabase `conversations`), when signed in. */
+  conversationId?: string;
   /** Lets the backend read the player's world: presence, groups, pins and closures. */
   playerId?: string;
   /** A skill chip was tapped: resolve this skill relative to the player's presence. */
@@ -50,6 +52,12 @@ export interface ChatResponse {
   actions?: { label: string; message: string; send?: boolean }[];
   /** Backend conversation id; send it back with the next message. */
   sessionId?: string;
+  /** Saved chat thread id; send it back with the next message. */
+  conversationId?: string;
+  /** Building edits the agent made this turn (closures, new doors, moved assets). */
+  edits?: unknown[];
+  /** Claude cost of this answer in dollars (agent answers only). */
+  cost?: number;
   /** Who answered: the Python agent, the world layer (people, reports, skills), or the offline demo resolver. */
   source?: 'agent' | 'world' | 'demo';
   /** World changes the agent proposes (docs/MULTIPLAYER.md §7). */

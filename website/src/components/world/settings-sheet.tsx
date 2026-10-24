@@ -16,9 +16,11 @@ const roles: { value: Role; label: string }[] = [
 ];
 
 /** Profile, mode and privacy (docs/MULTIPLAYER.md §2, §3). Choices apply at once; text fields when they lose focus. */
-export function SettingsSheet({ building, profile, world, category, act, onClose }: {
+export function SettingsSheet({ building, profile, world, category, act, onClose, onSwitchUser }: {
   building: Building;
   profile: Profile;
+  /** Opens the demo account picker (only when accounts are configured). */
+  onSwitchUser?: () => void;
   world?: WorldState;
   category: BuildingCategory;
   act: WorldActions['act'];
@@ -48,6 +50,7 @@ export function SettingsSheet({ building, profile, world, category, act, onClose
     <Sheet title="Settings" onClose={() => { saveText(); onClose(); }}>
       <section>
         <h3>You</h3>
+        {onSwitchUser && <button type="button" className="demo-switch" onClick={() => { saveText(); onSwitchUser(); }}>Signed in as {profile.name} · Switch user</button>}
         <label>Name<input value={name} maxLength={40} onChange={e => setName(e.target.value)} onBlur={saveText} autoComplete="nickname" /></label>
         <label>Groups<input value={groups} onChange={e => setGroups(e.target.value)} onBlur={saveText} placeholder="e.g. lunch crew, line 2" /></label>
         <Segmented label="Role" options={roles} value={profile.role} onChange={role => saveProfile({ ...profile, role })} />

@@ -10,6 +10,8 @@ import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
 import { detectCategory } from '@/lib/world/mode';
 import { useProfile } from '@/lib/world/profile';
+import { DemoLoginSheet, useSignedIn } from '@/components/auth/demo-login';
+import { authHeader, supabaseBrowser } from '@/lib/supabase/browser';
 import { useWorld } from '@/lib/world/use-world';
 import { WorldHud } from '@/components/world/world-hud';
 import { SettingsSheet } from '@/components/world/settings-sheet';
@@ -56,7 +58,10 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const profile = useProfile();
   const { world, act } = useWorld(building, profile);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report'>();
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'account'>();
+  const signedIn = useSignedIn();
+  // Chat history in Supabase: one conversation per thread, started on the first message.
+  const conversationId = useRef<string | undefined>(undefined);
   const closeSheet = useCallback(() => setSheet(undefined), []);
   // A pin proposed in chat that the user wants to edit before posting.
   const [reportDraft, setReportDraft] = useState<ReportDraft>();
@@ -105,6 +110,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const startOver = useCallback(() => {
     setMessages([]);
     sessionId.current = undefined;
+    conversationId.current = undefined;
     setDirective(overview);
     setDraft('');
     setExpanded(false);
@@ -132,11 +138,12 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, playerId: profile?.id, skillId }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
       sessionId.current = response.sessionId;
+      conversationId.current = response.conversationId ?? conversationId.current;
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
       setDirective(response.scene);
       setActiveStep(undefined);
@@ -269,7 +276,9 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
       {sheet === 'report' && profile && <ReportSheet key={JSON.stringify(reportDraft ?? null)} initial={reportDraft} building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
       {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
-      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
+      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
+      {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
+      {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>

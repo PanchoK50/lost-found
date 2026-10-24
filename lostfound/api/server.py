@@ -181,6 +181,7 @@ def ui_chat(request: UIChatRequest) -> dict:
         "source": "agent",
         "cost": turn["cost"],
         "toolCalls": turn["tool_calls"],
+        "edits": turn["edits"],
     }
 
 

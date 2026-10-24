@@ -7,6 +7,7 @@ import { resolveDemo } from '@/lib/chat/demo-resolver';
 import { markBroken, offerAskCrowd, resolveWorld } from '@/lib/world/chat';
 import { activeClosures, viewFor } from '@/lib/world/rules';
 import { worldStore } from '@/lib/world/store';
+import { supabaseAdmin, userFrom } from '@/lib/supabase/server';
 
 /** The Python agent (lostfound.api.server). Start it with `uv run uvicorn lostfound.api.server:app --port 8000`. */
 const AGENT_URL = process.env.LOSTFOUND_API_URL ?? 'http://127.0.0.1:8000';
@@ -49,7 +50,38 @@ export async function POST(request: Request) {
   const response = resolved.scene.routes?.length && worldClosed.length
     ? { ...resolved, scene: { ...resolved.scene, closed: [...new Set([...(resolved.scene.closed ?? []), ...worldClosed])] } }
     : resolved;
-  return Response.json(withRoutePoints(entry.building, response));
+  const finished = withRoutePoints(entry.building, response);
+  const user = await userFrom(request);
+  const conversationId = user ? await saveTurn(user.id, entry.id, body.conversationId, message, finished).catch(() => undefined) : undefined;
+  return Response.json({ ...finished, conversationId });
+}
+
+/** Chat history (Supabase): the user's message, the full answer (to replay its scene) and any building edits. */
+async function saveTurn(userId: string, buildingId: string, conversationId: string | undefined, message: string, response: ChatResponse): Promise<string | undefined> {
+  const db = supabaseAdmin();
+  if (!db) return undefined;
+  let id = conversationId;
+  if (id) {
+    const { data } = await db.from('conversations').select('id').eq('id', id).eq('user_id', userId).maybeSingle();
+    id = data?.id;
+  }
+  if (!id) {
+    const { data, error } = await db.from('conversations')
+      .insert({ user_id: userId, building_id: buildingId, agent_session_id: response.sessionId ?? null, title: message.slice(0, 80) })
+      .select('id').single();
+    if (error) throw error;
+    id = data.id as string;
+  } else {
+    await db.from('conversations').update({ updated_at: new Date().toISOString(), agent_session_id: response.sessionId ?? null }).eq('id', id);
+  }
+  await db.from('messages').insert([
+    { conversation_id: id, role: 'user', content: message },
+    { conversation_id: id, role: 'assistant', content: response.reply, response, source: response.source ?? null, cost: response.cost ?? null },
+  ]);
+  if (response.edits?.length) {
+    await db.from('building_edits').insert(response.edits.map(action => ({ building_id: buildingId, user_id: userId, conversation_id: id, action })));
+  }
+  return id;
 }
 
 type AgentResult =
