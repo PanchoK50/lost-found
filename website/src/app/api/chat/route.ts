@@ -4,7 +4,8 @@ import { WalkGraph } from '@/lib/buildings/walk';
 import { turnByTurn } from '@/lib/buildings/turns';
 import type { ChatRequest, ChatResponse } from '@/lib/chat/contract';
 import { resolveDemo } from '@/lib/chat/demo-resolver';
-import { activeClosures } from '@/lib/world/rules';
+import { offerAskCrowd, resolveWorld } from '@/lib/world/chat';
+import { activeClosures, viewFor } from '@/lib/world/rules';
 import { worldStore } from '@/lib/world/store';
 
 // Chat boundary for the viewer. Swap `resolveDemo` for the real agent; keep the ChatResponse shape.
@@ -16,9 +17,14 @@ export async function POST(request: Request) {
   const entry = getCatalogEntry(body.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   // Reports from people in the building close doors, stairs and lifts for routing (docs/MULTIPLAYER.md §8).
+  const playerId = typeof body.playerId === 'string' ? body.playerId : undefined;
   const world = await worldStore.get(entry.building, Date.now());
-  const worldClosed = activeClosures(world, typeof body.playerId === 'string' ? body.playerId : undefined);
-  const resolved: ChatResponse = resolveDemo(entry.building, message, { closed: worldClosed });
+  const worldClosed = activeClosures(world, playerId);
+  // People, reports and skills first (docs/MULTIPLAYER.md §7); everything else is a question about the building.
+  const input = { world: viewFor(world, playerId), playerId, skillId: typeof body.skillId === 'string' ? body.skillId : undefined, history: Array.isArray(body.history) ? body.history : undefined, closed: worldClosed };
+  const fromWorld = resolveWorld(entry.building, message, input);
+  if (fromWorld?.usedSkill && playerId) await worldStore.apply(entry.building, { type: 'skill.use', buildingId: entry.building.building.id, skillId: fromWorld.usedSkill, playerId }, Date.now()).catch(() => undefined);
+  const resolved: ChatResponse = fromWorld?.response ?? offerAskCrowd(entry.building, message, input, resolveDemo(entry.building, message, { closed: worldClosed }));
   const response = resolved.scene.routes?.length && worldClosed.length
     ? { ...resolved, scene: { ...resolved.scene, closed: [...new Set([...(resolved.scene.closed ?? []), ...worldClosed])] } }
     : resolved;

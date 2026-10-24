@@ -200,6 +200,13 @@ export function applyAction(current: StoredWorld, action: WorldAction, building:
       skill.votes++;
       break;
     }
+    case 'skill.use': {
+      const skill = world.skills.find(x => x.id === action.skillId);
+      if (!skill) throw new WorldError('Unknown skill.');
+      v.player(action.playerId);
+      skill.uses++;
+      break;
+    }
     case 'mode.set': {
       v.player(action.playerId);
       const mode = v.oneOf(action.mode, ['auto', 'team', 'public', 'home'] as const, 'mode');

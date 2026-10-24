@@ -105,5 +105,7 @@ export type WorldAction =
   | { type: 'ping.update'; buildingId: string; pingId: string; playerId: string; status?: Ping['status']; answer?: string }
   | { type: 'skill.create'; buildingId: string; skill: Omit<Skill, 'id' | 'createdAt' | 'votes' | 'uses'> }
   | { type: 'skill.vote'; buildingId: string; skillId: string; playerId: string }
+  /** Counted by the chat route when a skill chip is used; the top skills become chips. */
+  | { type: 'skill.use'; buildingId: string; skillId: string; playerId: string }
   /** Override the detected mode for everyone in this building ('auto' goes back to detection). */
   | { type: 'mode.set'; buildingId: string; playerId: string; mode: MultiplayerMode | 'auto' };

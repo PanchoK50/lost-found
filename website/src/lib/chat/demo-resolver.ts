@@ -52,6 +52,8 @@ export function resolveDemo(building: Building, message: string, options: Resolv
 export interface ResolveOptions {
   /** Opening, connector or space ids closed by reports from people in the building (docs/MULTIPLAYER.md §8). */
   closed?: string[];
+  /** Spaces never picked as "the nearest …" (skills skip items reported broken). */
+  skip?: string[];
 }
 
 class Context {
@@ -59,10 +61,12 @@ class Context {
   readonly floors: Map<string, Floor>;
   /** Closures from the world, with names for the reply. */
   readonly worldClosed: { id: string; name: string }[];
+  readonly skip: Set<string>;
   constructor(readonly building: Building, message: string, options: ResolveOptions = {}) {
     this.text = message.toLowerCase();
     this.floors = new Map(building.floors.map(floor => [floor.id, floor]));
     this.worldClosed = (options.closed ?? []).map(id => ({ id, name: elementName(building, id) }));
+    this.skip = new Set(options.skip);
   }
   floorOf(space: Space) { return this.floors.get(space.floor_id)!; }
   spacesOn(floor: Floor) { return this.building.spaces.filter(space => space.floor_id === floor.id); }
@@ -338,7 +342,7 @@ function ruleNotes(rules: WalkRules) {
 /** Nearest room (by walking) that holds an item of this type. */
 function nearestWithAsset(ctx: Context, graph: WalkGraph, from: Space, type: string, exclude?: string) {
   const dist = graph.distancesFrom(from.id);
-  const rooms = [...new Set(ctx.building.assets.filter(a => a.type === type).map(a => a.space_id))].filter(id => id !== exclude && dist.has(id));
+  const rooms = [...new Set(ctx.building.assets.filter(a => a.type === type).map(a => a.space_id))].filter(id => id !== exclude && !ctx.skip.has(id) && dist.has(id));
   rooms.sort((a, b) => dist.get(a)! - dist.get(b)!);
   return rooms.length ? ctx.building.spaces.find(sp => sp.id === rooms[0]) : undefined;
 }
@@ -621,4 +625,10 @@ function elementName(building: Building, id: string) {
   const opening = building.openings.find(o => o.id === id);
   const sides = opening?.space_ids.map(sid => building.spaces.find(s => s.id === sid)?.name).filter(Boolean) ?? [];
   return sides.length ? `the ${opening!.kind} to ${sides.join(' / ')}` : id;
+}
+
+/** Names in a message: spaces, stairs and lifts, asset and room types. Used by the multiplayer chat patterns. */
+export function mentionsIn(building: Building, message: string) {
+  const ctx = new Context(building, message);
+  return { spaces: ctx.mentionedSpaces(), connectors: ctx.mentionedConnectors(), assetType: ctx.mentionedAssetType(), roomType: ctx.mentionedRoomType() };
 }
