@@ -70,7 +70,8 @@ button:disabled { cursor: default; }
 .hero h1 { margin: 0; font-size: 34px; letter-spacing: -.03em; font-weight: 600; line-height: 1.05; color: var(--ink); }
 .hero .agent-avatar { margin: 0 auto 14px; }
 .chips { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; margin: 0 -10px; padding: 2px 10px; }
-.chips button { color: var(--ink); font-weight: 500; flex: none; scroll-snap-align: start; max-width: 78vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 999px; padding: 11px 14px; font-size: 13px; }
+.chips button, .chips .chip-link { color: var(--ink); font-weight: 500; flex: none; scroll-snap-align: start; max-width: 78vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 999px; padding: 11px 14px; font-size: 13px; }
+.chips .chip-link { text-decoration: none; border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .ask { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 18px; background: #fff; border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); }
 /* 16px stops iOS Safari zooming the page when the input gets focus. */
 .ask input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 10px 0; font-size: 16px; outline: none; }
@@ -200,8 +201,8 @@ button:disabled { cursor: default; }
   .experience--started .dock { left: calc(50% + 200px); width: min(640px, calc(100% - 480px)); }
   .hero h1 { font-size: clamp(34px, 4.4vw, 52px); }
   .chips { flex-wrap: wrap; justify-content: center; overflow: visible; margin: 0; padding: 0; order: 2; }
-  .chips button { max-width: none; padding: 7px 12px; font-size: 12px; }
-  .chips button:hover { background: #fff; border-color: var(--blue-weak); }
+  .chips button, .chips .chip-link { max-width: none; padding: 7px 12px; font-size: 12px; }
+  .chips button:hover, .chips .chip-link:hover { background: #fff; border-color: var(--blue-weak); }
   .ask { padding: 8px 8px 8px 20px; }
   .ask input { font-size: 15px; }
   .ask button { width: 40px; height: 40px; }

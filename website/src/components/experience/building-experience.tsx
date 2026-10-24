@@ -322,7 +322,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
               {importIntro.checks > 0 && <button type="button" className="button button--primary" onClick={() => void ask('Let’s check what you were unsure about in this building, one question at a time.')}>Check it with me</button>}
             </div>
           )}
-          {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
+          {!started && <div className="chips">
+            {/* The building game (docs/GEOGUESSR.md); first, so it shows on phones without scrolling. */}
+            <Link className="chip-link" href={`/guess?building=${encodeURIComponent(building.building.id)}`}>🎮 Building GeoGuessr</Link>
+            {suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}
+          </div>}
           {profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
           {world && profile && mentionQuery(draft) !== undefined
             ? <MentionPicker players={world.players.filter(p => p.id !== profile.id)} draft={draft} onPick={text => { setDraft(text); input.current?.focus(); }} />
