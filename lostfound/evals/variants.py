@@ -42,7 +42,7 @@ class Outcome:
 Variant = Callable[[dict], Outcome]  # gets the eval item (building_dir, question, inputs...) -> Outcome
 
 
-def rules_variant(_model: str | None, _effort: str | None) -> Variant:
+def rules_variant(_model: str | None, _effort: str | None, **_options) -> Variant:
     from lostfound.agent import rules
 
     def run(item: dict) -> Outcome:
@@ -51,7 +51,7 @@ def rules_variant(_model: str | None, _effort: str | None) -> Variant:
     return run
 
 
-def oracle_variant(_model: str | None, _effort: str | None) -> Variant:
+def oracle_variant(_model: str | None, _effort: str | None, **_options) -> Variant:
     """Upper bound: the labelled structured inputs go straight into the skills (benchmark sets only)."""
     from tests.test_skills_oracle import run_skill
 
@@ -64,7 +64,7 @@ def oracle_variant(_model: str | None, _effort: str | None) -> Variant:
     return run
 
 
-def starter_variant(model: str | None, effort: str | None) -> Variant:
+def starter_variant(model: str | None, effort: str | None, **_options) -> Variant:
     """V0: the kit's starter agent exactly as shipped (its own model and effort)."""
     import anthropic
 
@@ -84,11 +84,17 @@ def starter_variant(model: str | None, effort: str | None) -> Variant:
     return run
 
 
-def agent_variant(design: str) -> Callable[[str | None, str | None], Variant]:
-    def factory(model: str | None, effort: str | None) -> Variant:
+def agent_variant(design: str) -> Callable[..., Variant]:
+    def factory(model: str | None, effort: str | None, excluded_kinds: frozenset[str] = frozenset()) -> Variant:
         from lostfound.agent.agent import AgentConfig, BuildingQA
 
-        qa = BuildingQA(AgentConfig(design=design, model=MODELS.get(model or "opus", model), effort=effort or "low"))
+        config = AgentConfig(
+            design=design,
+            model=MODELS.get(model or "opus", model),
+            effort=effort or "low",
+            excluded_kinds=excluded_kinds,
+        )
+        qa = BuildingQA(config)
         return lambda item: qa.answer_item(item)
 
     return factory
@@ -100,5 +106,6 @@ VARIANTS: dict[str, Callable[[str | None, str | None], Variant]] = {
     "V2": agent_variant("typed"),
     "V3": agent_variant("code"),
     "V4": agent_variant("hybrid"),
+    "V5": agent_variant("rules+"),
     "oracle": oracle_variant,
 }

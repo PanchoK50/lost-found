@@ -44,10 +44,18 @@ def run(
     workers: int = 8,
     max_cost: float = 25.0,
     name: str | None = None,
+    leave_one_kind_out: bool = False,
 ) -> Path:
+    """leave_one_kind_out: answer each question with its own kind's typed tool, skill and template removed,
+    as if the kind were new (a proxy for unseen Sunday questions)."""
     items = sample(load_set(set_name), per_kind, kinds)
-    answer = VARIANTS[variant](model, effort)
-    run_name = name or "__".join(part for part in (set_name, variant, model, effort) if part)
+    if leave_one_kind_out:
+        factories = {kind: VARIANTS[variant](model, effort, excluded_kinds=frozenset({kind})) for kind in {i["kind"] for i in items}}
+        answer = lambda item: factories[item["kind"]](item)  # noqa: E731
+    else:
+        answer = VARIANTS[variant](model, effort)
+    suffix = "loko" if leave_one_kind_out else None
+    run_name = name or "__".join(part for part in (set_name, variant, model, effort, suffix) if part)
     RESULTS.mkdir(parents=True, exist_ok=True)
     path = RESULTS / f"{run_name}.jsonl"
     spent = 0.0
@@ -133,6 +141,7 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--max-cost", type=float, default=25.0)
     parser.add_argument("--name", default=None)
+    parser.add_argument("--leave-one-kind-out", action="store_true")
     arguments = parser.parse_args()
     run(
         arguments.variant,
@@ -144,6 +153,7 @@ def main() -> None:
         arguments.workers,
         arguments.max_cost,
         arguments.name,
+        arguments.leave_one_kind_out,
     )
 
 
