@@ -36,7 +36,15 @@ interface Props {
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
-interface Anchor { key: string; position: [number, number, number]; content: ReactNode }
+interface Anchor {
+  key: string;
+  position: [number, number, number];
+  content: ReactNode;
+  /** `above`: a callout that floats over its point with a tail, so the point itself stays visible. */
+  placement?: 'above' | 'center';
+  /** Anchors in a group are spread out so they never overlap (e.g. floor tags 3 m apart). */
+  group?: 'floors';
+}
 
 export default function BuildingScene({ building, directive, insets, onFocusFloor }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
@@ -77,24 +85,43 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         <Projector anchors={anchors} elements={elements} />
       </Canvas>
       <div className="scene-anchors" key={directiveKey}>
-        {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className="scene-anchor">{anchor.content}</div>)}
+        {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
     </div>
   );
 }
 
+const FLOOR_TAG_GAP_PX = 30;
+
 function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObject<Map<string, HTMLDivElement>> }) {
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
+    const placed: { anchor: Anchor; el: HTMLDivElement; x: number; y: number; visible: boolean }[] = [];
     for (const anchor of anchors) {
       const el = elements.current.get(anchor.key);
       if (!el) continue;
       const p = v.set(...anchor.position).project(camera);
+      placed.push({ anchor, el, x: ((p.x + 1) / 2) * size.width, y: ((1 - p.y) / 2) * size.height, visible: p.z < 1 });
+    }
+    // Floor tags: one evenly spaced column in floor order, centred where the floors are.
+    const floors = placed.filter(a => a.anchor.group === 'floors');
+    if (floors.length > 1) {
+      const order = [...floors].sort((a, b) => b.y - a.y); // lowest floor (largest y) first
+      const column = Math.max(...floors.map(a => a.x));
+      const mean = floors.reduce((sum, a) => sum + a.y, 0) / floors.length;
+      const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
+      order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
+    }
+    for (const { anchor, el, x, y, visible } of placed) {
       // Keep labels fully on screen; narrow phone screens otherwise clip long room names.
       const half = el.offsetWidth / 2, margin = 8;
-      const x = THREE.MathUtils.clamp(((p.x + 1) / 2) * size.width, half + margin, Math.max(half + margin, size.width - half - margin));
-      el.style.transform = `translate(${x}px, ${((1 - p.y) / 2) * size.height}px) translate(-50%, -50%)`;
-      el.style.visibility = p.z < 1 ? 'visible' : 'hidden';
+      const cx = THREE.MathUtils.clamp(x, half + margin, Math.max(half + margin, size.width - half - margin));
+      el.style.transform = anchor.placement === 'above'
+        ? `translate(${cx}px, ${y}px) translate(-50%, calc(-100% - 12px))`
+        : `translate(${cx}px, ${y}px) translate(-50%, -50%)`;
+      // The tail keeps pointing at the real spot when the label is pushed back on screen.
+      if (anchor.placement === 'above') el.style.setProperty('--tail-shift', `${x - cx}px`);
+      el.style.visibility = visible ? 'visible' : 'hidden';
     }
   });
   return null;
@@ -276,21 +303,29 @@ function worldAt(model: BuildingModel, poses: Map<string, FloorPose>, point: Flo
 function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, directive: SceneDirective): Anchor[] {
   const floorOf = new Map(model.floors.map(f => [f.floor.id, f]));
   const anchors: Anchor[] = [];
+  // Route stops are labelled at the exact point the route starts or ends, right above its marker.
+  const routeEnds = new Map<string, FloorPoint>();
+  for (const route of directive.routes ?? []) {
+    const pts = route.points ?? [], path = route.spacePath ?? [];
+    if (pts.length && path.length) { if (!routeEnds.has(path[0])) routeEnds.set(path[0], pts[0]); routeEnds.set(path.at(-1)!, pts.at(-1)!); }
+  }
   for (const h of directive.highlights ?? []) {
     const m = model.spaces.get(h.spaceId);
     const f = m && floorOf.get(m.space.floor_id);
     if (!h.label || !m || !f || !shown(poses, f.floor.id)) continue;
     const pose = poses.get(f.floor.id)!;
-    anchors.push({ key: `hl-${h.spaceId}`, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]], content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
+    const end = routeEnds.get(h.spaceId);
+    const position: [number, number, number] = end ? worldAt(model, poses, end, ROUTE_HEIGHT) : [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]];
+    anchors.push({ key: `hl-${h.spaceId}`, position, placement: 'above', content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
   }
   const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId) && marker.tone !== 'muted');
-  if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 3.6), content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
+  if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 2.9), placement: 'above', content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
   (directive.links ?? []).forEach((link, i) => {
     if (!link.label || !shown(poses, link.from.floorId) || !shown(poses, link.to.floorId)) return;
     const a = worldAt(model, poses, link.from, 1.2), b = worldAt(model, poses, link.to, 1.2);
     anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1, (a[2] + b[2]) / 2], content: <div className="scene-label scene-label--primary">{link.label}</div> });
   });
-  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), content: <div className="scene-label scene-label--closed">Closed</div> }));
+  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), placement: 'above', content: <div className="scene-label scene-label--closed">Closed</div> }));
   return anchors;
 }
 
@@ -298,6 +333,7 @@ function floorAnchors(model: BuildingModel, poses: Map<string, FloorPose>, onFoc
   // Down the right-hand edge of the building as seen from the default camera.
   return model.floors.map(f => ({
     key: `fl-${f.floor.id}`,
+    group: 'floors' as const,
     position: [model.box.maxX + 4, poses.get(f.floor.id)!.y + f.storey * 0.45, model.box.minZ],
     content: <button type="button" className="floor-tag-3d" onClick={() => onFocusFloor(f.floor.id)}>{f.floor.name}</button>,
   }));
@@ -308,7 +344,7 @@ function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceI
   const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
   if (!m || !f) return [];
   const pose = poses.get(f.floor.id)!;
-  return [{ key: `hv-${spaceId}`, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div> }];
+  return [{ key: `hv-${spaceId}`, placement: 'above', position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div> }];
 }
 
 /** Routes, link lines and markers, positioned against the target floor poses. */
@@ -324,7 +360,15 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
         <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.route} /></mesh>
       </group>
     ))}
-    {(directive.routes ?? []).map(route => (route.points ?? []).filter(p => shown(poses, p.floorId))).filter(points => points.length >= 2).map((points, i) => <RouteLine key={i} points={points.map(p => at(p, 1.6))} />)}
+    {(directive.routes ?? []).map(route => (route.points ?? []).filter(p => shown(poses, p.floorId))).filter(points => points.length >= 2).map((points, i) => <RouteLine key={i} points={points.map(p => at(p, ROUTE_HEIGHT))} />)}
+    {(directive.routes ?? []).map((route, i, all) => {
+      const pts = route.points ?? [];
+      const first = pts[0], last = pts.at(-1);
+      return <group key={`ends-${i}`}>
+        {i === 0 && first && shown(poses, first.floorId) && <RouteEnd kind="origin" position={at(first, ROUTE_HEIGHT)} />}
+        {last && shown(poses, last.floorId) && <RouteEnd kind={i === all.length - 1 ? 'destination' : 'stop'} position={at(last, ROUTE_HEIGHT)} />}
+      </group>;
+    })}
     {(directive.links ?? []).filter(link => visible([link.from, link.to])).map((link, i) => {
       const a = at(link.from, 1.2), b = at(link.to, 1.2);
       return <group key={i}>
@@ -333,6 +377,32 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
       </group>;
     })}
   </>;
+}
+
+const ROUTE_HEIGHT = 1.6;
+
+/** Route ends, styled like the directions panel: hollow ring = start, lime dot = destination. Constant size on screen. */
+function RouteEnd({ kind, position }: { kind: 'origin' | 'stop' | 'destination'; position: [number, number, number] }) {
+  const group = useRef<THREE.Group>(null);
+  const at = useMemo(() => new THREE.Vector3(...position), [position]);
+  useFrame(({ camera, size }) => {
+    if (!group.current || !(camera instanceof THREE.PerspectiveCamera)) return;
+    // World size of ~14 px at this distance.
+    const perPx = (2 * camera.position.distanceTo(at) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / size.height;
+    group.current.scale.setScalar(perPx * 14);
+  });
+  const [ring, centre, centreSize] = kind === 'origin' ? ['#1f2a1b', '#ffffff', 0.5] : kind === 'stop' ? [palette.primary, '#1f2a1b', 0.55] : ['#1f2a1b', palette.primary, 0.62];
+  // Transparent so they render in the same pass as the (transparent) room blocks, after them.
+  const disc = (radius: number, color: string, order: number) => (
+    <mesh renderOrder={order}><circleGeometry args={[radius, 40]} /><meshBasicMaterial color={color} transparent depthTest={false} depthWrite={false} /></mesh>
+  );
+  return (
+    <group ref={group} position={position} rotation-x={-Math.PI / 2}>
+      {disc(1.12, '#ffffff', 8)}
+      {disc(0.92, ring, 9)}
+      {disc(centreSize, centre, 10)}
+    </group>
+  );
 }
 
 /** Pulsing ring that marks where a route step happens. */
@@ -346,7 +416,7 @@ function Cursor({ position }: { position: [number, number, number] }) {
   });
   return (
     <group position={position}>
-      <mesh rotation-x={-Math.PI / 2} renderOrder={7}><circleGeometry args={[0.55, 32]} /><meshBasicMaterial color={palette.route} depthTest={false} /></mesh>
+      <mesh rotation-x={-Math.PI / 2} renderOrder={7}><circleGeometry args={[0.55, 32]} /><meshBasicMaterial color={palette.route} transparent depthTest={false} depthWrite={false} /></mesh>
       <mesh ref={ring} rotation-x={-Math.PI / 2} renderOrder={7}><ringGeometry args={[0.7, 0.95, 40]} /><meshBasicMaterial color={palette.primary} transparent depthTest={false} /></mesh>
     </group>
   );

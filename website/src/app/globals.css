@@ -116,6 +116,11 @@ button:disabled { cursor: default; }
 .scene-label--primary::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--accent); }
 .scene-label--secondary, .scene-label--muted, .scene-label--marker { background: #fff; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
 .scene-label--closed { background: #e5484d; color: #fff; }
+/* Callouts float above their point; the tail points at it (shifted if the label was pushed on screen). */
+.scene-anchor--above .scene-label, .scene-anchor--above .scene-tip { position: relative; }
+.scene-anchor--above .scene-label::after, .scene-anchor--above .scene-tip::after { content: ""; position: absolute; left: calc(50% + var(--tail-shift, 0px)); bottom: -5px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); background: inherit; border-right: inherit; border-bottom: inherit; }
+.scene-anchor--above .scene-label--primary::after { background: var(--ink); }
+.scene-anchor--above .scene-label--closed::after { background: #e5484d; }
 .scene-tip { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; padding: 8px 11px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; box-shadow: var(--shadow); pointer-events: none; animation: rise .2s ease both; }
 .scene-tip span { color: var(--muted); }
 /* The floor strip covers floor picking on phones; 3D floor tags are a desktop extra. */
