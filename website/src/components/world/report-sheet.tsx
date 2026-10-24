@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import type { Profile } from '@/lib/world/profile';
-import type { PinKind, WorldState } from '@/lib/world/types';
+import type { PinKind, WorldAction, WorldState } from '@/lib/world/types';
 import type { WorldActions } from './world-hud';
 import { Segmented } from './segmented';
 import { Sheet } from './sheet';
 import { SpaceSelect } from './space-select';
 
 type ReportKind = Exclude<PinKind, 'meet'>;
+/** A pin proposed in chat, to edit before posting. */
+export type ReportDraft = Extract<WorldAction, { type: 'pin.create' }>['pin'];
 const kinds: { value: ReportKind; label: string }[] = [
   { value: 'blocked', label: 'Blocked' }, { value: 'broken', label: 'Broken' }, { value: 'item', label: 'Item' },
   { value: 'event', label: 'Event' }, { value: 'info', label: 'Info' },
@@ -26,20 +28,24 @@ const suggest: Record<ReportKind, (place: string) => string> = {
  * Quick action "Report" (docs/MULTIPLAYER.md §11): pick what and where, check the preview, confirm (U8).
  * Blocked and broken reports on stairs, lifts or spaces close them for routing. Phase 2 routes this through chat proposals.
  */
-export function ReportSheet({ building, profile, world, floorId, act, onPosted, onClose }: {
+export function ReportSheet({ building, profile, world, floorId, initial, act, onPosted, onClose }: {
   building: Building;
   profile: Profile;
   world?: WorldState;
   /** The floor in view: a stair or lift report is pinned on this floor if it stops here. */
   floorId?: string;
+  initial?: ReportDraft;
   act: WorldActions['act'];
   onPosted(floorId: string): void;
   onClose(): void;
 }) {
-  const [kind, setKind] = useState<ReportKind>('blocked');
-  const [place, setPlace] = useState(profile.rooms[building.building.id] ?? '');
-  const [title, setTitle] = useState<string>();
-  const [detail, setDetail] = useState('');
+  const initialPlace = initial && building.vertical_connectors.some(c => c.id === initial.elementId) ? initial.elementId! : initial?.spaceId;
+  const [kind, setKind] = useState<ReportKind>(initial && initial.kind !== 'meet' ? initial.kind : 'blocked');
+  const [place, setPlace] = useState(initialPlace ?? profile.rooms[building.building.id] ?? '');
+  const [title, setTitle] = useState<string | undefined>(initial?.title);
+  const [detail, setDetail] = useState(initial?.detail ?? '');
+  // An item the chat recognised (e.g. a broken coffee machine) stays attached while the place is unchanged.
+  const assetId = initial?.assetId && place === initialPlace ? initial.assetId : undefined;
   const [step, setStep] = useState<'form' | 'preview'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -50,7 +56,7 @@ export function ReportSheet({ building, profile, world, floorId, act, onPosted, 
     : building.spaces.find(s => s.id === place);
   const placeName = connector?.name ?? space?.name ?? '';
   const finalTitle = (title ?? (placeName ? suggest[kind](placeName) : '')).trim();
-  const closes = kind === 'blocked' || kind === 'broken';
+  const closes = (kind === 'blocked' || kind === 'broken') && !assetId;
   const floor = building.floors.find(f => f.id === space?.floor_id);
 
   async function confirm() {
@@ -62,6 +68,8 @@ export function ReportSheet({ building, profile, world, floorId, act, onPosted, 
         kind, spaceId: space.id, title: finalTitle,
         detail: detail.trim() || undefined,
         elementId: closes ? (connector?.id ?? space.id) : undefined,
+        assetId,
+        position: assetId ? initial?.position : undefined,
         authorId: profile.id,
         audience: world?.mode === 'public' ? 'everyone' : 'team',
       },

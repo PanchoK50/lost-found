@@ -225,7 +225,7 @@ class WorldChat {
     const walk = theirs && this.graph().route(theirs.id, space.id);
     return this.reply(
       `Shall I ask ${player.name} to come to ${space.name}?${walk ? ` It's about ${minutes(walk.length)} min for them.` : ''}`,
-      { focus: this.focusOn(space), highlights: [{ spaceId: space.id, tone: 'primary', label: `Meet ${player.name} · ${space.name}` }, ...(theirs ? [{ spaceId: theirs.id, tone: 'secondary' as const, label: player.name }] : [])], routes: theirs && this.routeScene(theirs, space) },
+      { focus: this.focusOn(space), highlights: [{ spaceId: space.id, tone: 'primary', label: `Meet ${player.name} · ${space.name}` }, ...(theirs ? [{ spaceId: theirs.id, tone: 'secondary' as const }] : [])], routes: theirs && this.routeScene(theirs, space) },
       [{
         label: `Ask ${player.name} to come to ${space.name}`,
         detail: this.where(space),
@@ -251,7 +251,7 @@ class WorldChat {
         focus: this.focusOn(meet.space),
         highlights: [
           { spaceId: meet.space.id, tone: 'primary', label: `Meet here · ${a} / ${b} min` },
-          { spaceId: theirs.id, tone: 'secondary', label: player.name },
+          { spaceId: theirs.id, tone: 'secondary' },
         ],
         routes: this.routeScene(mine, meet.space),
       },

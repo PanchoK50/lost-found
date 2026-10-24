@@ -12,7 +12,9 @@ import { useProfile } from '@/lib/world/profile';
 import { useWorld } from '@/lib/world/use-world';
 import { WorldHud } from '@/components/world/world-hud';
 import { SettingsSheet } from '@/components/world/settings-sheet';
-import { ReportSheet } from '@/components/world/report-sheet';
+import { ReportSheet, type ReportDraft } from '@/components/world/report-sheet';
+import { ProposalCards } from '@/components/world/proposal-cards';
+import { SkillChips } from '@/components/world/skill-chips';
 import { PinCard } from '@/components/world/pin-card';
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
@@ -53,6 +55,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const category = useMemo(() => detectCategory(building), [building]);
   const [sheet, setSheet] = useState<'settings' | 'report'>();
   const closeSheet = useCallback(() => setSheet(undefined), []);
+  // A pin proposed in chat that the user wants to edit before posting.
+  const [reportDraft, setReportDraft] = useState<ReportDraft>();
   const [pinId, setPinId] = useState<string>();
   const closePin = useCallback(() => setPinId(undefined), []);
   const openPin = world?.pins.find(p => p.id === pinId);
@@ -101,7 +105,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     return () => window.removeEventListener('keydown', onKey);
   }, [showOverview]);
 
-  async function ask(text: string) {
+  async function ask(text: string, skillId?: string) {
     const message = text.trim();
     if (!message || busy) return;
     const history = messages.map(({ role, content }) => ({ role, content }));
@@ -112,7 +116,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, playerId: profile?.id }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, playerId: profile?.id, skillId }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
@@ -184,6 +188,14 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                         onOverview={() => { setDirective(message.response!.scene); setActiveStep(undefined); }}
                       />
                     )}
+                    {message.response?.proposals?.length ? (
+                      <ProposalCards
+                        proposals={message.response.proposals}
+                        act={act}
+                        onEditPin={pin => { setReportDraft(pin); setSheet('report'); }}
+                        onEditText={() => { setDraft(messages.findLast(m => m.role === 'user' && m.id < message.id)?.content ?? ''); input.current?.focus(); }}
+                      />
+                    ) : null}
                   </article>)}
               {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
               <div ref={transcriptEnd} />
@@ -197,15 +209,16 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             <h1>Ask me anything.</h1>
           </div>}
           {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s} onClick={() => void ask(s)}>{s}</button>)}</div>}
+          {world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />}
           <form className="ask" onSubmit={submit}>
-            <button type="button" className="ask-plus" onClick={() => setSheet('report')} disabled={!profile} aria-label="Report something">+</button>
+            <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>
             <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
           </form>
         </section>
       </div>
 
-      {sheet === 'report' && profile && <ReportSheet building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
+      {sheet === 'report' && profile && <ReportSheet key={JSON.stringify(reportDraft ?? null)} initial={reportDraft} building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}
       {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
 

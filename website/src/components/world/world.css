@@ -85,3 +85,25 @@
 .person-row .person-dot { width: 32px; height: 32px; margin: 0; font-size: 12px; }
 .person-row strong { display: block; font-size: 14px; }
 .person-row small { display: block; font-size: 12px; color: var(--muted); }
+
+/* Proposal cards in the transcript */
+.proposals { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.proposal { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; animation: rise .35s ease both; }
+.proposal--posted { border-left-color: var(--ink); }
+.proposal-text strong { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.proposal-text small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.proposal-text .proposal-error { color: #b4232a; }
+.proposal-actions { display: flex; gap: 8px; }
+.proposal-actions .button { min-height: 40px; }
+.proposal-done { font-size: 13px; font-weight: 600; color: #2f6f2a; }
+
+/* Skill chips above the ask bar */
+.skill-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.skill-chips::-webkit-scrollbar { display: none; }
+.skill-chips button { flex: none; min-height: 40px; padding: 0 14px; border: 1px solid #c9e07a; border-radius: 999px; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 13px; font-weight: 600; color: var(--ink); }
+.skill-chips--match button { background: var(--accent); border-color: var(--accent); }
+@media (min-width: 900px) {
+  .skill-chips { justify-content: center; }
+  .skill-chips button { min-height: 34px; font-size: 12px; }
+  .skill-chips button:hover { background: #fff; }
+}
