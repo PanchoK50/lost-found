@@ -75,3 +75,10 @@
   .sheet { left: auto; right: 20px; top: 76px; bottom: auto; width: 380px; max-height: calc(100dvh - 120px); border-radius: 20px; padding: 8px 18px 18px; }
   .ask .ask-plus { width: 32px; height: 32px; }
 }
+
+.sheet .field-label { margin: 12px 0 6px; font-size: 13px; color: var(--muted); }
+.sheet .field-label:first-of-type { margin-top: 0; }
+.person-row { display: flex; align-items: center; gap: 10px; margin: 0; padding: 6px 0; }
+.person-row .person-dot { width: 32px; height: 32px; margin: 0; font-size: 12px; }
+.person-row strong { display: block; font-size: 14px; }
+.person-row small { display: block; font-size: 12px; color: var(--muted); }

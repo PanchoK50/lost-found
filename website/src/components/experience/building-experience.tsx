@@ -1,12 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import type { Building } from '@/lib/buildings/types';
 import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
+import { detectCategory } from '@/lib/world/mode';
+import { useProfile } from '@/lib/world/profile';
+import { useWorld } from '@/lib/world/use-world';
+import { WorldHud } from '@/components/world/world-hud';
+import { SettingsSheet } from '@/components/world/settings-sheet';
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
 
@@ -40,6 +45,12 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const [activeStep, setActiveStep] = useState<string>();
   const [insets, setInsets] = useState<SceneInsets>({ top: 0, left: 0, bottom: 0 });
   const wide = useWide();
+  // Multiplayer: the shared world of this building (docs/MULTIPLAYER.md).
+  const profile = useProfile();
+  const { world, act } = useWorld(building, profile);
+  const category = useMemo(() => detectCategory(building), [building]);
+  const [sheet, setSheet] = useState<'settings'>();
+  const closeSheet = useCallback(() => setSheet(undefined), []);
   const nextId = useRef(0);
   const transcriptEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -96,7 +107,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, playerId: profile?.id }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
@@ -114,7 +125,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} /></div>
+      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
@@ -122,6 +133,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           <nav className="building-switch" aria-label="Building">
             {buildings.map(b => <Link key={b.id} href={`/?building=${b.id}`} className={b.id === building.building.id ? 'active' : ''} aria-current={b.id === building.building.id ? 'page' : undefined}>{b.name}</Link>)}
           </nav>
+          <WorldHud world={world} playerId={profile?.id} onOpen={() => setSheet('settings')} />
         </header>
         <nav className="floor-rail" aria-label="Floors">
           <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
@@ -186,6 +198,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           </form>
         </section>
       </div>
+
+      {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
