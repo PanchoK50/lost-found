@@ -10,7 +10,10 @@ export interface RoundOutcome {
   answer: Space;
   guess: Space;
   distance: GuessDistance;
+  /** Points after the clues bought this round. */
   points: number;
+  /** Points spent on detective clues. */
+  penalty: number;
   sameFloor: boolean;
 }
 
@@ -52,13 +55,14 @@ export function RoundResult({ outcome, round, rounds, floorName, onNext }: Round
       {bullseye && <Confetti />}
       <p className={styles.resultPoints}><strong>{shown.toLocaleString('en')}</strong> points</p>
       <div className={styles.bar} aria-hidden><span style={{ width: `${(shown / MAX_POINTS) * 100}%` }} /></div>
+      {outcome.penalty > 0 && <p className={styles.penalty}>🔎 −{outcome.penalty.toLocaleString('en')} for clues</p>}
       <p className={styles.resultLine}>
         {bullseye
           ? <>🎯 <b>Bullseye!</b> You were right there.</>
           : <>Your guess was <b>{metres(outcome.distance.metres)}</b> {outcome.distance.walked ? 'away on foot' : 'away (no walking route, 1.5× straight line)'}.</>}
       </p>
       <p className={styles.resultAnswer}>It was <b>{roomName(outcome.answer)}</b> · {floorName(outcome.answer.floor_id)}</p>
-      <blockquote className={styles.quip}>“{verdict(outcome.points, outcome.distance.metres, outcome.sameFloor)}” <cite>— the building</cite></blockquote>
+      <blockquote className={styles.quip}>“{verdict(outcome.points, outcome.distance.metres, outcome.sameFloor, outcome.penalty > 0)}” <cite>— the building</cite></blockquote>
       <button type="button" className={styles.primary} onClick={onNext} autoFocus>{last ? 'See results' : 'Next round'} <kbd>↵</kbd></button>
     </section>
   );

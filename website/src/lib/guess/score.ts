@@ -47,8 +47,9 @@ export function emojiFor(score: number): string {
 }
 
 /** The building comments on your guess, in the first person (§5). */
-export function verdict(score: number, metres: number, sameFloor: boolean): string {
-  if (score === MAX_POINTS) return 'You know me better than my caretaker.';
+export function verdict(score: number, metres: number, sameFloor: boolean, cluesBought = false): string {
+  if (metres <= 0) return 'You know me better than my caretaker.';
+  if (cluesBought) return 'Cheating is allowed. But I\'ll remember.';
   if (!sameFloor) return 'Cold. Very cold. Wrong floor entirely.';
   if (metres > 100) return 'That\'s not even the same wing.';
   if (score >= 4000) return 'So close I can feel it.';
