@@ -30,6 +30,7 @@ export function DirectionsPanel({ building, response, open, active, onStep, onOv
         <span>Directions · {total} steps</span>
         {active && <button type="button" className="directions-overview" onClick={event => { event.preventDefault(); onOverview(); }}>Whole route</button>}
       </summary>
+      <p className="directions-hint">Tap a step to see it on the map.</p>
       <Place kind="origin" {...place(legs[0].spacePath![0])} />
       {legs.map((leg, l) => {
         const end = leg.spacePath!.at(-1)!;
@@ -46,6 +47,10 @@ export function DirectionsPanel({ building, response, open, active, onStep, onOv
                       <span className="maneuver-text">
                         {step.text}
                         {step.note && <span className="maneuver-note"><i aria-hidden>i</i>{step.note}</span>}
+                      </span>
+                      <span className="maneuver-show" aria-hidden>
+                        <svg viewBox="0 0 12 12"><path d="M6 11s4-3.6 4-6.4A4 4 0 0 0 2 4.6C2 7.4 6 11 6 11Z" fill="none" stroke="currentColor" strokeWidth="1.4" /><circle cx="6" cy="4.7" r="1.3" fill="currentColor" /></svg>
+                        {active === key ? 'Shown' : 'Show'}
                       </span>
                     </button>
                     <div className="maneuver-distance"><span>{step.floors ? `${step.floors} floor${step.floors === 1 ? '' : 's'}` : formatDistance(step.distance)}</span><hr /></div>

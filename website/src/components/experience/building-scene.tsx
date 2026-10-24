@@ -69,6 +69,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
     ...(hovered && !overview ? hoverAnchor(model, poses, hovered) : []),
   ], [model, poses, directive, overview, onFocusFloor, hovered]);
+  const routePaths = useMemo(() => (directive.routes ?? []).map(r => (r.points ?? []).filter(p => shown(poses, p.floorId)).map(p => worldAt(model, poses, p, ROUTE_HEIGHT))), [directive.routes, model, poses]);
   const elements = useRef(new Map<string, HTMLDivElement>());
   const register = useCallback((key: string) => (el: HTMLDivElement | null) => {
     if (el) elements.current.set(key, el); else elements.current.delete(key);
@@ -95,7 +96,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         {directive.focus.mode === 'floor' && directive.focus.around && (
           <Cursor key={`cursor-${directiveKey}`} position={worldAt(model, poses, { floorId: directive.focus.floorId, position: directive.focus.around }, 1.7)} />
         )}
-        <Projector anchors={anchors} elements={elements} topInset={insets.top} />
+        <Projector anchors={anchors} elements={elements} topInset={insets.top} paths={routePaths} />
       </Canvas>
       <div className="scene-anchors" key={directiveKey}>
         {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className="scene-anchor">{anchor.content}</div>)}
@@ -109,9 +110,24 @@ const EDGE_MARGIN_PX = 14;
 const TAIL_PX = 12;
 
 type Rect = { l: number; t: number; r: number; b: number };
+type Side = 'above' | 'below' | 'right' | 'left' | 'center';
+
+/** Does a screen segment cross a rectangle (with a few pixels of padding)? */
+function segmentHitsRect([x1, y1, x2, y2]: [number, number, number, number], r: Rect, pad = 4) {
+  const l = r.l - pad, t = r.t - pad, rr = r.r + pad, b = r.b + pad;
+  const inside = (x: number, y: number) => x >= l && x <= rr && y >= t && y <= b;
+  if (inside(x1, y1) || inside(x2, y2)) return true;
+  const cross = (ax: number, ay: number, bx: number, by: number) => {
+    const d = (x2 - x1) * (by - ay) - (y2 - y1) * (bx - ax);
+    if (!d) return false;
+    const u = ((ax - x1) * (by - ay) - (ay - y1) * (bx - ax)) / d, w = ((ax - x1) * (y2 - y1) - (ay - y1) * (x2 - x1)) / d;
+    return u >= 0 && u <= 1 && w >= 0 && w <= 1;
+  };
+  return cross(l, t, rr, t) || cross(rr, t, rr, b) || cross(rr, b, l, b) || cross(l, b, l, t);
+}
 const overlaps = (a: Rect, b: Rect) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
 
-function Projector({ anchors, elements, topInset }: { anchors: Anchor[]; elements: RefObject<Map<string, HTMLDivElement>>; topInset: number }) {
+function Projector({ anchors, elements, topInset, paths }: { anchors: Anchor[]; elements: RefObject<Map<string, HTMLDivElement>>; topInset: number; paths: [number, number, number][][] }) {
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
     const placed: { anchor: Anchor; el: HTMLDivElement; x: number; y: number; visible: boolean }[] = [];
@@ -130,31 +146,50 @@ function Projector({ anchors, elements, topInset }: { anchors: Anchor[]; element
       const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
       order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
     }
-    // Callouts: highest priority first; each tries above its point, then below, else hides.
+    // Route polylines on screen: labels must not cover the path, e.g. where it leaves the start room.
+    const segments: [number, number, number, number][] = [];
+    for (const path of paths) {
+      let prev: [number, number] | undefined;
+      for (const point of path) {
+        const p = v.set(...point).project(camera);
+        const cur: [number, number] = [((p.x + 1) / 2) * size.width, ((1 - p.y) / 2) * size.height];
+        if (prev && p.z < 1) segments.push([prev[0], prev[1], cur[0], cur[1]]);
+        prev = cur;
+      }
+    }
+    // Callouts: highest priority first; each takes the first side (above, below, right, left) that is free.
     const taken: Rect[] = [];
     const callouts = placed.filter(a => a.anchor.group !== 'floors').sort((a, b) => (b.anchor.priority ?? 1) - (a.anchor.priority ?? 1));
     for (const item of [...placed.filter(a => a.anchor.group === 'floors'), ...callouts]) {
       const { anchor, el, x, y, visible } = item;
       const w = el.offsetWidth, h = el.offsetHeight, half = w / 2;
-      const cx = THREE.MathUtils.clamp(x, half + EDGE_MARGIN_PX, Math.max(half + EDGE_MARGIN_PX, size.width - half - EDGE_MARGIN_PX));
-      let side: 'above' | 'below' | 'center' = anchor.placement === 'above' ? 'above' : 'center';
-      const rect = (s: typeof side): Rect => s === 'above' ? { l: cx - half, r: cx + half, t: y - h - TAIL_PX, b: y - TAIL_PX }
-        : s === 'below' ? { l: cx - half, r: cx + half, t: y + TAIL_PX, b: y + h + TAIL_PX }
-        : { l: cx - half, r: cx + half, t: y - h / 2, b: y + h / 2 };
+      const clampX = (cx: number) => THREE.MathUtils.clamp(cx, half + EDGE_MARGIN_PX, Math.max(half + EDGE_MARGIN_PX, size.width - half - EDGE_MARGIN_PX));
+      const place = (s: Side): { rect: Rect; cx: number; cy: number } => {
+        if (s === 'right') return { cx: x + TAIL_PX + half, cy: y, rect: { l: x + TAIL_PX, r: x + TAIL_PX + w, t: y - h / 2, b: y + h / 2 } };
+        if (s === 'left') return { cx: x - TAIL_PX - half, cy: y, rect: { l: x - TAIL_PX - w, r: x - TAIL_PX, t: y - h / 2, b: y + h / 2 } };
+        const cx = clampX(x);
+        if (s === 'above') return { cx, cy: y - TAIL_PX - h / 2, rect: { l: cx - half, r: cx + half, t: y - h - TAIL_PX, b: y - TAIL_PX } };
+        if (s === 'below') return { cx, cy: y + TAIL_PX + h / 2, rect: { l: cx - half, r: cx + half, t: y + TAIL_PX, b: y + h + TAIL_PX } };
+        return { cx, cy: y, rect: { l: cx - half, r: cx + half, t: y - h / 2, b: y + h / 2 } };
+      };
+      const free = (r: Rect) => r.t >= topInset + 4 && r.l >= 4 && r.r <= size.width - 4 && !taken.some(t => overlaps(t, r)) && !segments.some(seg => segmentHitsRect(seg, r));
+      let side: Side = anchor.placement === 'above' ? 'above' : 'center';
       let show = visible;
-      // Labels never go under the header or floor strip: flip below their point instead.
-      const blocked = (r: Rect) => r.t < topInset + 4 || taken.some(t => overlaps(t, r));
-      if (show && side === 'above' && blocked(rect('above'))) {
-        if (!blocked(rect('below'))) side = 'below';
-        else show = (anchor.priority ?? 1) >= 3; // keep the answer itself even if crowded
+      if (show && side === 'above') {
+        const sides = ['above', 'below', 'right', 'left'] as const;
+        const onScreen = (r: Rect) => r.t >= topInset + 4 && r.b <= size.height - 4 && r.l >= 4 && r.r <= size.width - 4;
+        const choice = sides.find(s => free(place(s).rect));
+        if (choice) side = choice;
+        // Route stops and the answer always stay: first avoid other labels (even if touching the line), then just stay on screen.
+        else if ((anchor.priority ?? 1) >= 2.5) side = sides.find(s => onScreen(place(s).rect) && !taken.some(t => overlaps(t, place(s).rect))) ?? sides.find(s => onScreen(place(s).rect)) ?? 'above';
+        else show = false;
       }
-      if (show) taken.push(rect(side));
+      const { rect, cx, cy } = place(side);
+      if (show) taken.push(rect);
       el.dataset.side = side;
-      el.style.transform = side === 'above' ? `translate(${cx}px, ${y}px) translate(-50%, calc(-100% - ${TAIL_PX}px))`
-        : side === 'below' ? `translate(${cx}px, ${y}px) translate(-50%, ${TAIL_PX}px)`
-        : `translate(${cx}px, ${y}px) translate(-50%, -50%)`;
+      el.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%)`;
       // The tail keeps pointing at the real spot when the label is pushed back on screen.
-      if (side !== 'center') el.style.setProperty('--tail-shift', `${x - cx}px`);
+      el.style.setProperty('--tail-shift', `${x - cx}px`);
       el.style.visibility = show ? 'visible' : 'hidden';
     }
   });
@@ -181,7 +216,7 @@ function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; 
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.8 : 0.9);
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.68 : 0.9);
     const polar = directive.focus.mode === 'floor' ? 0.62 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);

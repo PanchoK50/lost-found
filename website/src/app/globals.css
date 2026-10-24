@@ -67,7 +67,7 @@ button:disabled { cursor: default; }
 .hero { text-align: center; padding: 0 8px; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; }
 .hero h1 { margin: 0; font-size: 34px; letter-spacing: -.03em; font-weight: 600; line-height: 1.05; color: var(--ink); }
-.hero .agent-avatar { margin: 0 auto 12px; }
+.hero .agent-avatar { margin: 0 auto 14px; }
 .chips { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; margin: 0 -10px; padding: 2px 10px; }
 .chips button { color: var(--ink); font-weight: 500; flex: none; scroll-snap-align: start; max-width: 78vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 999px; padding: 11px 14px; font-size: 13px; }
 .ask { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 18px; background: #fff; border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); }
@@ -85,7 +85,7 @@ button:disabled { cursor: default; }
 .sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: #c5ccd8; }
 .bubble { margin: 0; line-height: 1.5; max-width: 92%; animation: rise .35s ease both; }
 .bubble--user { align-self: flex-end; background: var(--ink); color: #fff; padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 14px; }
-.bubble--assistant { align-self: stretch; max-width: 100%; display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; }
+.bubble--assistant { align-self: stretch; max-width: 100%; display: grid; grid-template-columns: 30px 1fr; column-gap: 10px; }
 .bubble--assistant > .agent-avatar { grid-row: 1 / span 9; margin-top: 2px; }
 .bubble--assistant > :not(.agent-avatar) { grid-column: 2; }
 .bubble--assistant p { margin: 0; color: var(--text); font-size: 14px; }
@@ -116,8 +116,14 @@ button:disabled { cursor: default; }
 .place--stop .place-dot { border-color: #8a3fc4; }
 .place--destination .place-dot { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 3px, #fff 3.5px); }
 .maneuvers { list-style: none; margin: 0; padding: 0; }
-.maneuver { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 6px; margin: 0 -6px; border: 0; border-radius: 10px; background: transparent; text-align: left; font-size: 14px; line-height: 1.4; color: var(--ink); transition: background .15s; }
-.maneuver:active, .maneuver--active { background: var(--accent-soft); }
+.maneuver { display: flex; align-items: flex-start; gap: 12px; width: calc(100% + 12px); padding: 10px 6px; margin: 0 -6px; border: 1px solid transparent; border-radius: 12px; background: transparent; text-align: left; font-size: 14px; line-height: 1.4; color: var(--ink); transition: background .15s, border-color .15s; }
+.maneuver-text { flex: 1; }
+/* Each step is a button that flies the map there: a "show on map" chip says so. */
+.maneuver-show { flex: none; display: inline-flex; align-items: center; gap: 4px; align-self: center; padding: 4px 9px; border-radius: 999px; background: #eef3fb; color: var(--blue); font-size: 12px; font-weight: 600; }
+.maneuver-show svg { width: 12px; height: 12px; }
+.maneuver:active, .maneuver--active { background: var(--accent-soft); border-color: transparent; }
+.maneuver--active .maneuver-show { background: var(--ink); color: #fff; }
+.directions-hint { margin: -4px 0 6px; font-size: 12px; color: var(--muted); }
 .turn-icon { flex: none; color: var(--blue); margin-top: -1px; }
 .maneuver-text { display: flex; flex-direction: column; gap: 4px; }
 .maneuver-note { display: flex; align-items: center; gap: 6px; color: var(--blue); font-weight: 600; font-size: 13px; }
@@ -128,26 +134,15 @@ button:disabled { cursor: default; }
 @media (min-width: 900px) {
   .directions { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; margin-top: 10px; }
   .transcript:has(.directions[open]) { max-height: none; }
-  .maneuver:hover { background: #f4f6fa; }
+  .maneuver:hover { background: #f4f6fa; border-color: var(--line); }
 }
 .bubble--thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
 
-/* The assistant, after Synera's agent: a navy visor with a light-blue voice-wave. The wave moves while it thinks. */
-.agent-avatar { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: radial-gradient(120% 90% at 50% 30%, #1d3f9e, var(--ink)); box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .25), 0 2px 6px rgba(0, 36, 120, .2); }
-.agent-avatar span { display: flex; align-items: center; gap: 2px; height: 50%; }
-.agent-avatar i { width: 2px; border-radius: 2px; background: #cfe9ff; box-shadow: 0 0 4px var(--blue-weak); }
-.agent-avatar i:nth-child(1), .agent-avatar i:nth-child(5) { height: 30%; }
-.agent-avatar i:nth-child(2), .agent-avatar i:nth-child(4) { height: 65%; }
-.agent-avatar i:nth-child(3) { height: 100%; }
-.agent-avatar--lg { width: 56px; height: 56px; border-radius: 18px; }
-.agent-avatar--lg span { gap: 4px; }
-.agent-avatar--lg i { width: 4px; }
-.agent-avatar--thinking i { animation: wave .9s ease-in-out infinite; }
-.agent-avatar--thinking i:nth-child(2) { animation-delay: .1s; }
-.agent-avatar--thinking i:nth-child(3) { animation-delay: .2s; }
-.agent-avatar--thinking i:nth-child(4) { animation-delay: .3s; }
-.agent-avatar--thinking i:nth-child(5) { animation-delay: .4s; }
-@keyframes wave { 50% { transform: scaleY(.35); } }
+/* The assistant, after Synera's agent robots (SVG in building-experience.tsx). */
+.agent-avatar { display: block; flex: none; width: 30px; height: 30px; filter: drop-shadow(0 2px 4px rgba(0, 36, 120, .18)); }
+.agent-avatar--lg { width: 72px; height: 72px; filter: drop-shadow(0 8px 16px rgba(0, 36, 120, .18)); }
+.agent-avatar--thinking .agent-face { animation: agent-think 1.1s ease-in-out infinite; transform-origin: 32px 29.5px; }
+@keyframes agent-think { 50% { opacity: .45; transform: scaleY(.6); } }
 
 /* Labels pinned to the 3D model */
 .scene-anchors { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -160,11 +155,12 @@ button:disabled { cursor: default; }
 .scene-label--closed { background: #e5484d; color: #fff; }
 /* Callouts float above their point; the tail points at it (shifted if the label was pushed on screen). */
 .scene-anchor[data-side] .scene-label, .scene-anchor[data-side] .scene-tip { position: relative; }
-.scene-anchor[data-side="above"] .scene-label::after, .scene-anchor[data-side="above"] .scene-tip::after,
-.scene-anchor[data-side="below"] .scene-label::after, .scene-anchor[data-side="below"] .scene-tip::after { content: ""; position: absolute; left: calc(50% + var(--tail-shift, 0px)); width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); background: inherit; }
-.scene-anchor[data-side="above"] .scene-label::after, .scene-anchor[data-side="above"] .scene-tip::after { bottom: -5px; border-right: inherit; border-bottom: inherit; }
-/* Flipped below its point (another label was in the way): the tail points up. */
-.scene-anchor[data-side="below"] .scene-label::after, .scene-anchor[data-side="below"] .scene-tip::after { top: -5px; border-left: inherit; border-top: inherit; }
+.scene-anchor:not([data-side="center"]) .scene-label::after, .scene-anchor:not([data-side="center"]) .scene-tip::after { content: ""; position: absolute; width: 10px; height: 10px; transform: rotate(45deg); background: inherit; }
+/* The tail points at the spot: down when above it, up when below, sideways when beside it. */
+.scene-anchor[data-side="above"] .scene-label::after, .scene-anchor[data-side="above"] .scene-tip::after { left: calc(50% + var(--tail-shift, 0px)); margin-left: -5px; bottom: -5px; border-right: inherit; border-bottom: inherit; }
+.scene-anchor[data-side="below"] .scene-label::after, .scene-anchor[data-side="below"] .scene-tip::after { left: calc(50% + var(--tail-shift, 0px)); margin-left: -5px; top: -5px; border-left: inherit; border-top: inherit; }
+.scene-anchor[data-side="right"] .scene-label::after, .scene-anchor[data-side="right"] .scene-tip::after { left: -5px; top: 50%; margin-top: -5px; border-left: inherit; border-bottom: inherit; }
+.scene-anchor[data-side="left"] .scene-label::after, .scene-anchor[data-side="left"] .scene-tip::after { right: -5px; top: 50%; margin-top: -5px; border-right: inherit; border-top: inherit; }
 .scene-anchor[data-side] .scene-label--primary::after { background: var(--ink); }
 .scene-anchor[data-side] .scene-label--closed::after { background: #e5484d; }
 .scene-tip { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; padding: 8px 11px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; box-shadow: var(--shadow); pointer-events: none; animation: rise .2s ease both; }
@@ -197,6 +193,9 @@ button:disabled { cursor: default; }
 
   .console { display: contents; }
   .dock { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(760px, calc(100% - 48px)); gap: 14px; }
+  /* Start screen: the model owns the upper part, the hero and input sit lower with room to breathe. */
+  .experience:not(.experience--started) .dock { bottom: clamp(32px, 8vh, 96px); gap: 22px; }
+  .experience:not(.experience--started) .hero .eyebrow { margin-bottom: 10px; }
   .experience--started .dock { left: calc(50% + 200px); width: min(640px, calc(100% - 480px)); }
   .hero h1 { font-size: clamp(34px, 4.4vw, 52px); }
   .chips { flex-wrap: wrap; justify-content: center; overflow: visible; margin: 0; padding: 0; order: 2; }

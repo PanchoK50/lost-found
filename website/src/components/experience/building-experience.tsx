@@ -231,12 +231,32 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   );
 }
 
-/** The building's assistant, after Synera's agents: a navy visor with a voice-wave that moves while it thinks. */
+/**
+ * The building's assistant, drawn after Synera's agent robots: a glossy white head with a navy visor and a
+ * glowing light-blue face. The face pulses while it thinks.
+ */
 function AgentAvatar({ thinking = false, size }: { thinking?: boolean; size?: 'lg' }) {
   return (
-    <span className={`agent-avatar${size === 'lg' ? ' agent-avatar--lg' : ''}${thinking ? ' agent-avatar--thinking' : ''}`} aria-hidden>
-      <span><i /><i /><i /><i /><i /></span>
-    </span>
+    <svg className={`agent-avatar${size === 'lg' ? ' agent-avatar--lg' : ''}${thinking ? ' agent-avatar--thinking' : ''}`} viewBox="0 0 64 64" aria-hidden>
+      <defs>
+        <radialGradient id="agent-head" cx="40%" cy="28%" r="80%"><stop offset="0" stopColor="#ffffff" /><stop offset=".7" stopColor="#eef1f6" /><stop offset="1" stopColor="#cfd6e2" /></radialGradient>
+        <linearGradient id="agent-visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1b2a6b" /><stop offset=".55" stopColor="#0b1440" /><stop offset="1" stopColor="#3a2c8f" /></linearGradient>
+        <filter id="agent-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      {/* head */}
+      <rect x="4" y="5" width="56" height="52" rx="24" fill="url(#agent-head)" stroke="#d3dae6" strokeWidth="1" />
+      {/* visor */}
+      <rect x="11" y="17" width="42" height="25" rx="12.5" fill="url(#agent-visor)" />
+      <ellipse cx="25" cy="21.5" rx="10" ry="2.2" fill="#ffffff" opacity=".18" />
+      {/* face: Synera's glowing dot-and-bar pattern */}
+      <g className="agent-face" fill="#bfe3ff" filter="url(#agent-glow)">
+        <circle cx="20" cy="29.5" r="1.6" />
+        <rect x="24" y="26" width="3" height="7" rx="1.5" />
+        <rect x="29.5" y="23.5" width="3" height="12" rx="1.5" />
+        <rect x="35" y="26" width="3" height="7" rx="1.5" />
+        <circle cx="42.5" cy="29.5" r="1.6" />
+      </g>
+    </svg>
   );
 }
 
