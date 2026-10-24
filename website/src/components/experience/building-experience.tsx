@@ -318,7 +318,10 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
         </section>
       </div>
 
-      {profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('messages')} />}
+      {profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('messages')} onShareLocation={() => {
+        if (profile && settings?.share === 'off') saveProfile({ ...profile, settings: { ...profile.settings, share: 'team' } });
+        setSheet('location');
+      }} />}
       {sheet === 'messages' && profile && settings && <MessagesSheet building={building} profile={profile} world={world} pingFrom={settings.pingFrom} act={act} onGo={routeTo} onClose={closeSheet} />}
       {openPerson && profile && <PersonCard key={openPerson.id} player={openPerson} building={building} profile={profile} world={world} act={act} onRoute={routeTo} onAsk={name => { setDraft(`@${name} `); input.current?.focus(); }} onClose={closePerson} />}
       {sheet === 'report' && profile && <ReportSheet key={JSON.stringify(reportDraft ?? null)} initial={reportDraft} building={building} profile={profile} world={world} floorId={focusedFloor} act={act} onPosted={focusFloor} onClose={closeSheet} />}

@@ -52,7 +52,7 @@ export interface Pin {
 }
 
 /** `ask`: a direct question to one person ("@Tom where is the key?"); `ask_crowd`: the same to everyone here. */
-export type PingKind = 'come_to_me' | 'meet_halfway' | 'pick_up' | 'help' | 'ask' | 'ask_crowd';
+export type PingKind = 'come_to_me' | 'meet_halfway' | 'pick_up' | 'help' | 'ask' | 'ask_crowd' | 'share_location';
 export interface Ping {
   id: string;
   kind: PingKind;
@@ -66,6 +66,8 @@ export interface Ping {
   expiresAt: number;
   status: 'sent' | 'accepted' | 'declined' | 'done';
   answers?: { playerId: string; text: string; at: number }[];   // ask, ask_crowd
+  /** Group pings: each recipient's own reaction; the ping stays open for everyone who has not reacted. */
+  responses?: { playerId: string; status: 'accepted' | 'declined' | 'done'; at: number }[];
 }
 
 export interface Skill {
@@ -94,6 +96,8 @@ export interface WorldState {
   pins: Pin[];                 // active and unconfirmed only
   pings: Ping[];               // only pings sent to or by the requester
   skills: Skill[];
+  /** Accounts with the app open right now, whether or not they share a location. */
+  online?: string[];
 }
 
 export type WorldAction =

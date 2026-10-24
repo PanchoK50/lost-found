@@ -29,6 +29,8 @@ export function SettingsSheet({ building, profile, world, category, act, onClose
   const buildingId = building.building.id;
   const mode: MultiplayerMode = world?.mode ?? 'team';
   const settings = settingsFor(profile, mode);
+  const sharingIds = new Set((world?.presence ?? []).map(p => p.playerId));
+  const onlineOnly = (world?.online ?? []).filter(id => !sharingIds.has(id)).map(id => world!.players.find(p => p.id === id)).filter(p => p !== undefined);
   const [name, setName] = useState(profile.name);
   const [groups, setGroups] = useState(profile.groups.join(', '));
   const [error, setError] = useState<string>();
@@ -100,6 +102,13 @@ export function SettingsSheet({ building, profile, world, category, act, onClose
           return <p key={presence.playerId} className="person-row"><span className={`person-dot${player!.demo ? ' person-dot--demo' : ''}`}>{player!.initials}</span><span><strong>{player!.name}{player!.id === profile.id ? ' (you)' : ''}</strong><small>{where}</small></span></p>;
         }) : <p className="hint">Nobody is sharing their location right now.</p>}
       </section>
+
+      {onlineOnly.length > 0 && <section>
+        <h3>Online now</h3>
+        {onlineOnly.map(player => (
+          <p key={player.id} className="person-row"><span className="person-dot">{player.initials}</span><span><strong>{player.name}{player.id === profile.id ? ' (you)' : ''}</strong><small>Online · not sharing a location</small></span></p>
+        ))}
+      </section>}
     </Sheet>
   );
 }

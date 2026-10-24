@@ -2,6 +2,7 @@ import { getCatalogEntry } from '@/lib/buildings/catalog';
 import { viewFor, WorldError } from '@/lib/world/rules';
 import { worldStore } from '@/lib/world/store';
 import { supabaseAdmin, supabaseConfigured, userFrom } from '@/lib/supabase/server';
+import { onlineIds, recordSeen } from '@/lib/world/online';
 import type { WorldAction } from '@/lib/world/types';
 
 // GET /api/world?buildingId=…&playerId=…&since=<version> → 200 WorldState, or 204 if nothing changed since `since`.
@@ -10,10 +11,14 @@ export async function GET(request: Request) {
   const entry = getCatalogEntry(params.get('buildingId') ?? undefined);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   const world = await worldStore.get(entry.building, Date.now());
-  if (Number(params.get('since')) === world.version) return new Response(null, { status: 204 });
+  // Polling with the app open marks a signed-in user as online, whether or not they share a location.
+  const user = await userFrom(request);
+  if (user) await recordSeen(user.id).catch(() => undefined);
+  const online = await onlineIds().catch(() => []);
+  if (Number(params.get('since')) === world.version && params.get('online') === online.join(',')) return new Response(null, { status: 204 });
   const playerId = params.get('playerId') ?? undefined;
   // Accounts are known by name to everyone (for @ and pings); where they are stays private to their audience.
-  return Response.json({ ...viewFor(world, playerId), players: world.players.filter(p => !p.demo || p.id === playerId) });
+  return Response.json({ ...viewFor(world, playerId), players: world.players.filter(p => !p.demo || p.id === playerId), online });
 }
 
 // POST /api/world, body: WorldAction → 200 { ok: true, state } or 400 { error }.
@@ -42,7 +47,8 @@ export async function POST(request: Request) {
   try {
     const world = await worldStore.apply(entry.building, action, Date.now());
     const actor = actorOf(action);
-    return Response.json({ ok: true, state: { ...viewFor(world, actor), players: world.players.filter(p => !p.demo || p.id === actor) } });
+    const online = await onlineIds().catch(() => []);
+    return Response.json({ ok: true, state: { ...viewFor(world, actor), players: world.players.filter(p => !p.demo || p.id === actor), online } });
   } catch (error) {
     if (error instanceof WorldError) return Response.json({ error: error.message }, { status: 400 });
     throw error;

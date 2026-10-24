@@ -36,13 +36,16 @@ export async function POST(request: Request) {
   let resolved: ChatResponse;
   const user = await userFrom(request);
   const directAsk = fromWorld?.response.proposals?.length === 1 ? fromWorld.response.proposals[0] : undefined;
-  if (fromWorld && directAsk?.action.type === 'ping.send' && directAsk.action.ping.kind === 'ask' && message.trimStart().startsWith('@')
+  if (fromWorld && directAsk?.action.type === 'ping.send' && (directAsk.action.ping.kind === 'ask' || directAsk.action.ping.kind === 'share_location') && message.includes('@')
       && playerId && (!supabaseConfigured || user?.id === playerId)) {
     // "@Rabea where is the key?" is an explicit message: send it now instead of asking for a confirm tap.
     try {
       await worldStore.apply(entry.building, directAsk.action, Date.now());
       const to = directAsk.label.replace(/^Ask\s+/i, '');
-      resolved = { ...fromWorld.response, proposals: undefined, source: 'world', reply: `Sent to ${to}. The answer shows up under Messages (✉).`, answer: { title: `Message to ${to}`, value: 'Sent' } };
+      const locationRequest = directAsk.action.ping.kind === 'share_location';
+      resolved = locationRequest
+        ? { ...fromWorld.response, proposals: undefined, source: 'world', reply: `${to} isn't sharing a location right now, so I asked them to share it. You'll see them on the map once they do.`, answer: { title: `Location request to ${to}`, value: 'Sent' } }
+        : { ...fromWorld.response, proposals: undefined, source: 'world', reply: `Sent to ${to}. The answer shows up under Messages (✉).`, answer: { title: `Message to ${to}`, value: 'Sent' } };
     } catch (error) {
       resolved = { ...fromWorld.response, source: 'world', reply: `I couldn't send it: ${error instanceof Error ? error.message : 'unknown error'}` };
     }

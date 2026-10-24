@@ -21,7 +21,9 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  const accept = useCallback((state: WorldState) => { version.current = state.version; setWorld(state); }, []);
+  // Who is online changes without a world version bump: the poll sends both, so the server answers 204 only if neither changed.
+  const onlineKey = useRef('');
+  const accept = useCallback((state: WorldState) => { version.current = state.version; onlineKey.current = (state.online ?? []).join(','); setWorld(state); }, []);
   // The signed-in user's access token, kept for the page-close beacon (which cannot send headers).
   const token = useRef<string | undefined>(undefined);
 
@@ -55,7 +57,8 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
     version.current = 0;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/world?buildingId=${encodeURIComponent(buildingId)}&playerId=${encodeURIComponent(playerId)}&since=${version.current}`, { cache: 'no-store' });
+        const params = new URLSearchParams({ buildingId, playerId, since: String(version.current), online: onlineKey.current });
+        const res = await fetch(`/api/world?${params}`, { cache: 'no-store', headers: await authHeader() });
         if (alive && res.status === 200) accept(await res.json());
       } catch { /* offline for a moment; the next poll retries */ }
     };
