@@ -111,7 +111,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
       const dockTop = dock.current?.getBoundingClientRect().top ?? h;
       const sheet = transcript.current?.getBoundingClientRect();
       const next = wide
-        ? { top, left: sheet ? sheet.right : 0, bottom: h - dockTop }
+        // Desktop conversation: messages and input form one left column, so only the left side is covered.
+        ? { top, left: sheet ? sheet.right : 0, bottom: started ? 0 : h - dockTop }
         : { top, left: 0, bottom: h - Math.min(dockTop, sheet?.top ?? h) };
       const round = (v: number) => Math.round(v / 8) * 8;
       setInsets(prev => (round(prev.top) === round(next.top) && round(prev.left) === round(next.left) && round(prev.bottom) === round(next.bottom) ? prev : next));

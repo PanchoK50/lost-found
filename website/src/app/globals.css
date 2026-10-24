@@ -197,7 +197,9 @@ button:disabled { cursor: default; }
   /* Start screen: the model owns the upper part, the hero and input sit lower with room to breathe. */
   .experience:not(.experience--started) .dock { bottom: clamp(32px, 8vh, 96px); gap: 22px; }
   .experience:not(.experience--started) .hero .eyebrow { margin-bottom: 10px; }
-  .experience--started .dock { left: calc(50% + 200px); width: min(640px, calc(100% - 480px)); }
+  /* During a conversation the chat is one left-hand column: messages on top, the input pinned underneath. */
+  .experience--started .console { display: flex; flex-direction: column; gap: 10px; position: absolute; left: 24px; top: 76px; bottom: 24px; width: 380px; padding: 0; }
+  .experience--started .dock { position: static; transform: none; width: auto; flex: none; gap: 8px; }
   .hero h1 { font-size: clamp(34px, 4.4vw, 52px); }
   .chips { flex-wrap: wrap; justify-content: center; overflow: visible; margin: 0; padding: 0; order: 2; }
   .chips button { max-width: none; padding: 7px 12px; font-size: 12px; }
@@ -206,7 +208,7 @@ button:disabled { cursor: default; }
   .ask input { font-size: 15px; }
   .ask button { width: 40px; height: 40px; }
 
-  .transcript { position: absolute; left: 24px; top: 76px; bottom: 28px; width: 360px; max-height: none; animation-name: slide-in; }
+  .transcript { position: static; flex: 1; min-height: 0; width: auto; max-height: none; animation-name: slide-in; }
   .transcript-scroll { padding: 16px; flex: 1; }
   .answer-card { transition: transform .2s, box-shadow .2s; }
   .answer-card:hover { transform: translateY(-1px); box-shadow: var(--shadow); }

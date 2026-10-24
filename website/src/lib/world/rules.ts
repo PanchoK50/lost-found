@@ -1,3 +1,4 @@
+import { uuid } from './uuid';
 import type { Building } from '@/lib/buildings/types';
 import { representativePoint } from '@/lib/buildings/graph';
 import { CLOSING_KINDS, detectCategory, modeFor, PIN_TTL, type MultiplayerMode } from './mode';
@@ -112,7 +113,7 @@ export function applyAction(current: StoredWorld, action: WorldAction, building:
       }
       const ttl = PIN_TTL[kind];
       const pin: Pin = {
-        id: crypto.randomUUID(),
+        id: uuid(),
         kind,
         spaceId: space.id,
         floorId: space.floor_id,
@@ -151,7 +152,7 @@ export function applyAction(current: StoredWorld, action: WorldAction, building:
       const p = action.ping;
       const space = v.space(p?.spaceId);
       world.pings.push({
-        id: crypto.randomUUID(),
+        id: uuid(),
         kind: v.oneOf(p.kind, PING_KINDS, 'ping kind'),
         fromId: v.player(p.fromId).id,
         to: p.to === 'nearby' ? 'nearby' : v.audience(p.to),
@@ -177,7 +178,7 @@ export function applyAction(current: StoredWorld, action: WorldAction, building:
     case 'skill.create': {
       const s = action.skill;
       world.skills.push({
-        id: crypto.randomUUID(),
+        id: uuid(),
         name: v.text(s?.name, 'name', 40),
         phrases: v.list(s.phrases, 'phrases', 10, 40).map(x => x.toLowerCase()),
         kind: v.oneOf(s.kind, ['nearest', 'place', 'answer'] as const, 'skill kind'),

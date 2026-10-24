@@ -1,3 +1,4 @@
+import { uuid } from './uuid';
 import { useSyncExternalStore } from 'react';
 import type { MultiplayerMode } from './mode';
 import type { Ping, PingKind, Role } from './types';
@@ -63,7 +64,7 @@ const listeners = new Set<() => void>();
 let cached: { raw: string | null; profile: Profile } | undefined;
 
 function create(): Profile {
-  return { id: crypto.randomUUID(), name: `Guest ${Math.floor(1000 + Math.random() * 9000)}`, role: 'member', groups: [], settings: {}, rooms: {}, asked: [], sent: [], messagesSeenAt: 0 };
+  return { id: uuid(), name: `Guest ${Math.floor(1000 + Math.random() * 9000)}`, role: 'member', groups: [], settings: {}, rooms: {}, asked: [], sent: [], messagesSeenAt: 0 };
 }
 
 function read(): Profile {
