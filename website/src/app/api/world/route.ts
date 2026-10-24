@@ -7,7 +7,7 @@ import type { WorldAction } from '@/lib/world/types';
 // GET /api/world?buildingId=…&playerId=…&since=<version> → 200 WorldState, or 204 if nothing changed since `since`.
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const entry = getCatalogEntry(params.get('buildingId') ?? undefined);
+  const entry = await getCatalogEntry(params.get('buildingId') ?? undefined);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   const world = await worldStore.get(entry.building, Date.now());
   if (Number(params.get('since')) === world.version) return new Response(null, { status: 204 });
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     accessToken = token;
     action = rest as WorldAction;
   } catch { return Response.json({ error: 'Send JSON.' }, { status: 400 }); }
-  const entry = getCatalogEntry(action?.buildingId);
+  const entry = await getCatalogEntry(action?.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   if (supabaseConfigured) {
     const headers = typeof accessToken === 'string' ? new Headers({ authorization: `Bearer ${accessToken}` }) : request.headers;

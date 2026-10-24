@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   try { body = await request.json(); } catch { return Response.json({ error: 'Send JSON.' }, { status: 400 }); }
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   if (!message || message.length > 1000) return Response.json({ error: 'Ask something between 1 and 1000 characters.' }, { status: 400 });
-  const entry = getCatalogEntry(body.buildingId);
+  const entry = await getCatalogEntry(body.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
   // Reports from people in the building close doors, stairs and lifts for routing (docs/MULTIPLAYER.md §8).
   const playerId = typeof body.playerId === 'string' ? body.playerId : undefined;

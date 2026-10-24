@@ -11,6 +11,7 @@ import type { SceneInsets } from './building-scene';
 import { detectCategory } from '@/lib/world/mode';
 import { saveProfile, useProfile } from '@/lib/world/profile';
 import { LocationSheet } from '@/components/world/location-sheet';
+import { BuildingsSheet, type BuildingRow } from '@/components/world/buildings-sheet';
 import { DemoLoginSheet, useSignedIn } from '@/components/auth/demo-login';
 import { authHeader, supabaseBrowser } from '@/lib/supabase/browser';
 import { useWorld } from '@/lib/world/use-world';
@@ -36,7 +37,7 @@ type Message = { id: number; role: 'user' | 'assistant'; content: string; respon
 
 interface Props {
   building: Building;
-  buildings: { id: string; name: string }[];
+  buildings: BuildingRow[];
   suggestions: { label: string; question: string }[];
 }
 
@@ -72,7 +73,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const hideDemo = settings?.demoPlayers === false;
   const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location'>();
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings'>();
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
   const conversationId = useRef<string | undefined>(undefined);
@@ -220,7 +221,10 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
           {started && <button type="button" className="back-overview" onClick={startOver}>← Overview</button>}
           <nav className="building-switch" aria-label="Building">
-            {buildings.map(b => <Link key={b.id} href={`/?building=${b.id}`} className={b.id === building.building.id ? 'active' : ''} aria-current={b.id === building.building.id ? 'page' : undefined}>{b.name}</Link>)}
+            <button type="button" className="active" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
+              {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name} ▾
+            </button>
+            <button type="button" onClick={() => setSheet('buildings')}>{buildings.length} buildings</button>
           </nav>
           <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
             location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />
@@ -328,6 +332,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
       {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
+      {sheet === 'buildings' && <BuildingsSheet buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
       {sheet === 'location' && profile && <LocationSheet building={building} room={myRoom} sharing={settings?.share !== 'off'} onChange={setLocation} onSettings={() => setSheet('settings')} onClose={closeSheet} />}
       {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
 
