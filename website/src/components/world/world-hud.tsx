@@ -15,8 +15,8 @@ export function WorldHud({ world, playerId, onOpen }: { world?: WorldState; play
     <div className="world-hud">
       {sharing.length > 0 && (
         <button type="button" className="avatar-stack" onClick={onOpen} aria-label={`${sharing.length} sharing their location`}>
-          {sharing.slice(0, 3).map(p => <span key={p.id} className={`person-dot${p.demo ? ' person-dot--demo' : ''}${p.id === playerId ? ' person-dot--me' : ''}`} title={p.name}>{p.initials}</span>)}
-          {sharing.length > 3 && <span className="more">+{sharing.length - 3}</span>}
+          {sharing.slice(0, 2).map(p => <span key={p.id} className={`person-dot${p.demo ? ' person-dot--demo' : ''}${p.id === playerId ? ' person-dot--me' : ''}`} title={p.name}>{p.initials}</span>)}
+          {sharing.length > 2 && <span className="more">+{sharing.length - 2}</span>}
         </button>
       )}
       <button type="button" className="mode-badge" onClick={onOpen} aria-label={`Mode: ${world ? modeLabel[world.mode] : 'loading'}. Open settings`}>

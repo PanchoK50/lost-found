@@ -116,7 +116,8 @@ class Context {
     }
     const closedNames = new Set(closed.map(c => c.name.toLowerCase()));
     const stops = this.mentionedSpaces().filter(space => !closedSpaces.has(space.id) && !closedNames.has(space.name.toLowerCase()));
-    for (const c of this.worldClosed) if (!closed.some(x => x.id === c.id)) closed.push(c);
+    // A reported room never blocks a route that starts or ends in it: people must be able to get in and out.
+    for (const c of this.worldClosed) if (!closed.some(x => x.id === c.id) && !stops.some(stop => stop.id === c.id)) closed.push(c);
     return { stops, closed };
   }
 

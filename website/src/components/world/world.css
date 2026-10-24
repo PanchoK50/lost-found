@@ -32,10 +32,15 @@
 /* HUD: mode badge and the people sharing their location */
 /* The extra HUD items take room from the building switch (it scrolls), never from the brand. */
 .hud-bar .brand { flex: none; white-space: nowrap; }
+/* Phones: the brand row is full, so the mode badge and avatars sit right of the floor strip instead. */
+@media (max-width: 899px) {
+  .hud-bar .world-hud { position: absolute; right: calc(12px + var(--safe-right)); top: calc(67px + var(--safe-top)); }
+  .hud-top:has(.world-hud) .floor-rail { max-width: calc(100% - 190px); }
+}
 .world-hud { display: flex; align-items: center; gap: 6px; flex: none; }
 .mode-badge { display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); font-size: 12px; font-weight: 600; color: var(--ink); }
 .mode-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px #9dbd22; }
-.avatar-stack { display: flex; align-items: center; min-height: 36px; padding: 0 4px 0 8px; border: 0; background: transparent; }
+.avatar-stack { display: flex; align-items: center; flex: none; min-height: 36px; padding: 0 2px 0 8px; border: 0; background: transparent; }
 .avatar-stack .person-dot { width: 28px; height: 28px; font-size: 11px; }
 .avatar-stack .more { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
 
@@ -115,7 +120,7 @@
 
 /* Inbox toasts under the HUD */
 .inbox { position: absolute; left: calc(12px + var(--safe-left)); right: calc(12px + var(--safe-right)); z-index: 15; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; box-shadow: var(--shadow); animation: toast-in .35s cubic-bezier(.2, .9, .3, 1.2) both; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; box-shadow: var(--shadow); animation: toast-in .35s cubic-bezier(.2, .9, .3, 1.2) both; }
 .toast--update { align-items: center; border-left-color: var(--ink); }
 .toast .person-dot { flex: none; margin: 0; width: 32px; height: 32px; font-size: 12px; }
 .toast-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -129,12 +134,18 @@
 @keyframes toast-in { from { opacity: 0; transform: translateY(-12px); } }
 
 /* Passer-by check above the ask bar */
-.passer-by { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 6px 6px 12px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid #f1b7b9; border-radius: 18px; box-shadow: var(--shadow); font-size: 13px; animation: rise .3s ease both; }
-.passer-by span { flex: 1 1 160px; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.passer-by { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; padding: 8px 6px 8px 12px; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid #f1b7b9; border-radius: 18px; box-shadow: var(--shadow); font-size: 13px; animation: rise .3s ease both; }
+.passer-by > span:first-child { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .passer-by i { display: grid; place-items: center; flex: none; width: 18px; height: 18px; border-radius: 50%; background: #e5484d; color: #fff; font-style: normal; font-size: 11px; font-weight: 800; }
-.passer-by button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13px; font-weight: 600; }
-.passer-by button:nth-of-type(2) { background: var(--ink); border-color: var(--ink); color: #fff; }
-.passer-by .passer-by-close { width: 36px; padding: 0; background: transparent; border: 0; color: var(--muted); }
+.passer-by-actions { grid-column: 1 / -1; display: flex; gap: 6px; }
+.passer-by-actions button { flex: 1; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 13px; font-weight: 600; }
+.passer-by-actions button:last-child { background: var(--ink); border-color: var(--ink); color: #fff; }
+.passer-by .passer-by-close { width: 32px; height: 32px; padding: 0; background: transparent; border: 0; color: var(--muted); }
+@media (min-width: 900px) {
+  .passer-by { grid-template-columns: 1fr auto auto; }
+  .passer-by-actions { grid-column: auto; grid-row: 1; grid-column-start: 2; }
+  .passer-by-actions button { flex: none; }
+}
 
 /* Someone walking somewhere */
 .person-dot--moving { animation: walk-pulse 1.4s ease-in-out infinite; }

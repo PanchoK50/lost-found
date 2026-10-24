@@ -2,6 +2,7 @@ import type { Building } from '@/lib/buildings/types';
 import { representativePoint } from '@/lib/buildings/graph';
 import { CLOSING_KINDS, detectCategory, modeFor, PIN_TTL, type MultiplayerMode } from './mode';
 import type { Audience, Pin, PinKind, Ping, PingKind, Player, Presence, Role, Skill, WorldAction, WorldState } from './types';
+import type { DemoTimer } from './demo-players';
 
 /**
  * The truth rules of docs/MULTIPLAYER.md §4, as pure functions: no I/O, so any store (memory, Redis)
@@ -21,6 +22,8 @@ export interface StoredWorld {
   skills: Skill[];
   /** When each player created pins, for the rate limit. */
   created: { playerId: string; at: number }[];
+  /** Scripted demo players' pending reactions (§9); undefined until they are seeded. */
+  demo?: { timers: DemoTimer[] };
 }
 
 /** A rejected action; the API answers 400 with its message. */

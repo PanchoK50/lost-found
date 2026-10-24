@@ -25,9 +25,11 @@ export function PasserBy({ world, profile, building, routes, act }: {
   return (
     <div className="passer-by" role="group" aria-label="Is this still a problem?">
       <span><i>!</i>{pin.title.replace(/\s+(out of order|blocked|broken)\b.*$/i, '')} still {state}?</span>
-      <button type="button" onClick={() => vote('still')}>Still {state}</button>
-      <button type="button" onClick={() => vote('fixed')}>Fixed</button>
       <button type="button" className="passer-by-close" onClick={done} aria-label="Don't ask">✕</button>
+      <span className="passer-by-actions">
+        <button type="button" onClick={() => vote('still')}>Still {state}</button>
+        <button type="button" onClick={() => vote('fixed')}>Fixed</button>
+      </span>
     </div>
   );
 }

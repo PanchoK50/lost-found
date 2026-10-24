@@ -1,5 +1,6 @@
 // Server-side only: holds every player's world state.
 import type { Building } from '@/lib/buildings/types';
+import { runDemo, scheduleDemo } from './demo-players';
 import { applyAction, createWorld, prune, type StoredWorld } from './rules';
 import type { WorldAction } from './types';
 
@@ -22,13 +23,14 @@ class MemoryStore implements WorldStore {
     this.worlds = g.__lostFoundWorlds ??= new Map();
   }
   async get(building: Building, now: number) {
-    let world = this.worlds.get(building.building.id);
-    if (!world) { world = createWorld(building); this.worlds.set(world.buildingId, world); }
+    // Demo players are seeded on first use and their due reactions run on every read (§9).
+    const world = runDemo(this.worlds.get(building.building.id) ?? createWorld(building), building, now);
     prune(world, now);
+    this.worlds.set(world.buildingId, world);
     return world;
   }
   async apply(building: Building, action: WorldAction, now: number) {
-    const next = applyAction(await this.get(building, now), action, building, now);
+    const next = scheduleDemo(applyAction(await this.get(building, now), action, building, now), action, now);
     this.worlds.set(next.buildingId, next);
     return next;
   }

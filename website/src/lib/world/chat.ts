@@ -56,7 +56,8 @@ export function offerAskCrowd(building: Building, message: string, input: WorldC
 }
 
 const graphs = new Map<string, WalkGraph>();
-function walkGraph(building: Building, closed: string[]) {
+/** Walk graphs are expensive for big buildings: one per building and set of closures. */
+export function walkGraph(building: Building, closed: string[]) {
   const key = JSON.stringify([building.building.id, [...closed].sort()]);
   let graph = graphs.get(key);
   if (!graph) { graph = new WalkGraph(building, { closed }); graphs.set(key, graph); if (graphs.size > 20) graphs.delete(graphs.keys().next().value!); }
@@ -89,9 +90,9 @@ class WorldChat {
   graph() { return walkGraph(this.building, this.input.closed); }
   mentions(text = this.message) { return mentionsIn(this.building, text); }
 
-  /** Other players named in the message, by full or first name. */
+  /** Other players named in the message, by full or first name. Real people win over demo players of the same name. */
   named(): Player[] {
-    return this.input.world.players.filter(p => p.id !== this.me.id && [p.name, p.name.split(/\s+/)[0]].some(n => n.length >= 2 && new RegExp(`(?<![\\w])${escape(n.toLowerCase())}(?![\\w])`).test(this.text)));
+    return [...this.input.world.players].sort((a, b) => Number(!!a.demo) - Number(!!b.demo)).filter(p => p.id !== this.me.id && [p.name, p.name.split(/\s+/)[0]].some(n => n.length >= 2 && new RegExp(`(?<![\\w])${escape(n.toLowerCase())}(?![\\w])`).test(this.text)));
   }
 
   reply(reply: string, scene: SceneDirective, proposals?: Proposal[], answer?: ChatResponse['answer']): ChatResponse {
