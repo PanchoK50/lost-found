@@ -1,0 +1,340 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import * as THREE from 'three';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
+import { CameraControls, Line } from '@react-three/drei';
+import type { Line2 } from 'three-stdlib';
+import type { Building } from '@/lib/buildings/types';
+import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
+import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
+
+const palette = {
+  background: '#f2f2ee',
+  room: '#ffffff',
+  hall: '#f8f8f4',
+  corridor: '#e8e8e2',
+  core: '#d5d9de',
+  edge: '#7d837b',
+  asset: '#c3c7bf',
+  primary: '#c3ef2d',
+  secondary: '#f1f7dc',
+  muted: '#e4e5df',
+  route: '#1f2a1b',
+};
+const lift: Record<Tone, number> = { primary: 1, secondary: 0.2, muted: 0.1 };
+
+export interface SceneInsets { left: number; bottom: number }
+
+interface Props {
+  building: Building;
+  directive: SceneDirective;
+  insets: SceneInsets;
+  onFocusFloor(floorId: string): void;
+}
+
+/** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
+interface Anchor { key: string; position: [number, number, number]; content: ReactNode }
+
+export default function BuildingScene({ building, directive, insets, onFocusFloor }: Props) {
+  const model = useMemo(() => buildModel(building), [building]);
+  const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
+  const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
+  const overview = directive.focus.mode === 'building';
+  const directiveKey = useMemo(() => JSON.stringify(directive), [directive]);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const anchors = useMemo(() => [
+    ...answerAnchors(model, poses, directive),
+    ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
+    ...(hovered && !overview ? hoverAnchor(model, poses, hovered) : []),
+  ], [model, poses, directive, overview, onFocusFloor, hovered]);
+  const elements = useRef(new Map<string, HTMLDivElement>());
+  const register = useCallback((key: string) => (el: HTMLDivElement | null) => {
+    if (el) elements.current.set(key, el); else elements.current.delete(key);
+  }, []);
+  const hover = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
+
+  return (
+    <div className="scene-root">
+      <Canvas shadows="percentage" dpr={[1, 2]} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
+        <color attach="background" args={[palette.background]} />
+        <fog attach="fog" args={[palette.background, 400, 1400]} />
+        <hemisphereLight args={['#ffffff', '#d9dbd3', 1.6]} />
+        <directionalLight position={[60, 120, 40]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
+        <CameraRig model={model} poses={poses} directive={directive} insets={insets} />
+        {model.floors.map(floor => (
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} overview={overview} onPick={onFocusFloor} onHover={hover} />
+        ))}
+        <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
+        <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
+        <Projector anchors={anchors} elements={elements} />
+      </Canvas>
+      <div className="scene-anchors" key={directiveKey}>
+        {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className="scene-anchor">{anchor.content}</div>)}
+      </div>
+    </div>
+  );
+}
+
+function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObject<Map<string, HTMLDivElement>> }) {
+  const v = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ camera, size }) => {
+    for (const anchor of anchors) {
+      const el = elements.current.get(anchor.key);
+      if (!el) continue;
+      const p = v.set(...anchor.position).project(camera);
+      el.style.transform = `translate(${((p.x + 1) / 2) * size.width}px, ${((1 - p.y) / 2) * size.height}px) translate(-50%, -50%)`;
+      el.style.visibility = p.z < 1 ? 'visible' : 'hidden';
+    }
+  });
+  return null;
+}
+
+function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; poses: Map<string, FloorPose>; directive: SceneDirective; insets: SceneInsets }) {
+  const controls = useRef<CameraControls>(null);
+  const { size, camera } = useThree();
+  const focusKey = JSON.stringify(directive.focus);
+  const first = useRef(true);
+  useEffect(() => {
+    const c = controls.current;
+    if (!c || !(camera instanceof THREE.PerspectiveCamera)) return;
+    const box = focusBox(model, poses, directive.focus);
+    const centre = box.getCenter(new THREE.Vector3());
+    const extent = box.getSize(new THREE.Vector3());
+    const radius = Math.max(4, 0.5 * Math.hypot(extent.x, extent.z, directive.focus.mode === 'floor' ? 0 : extent.y));
+    // Fit the bounding sphere into the part of the viewport not covered by the chat UI.
+    const freeW = Math.max(0.3, (size.width - insets.left) / size.width);
+    const freeH = Math.max(0.3, (size.height - insets.bottom) / size.height);
+    const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
+    const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.8 : 0.9);
+    const polar = directive.focus.mode === 'floor' ? 0.62 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
+    const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
+    const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
+    const smooth = !first.current;
+    first.current = false;
+    c.setLookAt(centre.x + offset.x, centre.y + offset.y, centre.z + offset.z, centre.x, centre.y, centre.z, smooth);
+    // Shift the picture into the free area. Focal offset is in screen axes (Y down): move the camera left/down.
+    const worldPerPx = (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / size.height;
+    c.setFocalOffset(-(insets.left / 2) * worldPerPx, (insets.bottom / 2) * worldPerPx, 0, smooth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
+  }, [focusKey, insets.left, insets.bottom, size.width, size.height]);
+  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.08} />;
+}
+
+function damp(current: number, target: number, delta: number, lambda = 4) {
+  return THREE.MathUtils.damp(current, target, lambda, delta);
+}
+
+type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial };
+
+interface FloorViewProps {
+  model: FloorModel;
+  toWorld: BuildingModel['toWorld'];
+  pose: FloorPose;
+  tones: Map<string, Tone>;
+  overview: boolean;
+  onPick(floorId: string): void;
+  onHover(spaceId: string | null): void;
+}
+
+function FloorView({ model, toWorld, pose, tones, overview, onPick, onHover }: FloorViewProps) {
+  const group = useRef<THREE.Group>(null);
+  const blocks = useRef<THREE.Group>(null);
+  const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
+  const state = useRef({ opacity: pose.opacity, flat: pose.flat, y: pose.y });
+  const materials = useMemo((): FloorMaterials => {
+    const surface = (color: string) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0, transparent: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    return {
+      room: surface(palette.room), hall: surface(palette.hall), corridor: surface(palette.corridor), core: surface(palette.core),
+      primary: surface(palette.primary), secondary: surface(palette.secondary), muted: surface(palette.muted), asset: surface(palette.asset),
+      edge: new THREE.LineBasicMaterial({ color: palette.edge, transparent: true }),
+    };
+  }, []);
+  useEffect(() => () => Object.values(materials).forEach(m => m.dispose()), [materials]);
+  const assets = useMemo(() => buildAssets(model, toWorld), [model, toWorld]);
+
+  useFrame((_, delta) => {
+    const s = state.current;
+    s.opacity = damp(s.opacity, pose.opacity, delta, 5);
+    s.flat = damp(s.flat, pose.flat, delta, 3.5);
+    s.y = damp(s.y, pose.y, delta, 3.5);
+    if (!group.current || !blocks.current) return;
+    group.current.position.y = s.y;
+    group.current.visible = s.opacity > 0.01;
+    blocks.current.scale.y = blockHeight(model.storey, s.flat);
+    for (const tone of ['primary', 'secondary', 'muted'] as const) {
+      const g = raised.current[tone];
+      if (g) g.scale.y = blockHeight(model.storey, s.flat, lift[tone]);
+    }
+    applyFade(materials, assets, s, overview);
+  });
+
+  const plain = model.spaces.filter(m => !tones.has(m.space.id));
+  const pick = (event: ThreeEvent<MouseEvent>) => { if (overview) { event.stopPropagation(); onPick(model.floor.id); } };
+  const hover = (id: string | null) => (event: ThreeEvent<PointerEvent>) => {
+    if (!pose.interactive || overview) return;
+    event.stopPropagation();
+    onHover(id);
+  };
+
+  return (
+    <group ref={group} position-y={pose.y}>
+      <group ref={blocks} scale-y={blockHeight(model.storey, pose.flat)}>
+        {plain.map(m => (
+          <mesh key={m.space.id} geometry={m.geometry} material={materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={pick} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
+        ))}
+        <lineSegments geometry={model.edges} material={materials.edge} renderOrder={1} />
+      </group>
+      {(['primary', 'secondary', 'muted'] as const).map(tone => (
+        <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
+          {model.spaces.filter(m => tones.get(m.space.id) === tone).map(m => (
+            <mesh key={m.space.id} geometry={m.geometry} material={materials[tone]} castShadow receiveShadow onClick={pick} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)}>
+              <lineSegments renderOrder={2}><edgesGeometry args={[m.geometry, 30]} /><lineBasicMaterial color={tone === 'primary' ? '#3b4a1a' : palette.edge} transparent opacity={0.9} /></lineSegments>
+            </mesh>
+          ))}
+        </group>
+      ))}
+      {assets && <primitive object={assets} />}
+    </group>
+  );
+}
+
+/** Per-frame fade of a floor's shared materials (three.js objects are mutated imperatively). */
+function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null, s: { opacity: number; flat: number }, overview: boolean) {
+  const ghost = s.opacity < 0.6;
+  for (const key of ['room', 'hall', 'corridor', 'core', 'primary', 'secondary', 'muted'] as const) {
+    materials[key].opacity = s.opacity * (overview ? 0.94 : 1);
+    materials[key].depthWrite = !ghost;
+  }
+  materials.edge.opacity = Math.min(1, s.opacity * 1.6) * 0.85;
+  materials.asset.opacity = s.opacity * s.flat;
+  if (assets) assets.visible = s.flat > 0.3 && s.opacity > 0.5;
+}
+
+function surfaceFor(type: string): 'room' | 'hall' | 'corridor' | 'core' {
+  if (type === 'corridor' || type === 'outdoor') return 'corridor';
+  if (type === 'stair' || type === 'lift') return 'core';
+  if (type === 'hall') return 'hall';
+  return 'room';
+}
+
+const assetHeight: Record<string, number> = { furniture: 0.75, fixture: 0.9, machine: 1.6, equipment: 1.1 };
+
+/** One instanced mesh per floor: a small box per asset footprint. */
+function buildAssets(model: FloorModel, toWorld: BuildingModel['toWorld']) {
+  if (!model.assets.length) return null;
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: palette.asset, roughness: 0.9, transparent: true }), model.assets.length);
+  const matrix = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  model.assets.forEach((asset, i) => {
+    const h = assetHeight[asset.category] ?? 0.8;
+    const [x, z] = toWorld(asset.position);
+    q.setFromAxisAngle(up, THREE.MathUtils.degToRad(asset.footprint?.rotation_deg ?? 0));
+    matrix.compose(new THREE.Vector3(x, h / 2, z), q, new THREE.Vector3(asset.footprint?.width_m ?? 0.6, h, asset.footprint?.depth_m ?? 0.6));
+    mesh.setMatrixAt(i, matrix);
+  });
+  mesh.castShadow = true;
+  mesh.raycast = () => {};
+  return mesh;
+}
+
+function Ground({ y }: { y: number }) {
+  return (
+    <mesh rotation-x={-Math.PI / 2} position-y={y} receiveShadow>
+      <planeGeometry args={[3000, 3000]} />
+      <shadowMaterial transparent opacity={0.08} />
+    </mesh>
+  );
+}
+
+function worldAt(model: BuildingModel, poses: Map<string, FloorPose>, point: FloorPoint, above: number): [number, number, number] {
+  const [x, z] = model.toWorld(point.position);
+  return [x, (poses.get(point.floorId)?.y ?? 0) + above, z];
+}
+
+function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, directive: SceneDirective): Anchor[] {
+  const floorOf = new Map(model.floors.map(f => [f.floor.id, f]));
+  const anchors: Anchor[] = [];
+  for (const h of directive.highlights ?? []) {
+    const m = model.spaces.get(h.spaceId);
+    const f = m && floorOf.get(m.space.floor_id);
+    if (!h.label || !m || !f) continue;
+    const pose = poses.get(f.floor.id)!;
+    anchors.push({ key: `hl-${h.spaceId}`, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]], content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
+  }
+  const markers = directive.markers ?? [];
+  if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 3.6), content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
+  (directive.links ?? []).forEach((link, i) => {
+    if (!link.label) return;
+    const a = worldAt(model, poses, link.from, 1.2), b = worldAt(model, poses, link.to, 1.2);
+    anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1, (a[2] + b[2]) / 2], content: <div className="scene-label scene-label--primary">{link.label}</div> });
+  });
+  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), content: <div className="scene-label scene-label--closed">Closed</div> }));
+  return anchors;
+}
+
+function floorAnchors(model: BuildingModel, poses: Map<string, FloorPose>, onFocusFloor: (id: string) => void): Anchor[] {
+  // Down the right-hand edge of the building as seen from the default camera.
+  return model.floors.map(f => ({
+    key: `fl-${f.floor.id}`,
+    position: [model.box.maxX + 4, poses.get(f.floor.id)!.y + f.storey * 0.45, model.box.minZ],
+    content: <button type="button" className="floor-tag-3d" onClick={() => onFocusFloor(f.floor.id)}>{f.floor.name}</button>,
+  }));
+}
+
+function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: string): Anchor[] {
+  const m = model.spaces.get(spaceId);
+  const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
+  if (!m || !f) return [];
+  const pose = poses.get(f.floor.id)!;
+  return [{ key: `hv-${spaceId}`, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div> }];
+}
+
+/** Routes, link lines and markers, positioned against the target floor poses. */
+function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Map<string, FloorPose>; directive: SceneDirective }) {
+  const at = (point: FloorPoint, above: number) => worldAt(model, poses, point, above);
+  return <>
+    {(directive.markers ?? []).map((marker, i) => (
+      <group key={i} position={at(marker, 0)}>
+        <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>
+        <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.route} /></mesh>
+      </group>
+    ))}
+    {(directive.routes ?? []).map((route, i) => <RouteLine key={i} points={route.points.map(p => at(p, 1.6))} />)}
+    {(directive.links ?? []).map((link, i) => {
+      const a = at(link.from, 1.2), b = at(link.to, 1.2);
+      return <group key={i}>
+        <RouteLine points={[a, b]} />
+        {[a, b].map((p, j) => <mesh key={j} position={p}><sphereGeometry args={[0.5, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>)}
+      </group>;
+    })}
+  </>;
+}
+
+function RouteLine({ points }: { points: [number, number, number][] }) {
+  const line = useRef<Line2>(null);
+  const walker = useRef<THREE.Mesh>(null);
+  const curve = useMemo(() => {
+    const path = new THREE.CurvePath<THREE.Vector3>();
+    for (let i = 0; i < points.length - 1; i++) path.add(new THREE.LineCurve3(new THREE.Vector3(...points[i]), new THREE.Vector3(...points[i + 1])));
+    return path;
+  }, [points]);
+  const clock = useRef(0);
+  useFrame((_, delta) => {
+    clock.current += delta;
+    const reveal = THREE.MathUtils.clamp((clock.current - 0.9) / 0.6, 0, 1);
+    if (line.current) {
+      line.current.material.dashOffset -= delta * 2.5;
+      line.current.material.opacity = reveal;
+    }
+    if (walker.current && curve.curves.length) {
+      walker.current.visible = reveal > 0.5;
+      walker.current.position.copy(curve.getPointAt((clock.current * 0.12) % 1));
+    }
+  });
+  if (points.length < 2) return null;
+  return <>
+    <Line ref={line} points={points} color={palette.route} lineWidth={4} dashed dashSize={1.2} gapSize={0.8} transparent opacity={0} depthTest={false} renderOrder={5} />
+    <mesh ref={walker} renderOrder={6}><sphereGeometry args={[0.7, 24, 24]} /><meshBasicMaterial color={palette.primary} depthTest={false} /></mesh>
+  </>;
+}
