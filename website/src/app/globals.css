@@ -1,15 +1,26 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
 
 /* Mobile-first: base styles are the phone layout; the desktop layout is the min-width: 900px block at the end. */
+/*
+ * Colours follow the Synera brand (synera.ai stylesheet tokens):
+ * blue = the building and the interface, orange = "look here / do this" (answers and actions).
+ */
 :root {
   color-scheme: light;
-  --ink: #1f2a1b;
-  --muted: #6f776a;
-  --line: #dfe2d8;
-  --paper: #f2f2ee;
-  --accent: #c3ef2d;
-  --glass: rgba(255, 255, 255, 0.86);
-  --shadow: 0 12px 40px rgba(31, 42, 27, 0.12), 0 2px 6px rgba(31, 42, 27, 0.06);
+  --ink: #002478;          /* Synera Resolution Blue: headings, dark UI */
+  --blue: #004fab;         /* Cobalt: links, info */
+  --blue-weak: #75c6ff;    /* Primary weak: reference rooms, agent glow */
+  --text: #2b2b2b;         /* Text strong */
+  --muted: #737373;        /* Text grey */
+  --line: #e3e7ee;
+  --paper: #f4f5f7;        /* Concrete, cooled slightly to sit with the blue */
+  --accent: #f05c03;       /* Trinidad orange: the answer, primary actions */
+  --accent-hover: #d15406;
+  --accent-soft: #fff1e8;
+  --route: linear-gradient(90deg, #2f55d4, #8a3fc4, #e04f9a, #f26b4f); /* Synera path gradient */
+  --glass: rgba(255, 255, 255, 0.88);
+  --shadow: 0 12px 40px rgba(0, 36, 120, 0.10), 0 2px 6px rgba(0, 36, 120, 0.06);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -17,7 +28,7 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
-body { margin: 0; background: var(--paper); color: var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+body { margin: 0; background: var(--paper); color: var(--text); font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: default; }
@@ -33,7 +44,7 @@ button:disabled { cursor: default; }
 .hud-top > * { pointer-events: auto; }
 .hud-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .brand { text-decoration: none; color: var(--ink); font-size: 20px; letter-spacing: -1px; display: flex; gap: 8px; align-items: center; min-height: 44px; }
-.brand span { font-size: 16px; font-weight: 700; }
+.brand span { font-size: 16px; font-weight: 600; letter-spacing: -0.03em; }
 .back-overview { flex: none; min-height: 40px; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 600; box-shadow: var(--shadow); }
 /* On phones, while a conversation is open: logo mark + "← Overview" on the left, in the usual "back" spot. */
 .experience--started .building-switch { display: none; }
@@ -47,7 +58,7 @@ button:disabled { cursor: default; }
 .floor-list { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .floor-list::-webkit-scrollbar, .building-switch::-webkit-scrollbar, .chips::-webkit-scrollbar { display: none; }
 .floor-rail button { flex: none; min-width: 44px; height: 40px; border: 0; border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; color: var(--muted); transition: background .2s, color .2s; }
-.floor-rail button.active { background: var(--accent); color: var(--ink); }
+.floor-rail button.active { background: var(--ink); color: #fff; }
 
 /* Bottom console: conversation sheet + dock, stacked and in thumb reach */
 .console { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -55,31 +66,37 @@ button:disabled { cursor: default; }
 .dock { display: flex; flex-direction: column; gap: 12px; }
 .hero { text-align: center; padding: 0 8px; }
 .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; }
-.hero h1 { margin: 0; font-size: 34px; letter-spacing: -.04em; font-weight: 500; line-height: 1.05; }
+.hero h1 { margin: 0; font-size: 34px; letter-spacing: -.03em; font-weight: 600; line-height: 1.05; color: var(--ink); }
+.hero .agent-avatar { margin: 0 auto 12px; }
 .chips { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; margin: 0 -10px; padding: 2px 10px; }
-.chips button { flex: none; scroll-snap-align: start; max-width: 78vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 999px; padding: 11px 14px; font-size: 13px; }
+.chips button { color: var(--ink); font-weight: 500; flex: none; scroll-snap-align: start; max-width: 78vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 999px; padding: 11px 14px; font-size: 13px; }
 .ask { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 18px; background: #fff; border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); }
 /* 16px stops iOS Safari zooming the page when the input gets focus. */
 .ask input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 10px 0; font-size: 16px; outline: none; }
-.ask button { width: 44px; height: 44px; flex: none; border: 0; border-radius: 50%; background: var(--ink); color: #fff; font-size: 19px; transition: opacity .2s; }
-.ask button:disabled { opacity: .25; }
+.ask button { width: 44px; height: 44px; flex: none; border: 0; border-radius: 50%; background: var(--accent); color: #fff; font-size: 19px; transition: background-color .2s, opacity .2s; }
+.ask button:not(:disabled):active { background: var(--accent-hover); }
+.ask button:disabled { background: #c5ccd8; }
+.ask:focus-within { border-color: var(--blue-weak); box-shadow: var(--shadow), 0 0 0 3px rgba(117, 198, 255, .25); }
 
 .transcript { display: flex; flex-direction: column; max-height: 34dvh; background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; animation: rise .35s ease both; }
 .transcript--expanded { max-height: 62dvh; }
 .transcript-scroll { overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
 .sheet-handle { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: transparent; padding: 8px 0 4px; font-size: 12px; color: var(--muted); min-height: 44px; }
-.sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: #c9cdc3; }
+.sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: #c5ccd8; }
 .bubble { margin: 0; line-height: 1.5; max-width: 92%; animation: rise .35s ease both; }
 .bubble--user { align-self: flex-end; background: var(--ink); color: #fff; padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 14px; }
-.bubble--assistant { align-self: stretch; max-width: 100%; }
-.bubble--assistant p { margin: 0; color: #3d4638; font-size: 14px; }
-.bubble--error p { color: #b4232a; }
-.answer-card { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; margin-bottom: 8px; padding: 12px 14px; text-align: left; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 12px; }
+.bubble--assistant { align-self: stretch; max-width: 100%; display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; }
+.bubble--assistant > .agent-avatar { grid-row: 1 / span 9; margin-top: 2px; }
+.bubble--assistant > :not(.agent-avatar) { grid-column: 2; }
+.bubble--assistant p { margin: 0; color: var(--text); font-size: 14px; }
+.bubble--error p { color: #c0362c; }
+.answer-card { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; margin-bottom: 8px; padding: 12px 14px; text-align: left; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; }
 .answer-title { font-size: 13px; color: var(--muted); }
-.answer-value { font-size: 26px; font-weight: 600; letter-spacing: -.03em; }
+.answer-value { font-size: 26px; font-weight: 600; letter-spacing: -.03em; color: var(--ink); }
 .answer-detail { font-size: 12px; color: var(--muted); }
 .answer-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.answer-actions button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--ink); border-radius: 999px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 600; }
+.answer-actions button { min-height: 40px; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; transition: background-color .2s; }
+.answer-actions button:active { background: var(--accent-hover); }
 .answer-actions button + button { background: #fff; color: var(--ink); border-color: var(--line); }
 .directions { margin-top: 6px; border-top: 1px solid var(--line); }
 /* Open directions get more of the sheet; the model keeps the top part of the screen. */
@@ -88,32 +105,47 @@ button:disabled { cursor: default; }
 .directions summary::-webkit-details-marker { display: none; }
 .directions summary > span::before { content: "▸"; display: inline-block; margin-right: 6px; transition: transform .2s; }
 .directions[open] summary > span::before { transform: rotate(90deg); }
-.directions-overview { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--ink); }
+.directions-overview { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--blue); }
 .place { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
-.place strong { display: block; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--ink); }
+.place strong { display: block; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--ink); letter-spacing: -.01em; }
 .place small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
-.place-dot { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 3px solid var(--ink); background: #fff; }
-.place--stop .place-dot { border-color: var(--accent); background: var(--ink); }
-.place--destination .place-dot { border: 0; background: var(--accent); box-shadow: inset 0 0 0 6px var(--ink); }
+.place-dot { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 4px solid var(--ink); background: #fff; }
+/* Same ring nodes as on the map: navy = you, violet = a stop, orange = the destination. */
+.place--stop .place-dot { border-color: #8a3fc4; }
+.place--destination .place-dot { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 3px, #fff 3.5px); }
 .maneuvers { list-style: none; margin: 0; padding: 0; }
 .maneuver { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 10px 6px; margin: 0 -6px; border: 0; border-radius: 10px; background: transparent; text-align: left; font-size: 14px; line-height: 1.4; color: var(--ink); transition: background .15s; }
-.maneuver:active, .maneuver--active { background: #f1f6df; }
-.turn-icon { flex: none; color: var(--ink); margin-top: -1px; }
+.maneuver:active, .maneuver--active { background: var(--accent-soft); }
+.turn-icon { flex: none; color: var(--blue); margin-top: -1px; }
 .maneuver-text { display: flex; flex-direction: column; gap: 4px; }
-.maneuver-note { display: flex; align-items: center; gap: 6px; color: #2f6f2a; font-weight: 600; font-size: 13px; }
-.maneuver-note i { font-style: normal; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #2f6f2a; color: #fff; font-size: 11px; font-weight: 700; }
+.maneuver-note { display: flex; align-items: center; gap: 6px; color: var(--blue); font-weight: 600; font-size: 13px; }
+.maneuver-note i { font-style: normal; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 11px; font-weight: 700; }
 .maneuver-distance { display: flex; align-items: center; gap: 10px; padding-left: 34px; font-size: 12px; color: var(--muted); }
 .maneuver-distance span { white-space: nowrap; }
 .maneuver-distance hr { flex: 1; border: 0; border-top: 1px solid var(--line); margin: 0; }
 @media (min-width: 900px) {
   .directions { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px 10px; margin-top: 10px; }
   .transcript:has(.directions[open]) { max-height: none; }
-  .maneuver:hover { background: #f6f8f0; }
+  .maneuver:hover { background: #f4f6fa; }
 }
-.bubble--thinking { display: flex; gap: 4px; padding: 6px 2px; }
-.bubble--thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
-.bubble--thinking i:nth-child(2) { animation-delay: .15s; }
-.bubble--thinking i:nth-child(3) { animation-delay: .3s; }
+.bubble--thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+
+/* The assistant, after Synera's agent: a navy visor with a light-blue voice-wave. The wave moves while it thinks. */
+.agent-avatar { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: radial-gradient(120% 90% at 50% 30%, #1d3f9e, var(--ink)); box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .25), 0 2px 6px rgba(0, 36, 120, .2); }
+.agent-avatar span { display: flex; align-items: center; gap: 2px; height: 50%; }
+.agent-avatar i { width: 2px; border-radius: 2px; background: #cfe9ff; box-shadow: 0 0 4px var(--blue-weak); }
+.agent-avatar i:nth-child(1), .agent-avatar i:nth-child(5) { height: 30%; }
+.agent-avatar i:nth-child(2), .agent-avatar i:nth-child(4) { height: 65%; }
+.agent-avatar i:nth-child(3) { height: 100%; }
+.agent-avatar--lg { width: 56px; height: 56px; border-radius: 18px; }
+.agent-avatar--lg span { gap: 4px; }
+.agent-avatar--lg i { width: 4px; }
+.agent-avatar--thinking i { animation: wave .9s ease-in-out infinite; }
+.agent-avatar--thinking i:nth-child(2) { animation-delay: .1s; }
+.agent-avatar--thinking i:nth-child(3) { animation-delay: .2s; }
+.agent-avatar--thinking i:nth-child(4) { animation-delay: .3s; }
+.agent-avatar--thinking i:nth-child(5) { animation-delay: .4s; }
+@keyframes wave { 50% { transform: scaleY(.35); } }
 
 /* Labels pinned to the 3D model */
 .scene-anchors { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -130,6 +162,7 @@ button:disabled { cursor: default; }
 .scene-anchor--above .scene-label--primary::after { background: var(--ink); }
 .scene-anchor--above .scene-label--closed::after { background: #e5484d; }
 .scene-tip { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; padding: 8px 11px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; box-shadow: var(--shadow); pointer-events: none; animation: rise .2s ease both; }
+.scene-tip strong { color: var(--ink); font-weight: 600; }
 .scene-tip span { color: var(--muted); }
 /* The floor strip covers floor picking on phones; 3D floor tags are a desktop extra. */
 .floor-tag-3d { display: none; }
@@ -162,7 +195,7 @@ button:disabled { cursor: default; }
   .hero h1 { font-size: clamp(34px, 4.4vw, 52px); }
   .chips { flex-wrap: wrap; justify-content: center; overflow: visible; margin: 0; padding: 0; order: 2; }
   .chips button { max-width: none; padding: 7px 12px; font-size: 12px; }
-  .chips button:hover { background: #fff; border-color: #c7ccbf; }
+  .chips button:hover { background: #fff; border-color: var(--blue-weak); }
   .ask { padding: 8px 8px 8px 20px; }
   .ask input { font-size: 15px; }
   .ask button { width: 40px; height: 40px; }

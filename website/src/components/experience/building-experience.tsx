@@ -158,6 +158,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
               {visible.map(message => message.role === 'user'
                 ? <p key={message.id} className="bubble bubble--user">{message.content}</p>
                 : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
+                    <AgentAvatar />
                     {message.response?.answer && (
                       <button type="button" className="answer-card" onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
                         <span className="answer-title">{message.response.answer.title}</span>
@@ -193,7 +194,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                       />
                     )}
                   </article>)}
-              {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
+              {busy && <div className="bubble bubble--thinking" role="status"><AgentAvatar thinking />Looking it up…</div>}
               <div ref={transcriptEnd} />
             </div>
           </section>
@@ -201,6 +202,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
         <section className="dock" ref={dock}>
           {!started && <div className="hero">
+            <AgentAvatar size="lg" />
             <p className="eyebrow">{building.building.name} · {building.floors.length} floors · {building.spaces.length} spaces</p>
             <h1>Ask me anything.</h1>
           </div>}
@@ -214,6 +216,15 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
+  );
+}
+
+/** The building's assistant, after Synera's agents: a navy visor with a voice-wave that moves while it thinks. */
+function AgentAvatar({ thinking = false, size }: { thinking?: boolean; size?: 'lg' }) {
+  return (
+    <span className={`agent-avatar${size === 'lg' ? ' agent-avatar--lg' : ''}${thinking ? ' agent-avatar--thinking' : ''}`} aria-hidden>
+      <span><i /><i /><i /><i /><i /></span>
+    </span>
   );
 }
 

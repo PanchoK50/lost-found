@@ -9,20 +9,28 @@ import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
 import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
 
+/**
+ * Synera-style model: white, studio-lit blocks on a cool light ground. Orange marks the answer,
+ * light blue the reference room; routes use Synera's blue → violet → pink → coral path gradient.
+ */
 const palette = {
-  background: '#f2f2ee',
+  background: '#f4f5f7',
   room: '#ffffff',
-  hall: '#f8f8f4',
-  corridor: '#e8e8e2',
-  core: '#d5d9de',
-  edge: '#7d837b',
-  asset: '#c3c7bf',
-  primary: '#c3ef2d',
-  secondary: '#93a08c',
-  muted: '#eef3df',
+  hall: '#fafbfc',
+  corridor: '#eceff4',
+  core: '#dbe2ec',
+  edge: '#a3adbc',
+  asset: '#c9d0db',
+  primary: '#f26a1b',
+  primaryEdge: '#8d3201',
+  secondary: '#8fcbff',
+  muted: '#e4edf9',
   warning: '#e5484d',
-  route: '#1f2a1b',
+  ink: '#002478',
+  stop: '#8a3fc4',
 };
+/** Synera path gradient, sampled from their stage imagery. */
+const routeGradient = ['#2f55d4', '#8a3fc4', '#e04f9a', '#f26b4f'].map(c => new THREE.Color(c));
 const lift: Record<Tone, number> = { primary: 1, secondary: 0.2, muted: 0.1 };
 
 /** Pixels covered by UI on each side; the camera frames the model in the remaining area. */
@@ -72,8 +80,10 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => inspect(null)} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
         <fog attach="fog" args={[palette.background, 400, 1400]} />
-        <hemisphereLight args={['#ffffff', '#d9dbd3', 1.6]} />
-        <directionalLight position={[60, 120, 40]} intensity={1.5} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
+        {/* Bright, soft studio light so the model reads white, like Synera's renders. */}
+        <ambientLight intensity={0.55} />
+        <hemisphereLight args={['#ffffff', '#e8edf4', 1.7]} />
+        <directionalLight position={[60, 120, 40]} intensity={1.25} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} onPick={onFocusFloor} onInspect={inspect} />
@@ -237,7 +247,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
         <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
           {model.spaces.filter(m => tones.get(m.space.id) === tone).map(m => (
             <mesh key={m.space.id} geometry={m.geometry} material={materials[tone]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)}>
-              <lineSegments renderOrder={2}><edgesGeometry args={[m.geometry, 30]} /><lineBasicMaterial color={tone === 'primary' ? '#3b4a1a' : palette.edge} transparent opacity={0.9} /></lineSegments>
+              <lineSegments renderOrder={2}><edgesGeometry args={[m.geometry, 30]} /><lineBasicMaterial color={tone === 'primary' ? palette.primaryEdge : palette.edge} transparent opacity={0.9} /></lineSegments>
             </mesh>
           ))}
         </group>
@@ -380,8 +390,8 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
       <mesh key={i} position={at(marker, 1.15)}><cylinderGeometry args={[0.45, 0.45, 0.12, 20]} /><meshStandardMaterial color={palette.warning} /></mesh>
     ) : (
       <group key={i} position={at(marker, 0)}>
-        <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>
-        <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.route} /></mesh>
+        <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={palette.ink} /></mesh>
+        <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.ink} /></mesh>
       </group>
     ))}
     {(directive.routes ?? []).map(route => (route.points ?? []).filter(p => shown(poses, p.floorId))).filter(points => points.length >= 2).map((points, i) => <RouteLine key={i} points={points.map(p => at(p, ROUTE_HEIGHT))} />)}
@@ -399,7 +409,7 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
       return <group key={i}>
         <RouteLine points={[a, b]} />
         {link.breakdown && <Line points={[a[1] <= b[1] ? a : b, corner, a[1] <= b[1] ? b : a]} color={palette.edge} lineWidth={1.5} dashed dashSize={0.5} gapSize={0.4} transparent opacity={0.9} depthTest={false} renderOrder={4} />}
-        {[a, b].map((p, j) => <mesh key={j} position={p}><sphereGeometry args={[0.5, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>)}
+        {[a, b].map((p, j) => <mesh key={j} position={p}><sphereGeometry args={[0.5, 20, 20]} /><meshStandardMaterial color={palette.ink} /></mesh>)}
       </group>;
     })}
   </>;
@@ -417,7 +427,8 @@ function RouteEnd({ kind, position }: { kind: 'origin' | 'stop' | 'destination';
     const perPx = (2 * camera.position.distanceTo(at) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / size.height;
     group.current.scale.setScalar(perPx * 14);
   });
-  const [ring, centre, centreSize] = kind === 'origin' ? ['#1f2a1b', '#ffffff', 0.5] : kind === 'stop' ? [palette.primary, '#1f2a1b', 0.55] : ['#1f2a1b', palette.primary, 0.62];
+  // Ring nodes as in Synera's imagery: navy = you, violet = a stop, orange = the destination (with a dot).
+  const [ring, centre, centreSize] = kind === 'origin' ? [palette.ink, '#ffffff', 0.5] : kind === 'stop' ? [palette.stop, '#ffffff', 0.5] : [palette.primary, '#ffffff', 0.5];
   // Transparent so they render in the same pass as the (transparent) room blocks, after them.
   const disc = (radius: number, color: string, order: number) => (
     <mesh renderOrder={order}><circleGeometry args={[radius, 40]} /><meshBasicMaterial color={color} transparent depthTest={false} depthWrite={false} /></mesh>
@@ -427,8 +438,16 @@ function RouteEnd({ kind, position }: { kind: 'origin' | 'stop' | 'destination';
       {disc(1.12, '#ffffff', 8)}
       {disc(0.92, ring, 9)}
       {disc(centreSize, centre, 10)}
+      {kind === 'destination' && disc(0.24, palette.primary, 11)}
     </group>
   );
+}
+
+function gradientAt(t: number): [number, number, number] {
+  const x = THREE.MathUtils.clamp(t, 0, 1) * (routeGradient.length - 1);
+  const i = Math.min(Math.floor(x), routeGradient.length - 2);
+  const c = routeGradient[i].clone().lerp(routeGradient[i + 1], x - i);
+  return [c.r, c.g, c.b];
 }
 
 /** Pulsing ring that marks where a route step happens. */
@@ -442,7 +461,7 @@ function Cursor({ position }: { position: [number, number, number] }) {
   });
   return (
     <group position={position}>
-      <mesh rotation-x={-Math.PI / 2} renderOrder={7}><circleGeometry args={[0.55, 32]} /><meshBasicMaterial color={palette.route} transparent depthTest={false} depthWrite={false} /></mesh>
+      <mesh rotation-x={-Math.PI / 2} renderOrder={7}><circleGeometry args={[0.55, 32]} /><meshBasicMaterial color={palette.ink} transparent depthTest={false} depthWrite={false} /></mesh>
       <mesh ref={ring} rotation-x={-Math.PI / 2} renderOrder={7}><ringGeometry args={[0.7, 0.95, 40]} /><meshBasicMaterial color={palette.primary} transparent depthTest={false} /></mesh>
     </group>
   );
@@ -456,12 +475,21 @@ function RouteLine({ points }: { points: [number, number, number][] }) {
     for (let i = 0; i < points.length - 1; i++) path.add(new THREE.LineCurve3(new THREE.Vector3(...points[i]), new THREE.Vector3(...points[i + 1])));
     return path;
   }, [points]);
+  // Colour each point by how far along the route it is (start blue, end coral).
+  const colors = useMemo(() => {
+    const total = curve.getLength() || 1;
+    const out: [number, number, number][] = [];
+    for (let i = 0, walked = 0; i < points.length; i++) {
+      if (i > 0) walked += new THREE.Vector3(...points[i]).distanceTo(new THREE.Vector3(...points[i - 1]));
+      out.push(gradientAt(walked / total));
+    }
+    return out;
+  }, [curve, points]);
   const clock = useRef(0);
   useFrame((_, delta) => {
     clock.current += delta;
     const reveal = THREE.MathUtils.clamp((clock.current - 0.9) / 0.6, 0, 1);
     if (line.current) {
-      line.current.material.dashOffset -= delta * 2.5;
       line.current.material.opacity = reveal;
     }
     if (walker.current && curve.curves.length) {
@@ -471,7 +499,8 @@ function RouteLine({ points }: { points: [number, number, number][] }) {
   });
   if (points.length < 2) return null;
   return <>
-    <Line ref={line} points={points} color={palette.route} lineWidth={4} dashed dashSize={1.2} gapSize={0.8} transparent opacity={0} depthTest={false} renderOrder={5} />
-    <mesh ref={walker} renderOrder={6}><sphereGeometry args={[0.7, 24, 24]} /><meshBasicMaterial color={palette.primary} depthTest={false} /></mesh>
+    {/* Solid gradient path, as in Synera's imagery; the moving dot shows the direction. */}
+    <Line ref={line} points={points} vertexColors={colors} color="#ffffff" lineWidth={5} transparent opacity={0} depthTest={false} renderOrder={5} />
+    <mesh ref={walker} renderOrder={6}><sphereGeometry args={[0.6, 24, 24]} /><meshBasicMaterial color="#ffffff" depthTest={false} /></mesh>
   </>;
 }
