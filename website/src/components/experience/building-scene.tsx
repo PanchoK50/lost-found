@@ -24,7 +24,8 @@ const palette = {
 };
 const lift: Record<Tone, number> = { primary: 1, secondary: 0.2, muted: 0.1 };
 
-export interface SceneInsets { left: number; bottom: number }
+/** Pixels covered by UI on each side; the camera frames the model in the remaining area. */
+export interface SceneInsets { top: number; left: number; bottom: number }
 
 interface Props {
   building: Building;
@@ -52,18 +53,20 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   const register = useCallback((key: string) => (el: HTMLDivElement | null) => {
     if (el) elements.current.set(key, el); else elements.current.delete(key);
   }, []);
-  const hover = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
+  const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
+  // Phones get a lighter GPU budget: lower pixel ratio and smaller shadow maps.
+  const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
 
   return (
     <div className="scene-root">
-      <Canvas shadows="percentage" dpr={[1, 2]} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
+      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => inspect(null)} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
         <fog attach="fog" args={[palette.background, 400, 1400]} />
         <hemisphereLight args={['#ffffff', '#d9dbd3', 1.6]} />
-        <directionalLight position={[60, 120, 40]} intensity={1.5} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
+        <directionalLight position={[60, 120, 40]} intensity={1.5} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} overview={overview} onPick={onFocusFloor} onHover={hover} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} overview={overview} onPick={onFocusFloor} onInspect={inspect} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
@@ -83,7 +86,10 @@ function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObje
       const el = elements.current.get(anchor.key);
       if (!el) continue;
       const p = v.set(...anchor.position).project(camera);
-      el.style.transform = `translate(${((p.x + 1) / 2) * size.width}px, ${((1 - p.y) / 2) * size.height}px) translate(-50%, -50%)`;
+      // Keep labels fully on screen; narrow phone screens otherwise clip long room names.
+      const half = el.offsetWidth / 2, margin = 8;
+      const x = THREE.MathUtils.clamp(((p.x + 1) / 2) * size.width, half + margin, Math.max(half + margin, size.width - half - margin));
+      el.style.transform = `translate(${x}px, ${((1 - p.y) / 2) * size.height}px) translate(-50%, -50%)`;
       el.style.visibility = p.z < 1 ? 'visible' : 'hidden';
     }
   });
@@ -104,7 +110,7 @@ function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; 
     const radius = Math.max(4, 0.5 * Math.hypot(extent.x, extent.z, directive.focus.mode === 'floor' ? 0 : extent.y));
     // Fit the bounding sphere into the part of the viewport not covered by the chat UI.
     const freeW = Math.max(0.3, (size.width - insets.left) / size.width);
-    const freeH = Math.max(0.3, (size.height - insets.bottom) / size.height);
+    const freeH = Math.max(0.3, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
     const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.8 : 0.9);
@@ -116,9 +122,9 @@ function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; 
     c.setLookAt(centre.x + offset.x, centre.y + offset.y, centre.z + offset.z, centre.x, centre.y, centre.z, smooth);
     // Shift the picture into the free area. Focal offset is in screen axes (Y down): move the camera left/down.
     const worldPerPx = (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / size.height;
-    c.setFocalOffset(-(insets.left / 2) * worldPerPx, (insets.bottom / 2) * worldPerPx, 0, smooth);
+    c.setFocalOffset(-(insets.left / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
-  }, [focusKey, insets.left, insets.bottom, size.width, size.height]);
+  }, [focusKey, insets.top, insets.left, insets.bottom, size.width, size.height]);
   return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.08} />;
 }
 
@@ -135,10 +141,11 @@ interface FloorViewProps {
   tones: Map<string, Tone>;
   overview: boolean;
   onPick(floorId: string): void;
-  onHover(spaceId: string | null): void;
+  /** Show a room's name and area: hover with a mouse, tap on touch. */
+  onInspect(spaceId: string | null): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, overview, onPick, onHover }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, overview, onPick, onInspect }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -171,25 +178,28 @@ function FloorView({ model, toWorld, pose, tones, overview, onPick, onHover }: F
   });
 
   const plain = model.spaces.filter(m => !tones.has(m.space.id));
-  const pick = (event: ThreeEvent<MouseEvent>) => { if (overview) { event.stopPropagation(); onPick(model.floor.id); } };
+  const tap = (id: string) => (event: ThreeEvent<MouseEvent>) => {
+    if (overview) { event.stopPropagation(); onPick(model.floor.id); return; }
+    if (pose.interactive) { event.stopPropagation(); onInspect(id); }
+  };
   const hover = (id: string | null) => (event: ThreeEvent<PointerEvent>) => {
-    if (!pose.interactive || overview) return;
+    if (!pose.interactive || overview || event.pointerType !== 'mouse') return;
     event.stopPropagation();
-    onHover(id);
+    onInspect(id);
   };
 
   return (
     <group ref={group} position-y={pose.y}>
       <group ref={blocks} scale-y={blockHeight(model.storey, pose.flat)}>
         {plain.map(m => (
-          <mesh key={m.space.id} geometry={m.geometry} material={materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={pick} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
+          <mesh key={m.space.id} geometry={m.geometry} material={materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
         ))}
         <lineSegments geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
       {(['primary', 'secondary', 'muted'] as const).map(tone => (
         <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
           {model.spaces.filter(m => tones.get(m.space.id) === tone).map(m => (
-            <mesh key={m.space.id} geometry={m.geometry} material={materials[tone]} castShadow receiveShadow onClick={pick} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)}>
+            <mesh key={m.space.id} geometry={m.geometry} material={materials[tone]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)}>
               <lineSegments renderOrder={2}><edgesGeometry args={[m.geometry, 30]} /><lineBasicMaterial color={tone === 'primary' ? '#3b4a1a' : palette.edge} transparent opacity={0.9} /></lineSegments>
             </mesh>
           ))}
@@ -247,6 +257,11 @@ function Ground({ y }: { y: number }) {
   );
 }
 
+/** Overlays only belong on floors that are actually shown (not ghosted or lifted away). */
+function shown(poses: Map<string, FloorPose>, floorId: string) {
+  return (poses.get(floorId)?.opacity ?? 0) > 0.5;
+}
+
 function worldAt(model: BuildingModel, poses: Map<string, FloorPose>, point: FloorPoint, above: number): [number, number, number] {
   const [x, z] = model.toWorld(point.position);
   return [x, (poses.get(point.floorId)?.y ?? 0) + above, z];
@@ -258,18 +273,18 @@ function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, dire
   for (const h of directive.highlights ?? []) {
     const m = model.spaces.get(h.spaceId);
     const f = m && floorOf.get(m.space.floor_id);
-    if (!h.label || !m || !f) continue;
+    if (!h.label || !m || !f || !shown(poses, f.floor.id)) continue;
     const pose = poses.get(f.floor.id)!;
     anchors.push({ key: `hl-${h.spaceId}`, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]], content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
   }
-  const markers = directive.markers ?? [];
+  const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId));
   if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 3.6), content: <div className="scene-label scene-label--marker">{marker.label}</div> }));
   (directive.links ?? []).forEach((link, i) => {
-    if (!link.label) return;
+    if (!link.label || !shown(poses, link.from.floorId) || !shown(poses, link.to.floorId)) return;
     const a = worldAt(model, poses, link.from, 1.2), b = worldAt(model, poses, link.to, 1.2);
     anchors.push({ key: `ln-${i}`, position: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1, (a[2] + b[2]) / 2], content: <div className="scene-label scene-label--primary">{link.label}</div> });
   });
-  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), content: <div className="scene-label scene-label--closed">Closed</div> }));
+  (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), content: <div className="scene-label scene-label--closed">Closed</div> }));
   return anchors;
 }
 
@@ -293,15 +308,16 @@ function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceI
 /** Routes, link lines and markers, positioned against the target floor poses. */
 function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Map<string, FloorPose>; directive: SceneDirective }) {
   const at = (point: FloorPoint, above: number) => worldAt(model, poses, point, above);
+  const visible = (points: FloorPoint[]) => points.every(point => shown(poses, point.floorId));
   return <>
-    {(directive.markers ?? []).map((marker, i) => (
+    {(directive.markers ?? []).filter(marker => shown(poses, marker.floorId)).map((marker, i) => (
       <group key={i} position={at(marker, 0)}>
         <mesh position-y={2.4} castShadow><sphereGeometry args={[0.45, 20, 20]} /><meshStandardMaterial color={palette.route} /></mesh>
         <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.route} /></mesh>
       </group>
     ))}
-    {(directive.routes ?? []).map((route, i) => <RouteLine key={i} points={route.points.map(p => at(p, 1.6))} />)}
-    {(directive.links ?? []).map((link, i) => {
+    {(directive.routes ?? []).filter(route => visible(route.points)).map((route, i) => <RouteLine key={i} points={route.points.map(p => at(p, 1.6))} />)}
+    {(directive.links ?? []).filter(link => visible([link.from, link.to])).map((link, i) => {
       const a = at(link.from, 1.2), b = at(link.to, 1.2);
       return <group key={i}>
         <RouteLine points={[a, b]} />
