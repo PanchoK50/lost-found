@@ -4,12 +4,11 @@ import { useMemo } from 'react';
 import type { Building, Point, Space } from '@/lib/buildings/types';
 import { polygonCentroid } from '@/lib/buildings/geometry';
 import { representativePoint } from '@/lib/buildings/graph';
+import { wallsWithDoors } from '@/lib/guess/room-view';
 import styles from './guess.module.css';
 
 const VIEW = 100;
 const PAD = 10;
-
-interface Gap { from: number; to: number; entrance: boolean }
 
 /**
  * The room's outline only: rotated by `angle`, scaled to fit (no scale bar), doors as gaps in the wall.
@@ -37,7 +36,7 @@ export function ClueSilhouette({ building, space, angle }: { building: Building;
 }
 
 function silhouette(building: Building, space: Space, angle: number) {
-  const ring = closedRing(space.polygon) ? space.polygon.slice(0, -1) : space.polygon;
+  const { ring, gaps } = wallsWithDoors(building, space);
   const [cx, cy] = polygonCentroid(ring);
   const cos = Math.cos(angle), sin = Math.sin(angle);
   // Rotate about the centroid; SVG y points down, so flip y (coordinates are metres with y up).
@@ -50,30 +49,13 @@ function silhouette(building: Building, space: Space, angle: number) {
   const view = (p: Point): Point => [p[0] * k + ox, p[1] * k + oy];
   const pts = turned.map(view);
 
-  // Each door cuts a gap of its width into the wall nearest to its position.
-  const gaps = ring.map((): Gap[] => []);
-  for (const o of building.openings) {
-    if (!o.space_ids.includes(space.id)) continue;
-    let best = 0, bestT = 0, bestD = Infinity;
-    ring.forEach((p, i) => {
-      const q = ring[(i + 1) % ring.length];
-      const dx = q[0] - p[0], dy = q[1] - p[1], l2 = dx * dx + dy * dy || 1;
-      const t = Math.max(0, Math.min(1, ((o.position[0] - p[0]) * dx + (o.position[1] - p[1]) * dy) / l2));
-      const d = Math.hypot(p[0] + t * dx - o.position[0], p[1] + t * dy - o.position[1]);
-      if (d < bestD) { bestD = d; best = i; bestT = t; }
-    });
-    const p = ring[best], q = ring[(best + 1) % ring.length];
-    const half = Math.max(0.4, o.width_m / 2) / (Math.hypot(q[0] - p[0], q[1] - p[1]) || 1);
-    gaps[best].push({ from: Math.max(0, bestT - half), to: Math.min(1, bestT + half), entrance: o.kind === 'entrance' });
-  }
-
   const lerp = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   const walls: [Point, Point][] = [];
   const doors: { a: Point; b: Point; entrance: boolean }[] = [];
   pts.forEach((p, i) => {
     const q = pts[(i + 1) % pts.length];
     let t = 0;
-    for (const g of gaps[i].sort((a, b) => a.from - b.from)) {
+    for (const g of gaps[i]) {
       if (g.from > t) walls.push([lerp(p, q, t), lerp(p, q, g.from)]);
       doors.push({ a: lerp(p, q, g.from), b: lerp(p, q, g.to), entrance: g.entrance });
       t = Math.max(t, g.to);
@@ -82,8 +64,4 @@ function silhouette(building: Building, space: Space, angle: number) {
   });
 
   return { fill: `M${pts.map(p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join('L')}Z`, walls, doors, you: view(turn(representativePoint(ring))) };
-}
-
-function closedRing(polygon: Point[]) {
-  return polygon.length > 3 && polygon[0][0] === polygon.at(-1)![0] && polygon[0][1] === polygon.at(-1)![1];
 }
