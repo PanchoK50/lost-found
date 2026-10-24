@@ -1,6 +1,6 @@
 """HTTP API for the web app (contract documented in lostfound/api/README.md).
 
-  source .envrc && uv run uvicorn lostfound.api.server:app --reload --port 8000"""
+  uv run --env-file .env uvicorn lostfound.api.server:app --reload --port 8000"""
 
 import base64
 import csv

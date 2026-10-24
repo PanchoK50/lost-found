@@ -1,7 +1,7 @@
 """Generate reworded versions of dev questions (same meaning, same answer) to test robustness to phrasings
 the template parser has never seen, like the Sunday building may bring.
 
-  source .envrc && uv run python -m lostfound.evals.paraphrase --set dev --per-question 2
+  uv run --env-file .env python -m lostfound.evals.paraphrase --set dev --per-question 2
 Writes evals/data/paraphrase_dev.jsonl (items keep the original answer; ids get a -P<n> suffix)."""
 
 import argparse

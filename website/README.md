@@ -23,7 +23,7 @@ Use Node 24 (see `../.nvmrc`) and npm for the web app, and uv (Python 3.12+) for
 ```sh
 cd ..
 uv sync
-source .envrc   # exports ANTHROPIC_API_KEY (or put it in .env and use `uv run --env-file .env`)
+# put ANTHROPIC_API_KEY in ../.env (see ../.env.example)
 uv run uvicorn lostfound.api.server:app --port 8000
 ```
 

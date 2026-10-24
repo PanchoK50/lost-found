@@ -1,6 +1,6 @@
 """One command from questions to the submission CSV (see BENCHMARK.md).
 
-  source .envrc && uv run python -m lostfound.benchmark data/test --out submissions/team_lostfound.csv
+  uv run --env-file .env python -m lostfound.benchmark data/test --out submissions/team_lostfound.csv
 
 Input: a directory with building folders. Questions are read from <dir>/questions.csv
 (question_id,building_id,kind,question) if present, else from every <dir>/<building>/questions.jsonl

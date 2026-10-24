@@ -4,7 +4,7 @@ One command, no manual steps between input and output:
 
 ```sh
 uv sync
-source .envrc            # exports ANTHROPIC_API_KEY
+# put ANTHROPIC_API_KEY in .env (see .env.example)
 uv run python -m lostfound.benchmark <questions-directory> --out submissions/<name>.csv
 ```
 

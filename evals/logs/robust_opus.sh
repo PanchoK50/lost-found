@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -u
-source .envrc
+set -a; source .env; set +a
 uv run python -m lostfound.evals.run --variant V5 --model opus --effort low --set paraphrase-dev --workers 8 --max-cost 8 > evals/logs/paraphrase__V5__opus.log 2>&1
 grep "  all" evals/logs/paraphrase__V5__opus.log
 uv run python -m lostfound.evals.run --variant V4 --model opus --effort low --set warmup-dev --workers 8 --max-cost 10 > evals/logs/warmup__V4__opus.log 2>&1

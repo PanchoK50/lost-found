@@ -1,6 +1,6 @@
 """Run one variant on one eval set, in parallel, and log every question.
 
-  source .envrc && uv run python -m lostfound.evals.run --variant V2 --model sonnet --effort low --set dev
+  uv run --env-file .env python -m lostfound.evals.run --variant V2 --model sonnet --effort low --set dev
   uv run python -m lostfound.evals.run --variant V1 --set dev            # free, no API
 Options: --per-kind N (sample), --kinds a b, --workers 8, --max-cost 20 (stop submitting new questions once
 the run has spent this many dollars), --name custom_run_name."""

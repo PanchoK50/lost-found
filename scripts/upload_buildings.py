@@ -1,8 +1,8 @@
 """Upload the dataset buildings to Supabase: building.json into the 'buildings' Storage bucket and one row per
 building into the `buildings` table (from data/manifest.csv). Safe to re-run (upserts).
 
-  source .envrc && uv run python scripts/upload_buildings.py            # all splits
-  source .envrc && uv run python scripts/upload_buildings.py dev        # one split"""
+  uv run --env-file .env python scripts/upload_buildings.py            # all splits
+  uv run --env-file .env python scripts/upload_buildings.py dev        # one split"""
 
 import csv
 import json

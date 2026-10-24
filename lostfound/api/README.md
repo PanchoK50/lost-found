@@ -3,7 +3,7 @@
 Start the server from the repo root:
 
 ```sh
-source .envrc && uv run uvicorn lostfound.api.server:app --reload --port 8000
+uv run --env-file .env uvicorn lostfound.api.server:app --reload --port 8000
 ```
 
 Interactive docs are served at http://localhost:8000/docs. CORS is open for local development.

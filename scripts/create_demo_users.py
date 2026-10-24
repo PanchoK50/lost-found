@@ -1,6 +1,6 @@
 """Create (or update) the demo logins in Supabase Auth, so nobody has to go through a sign-up flow.
 
-  source .envrc && uv run python scripts/create_demo_users.py
+  uv run --env-file .env python scripts/create_demo_users.py
 
 Needs SUPABASE_URL, SUPABASE_SECRET_KEY and DEMO_PASSWORD in the environment. Profiles are created by the
 `on_auth_user_created` trigger from the user metadata (supabase/migrations)."""

@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -u
-source .envrc
+set -a; source .env; set +a
 for model in haiku sonnet opus; do
   for v in V2 V3 V4; do
     uv run python -m lostfound.evals.run --variant $v --model $model --effort low --set dev --workers 8 --max-cost 15 > evals/logs/dev__${v}__${model}__low.log 2>&1
