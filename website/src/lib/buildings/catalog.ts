@@ -21,7 +21,7 @@ const catalog: CatalogEntry[] = [
       { label: 'Largest room', question: 'Which is the largest generic room on floor 5, and how big is it in m²?' },
       { label: 'Total area', question: 'What is the total area of all generic rooms on floor 4?' },
       { label: 'Shared walls', question: 'We\'re soundproofing Generic room -1364. How many rooms share a wall with it?' },
-      { label: 'Wide delivery', question: 'A 0.8 m wide trolley arrives through the entrance into Corridor -1328. Into how many rooms on floor 2 can it be delivered?' },
+      { label: 'Wide delivery', question: 'A 0.8 m wide trolley arrives through the entrance into Generic room N0315D. Into how many rooms on the ground floor can it be delivered?' },
       { label: 'Step-free reach', question: 'Lift 1 is out of service. A wheelchair user comes in through the entrance into Stairwell N0320A. How many rooms on floor 2 can they still reach?' },
       { label: 'What-if door', question: 'What if we add a door between Corridor -1328 and Corridor -1351? How many rooms on basement 1 get a shorter walk out?' },
       { label: 'Room below', question: 'Which room is directly below N2324?' },

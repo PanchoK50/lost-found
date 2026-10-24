@@ -5,8 +5,8 @@ Every question kind in the challenge data (`data/*/*/questions*.jsonl`) maps to 
 The backend returns a `ChatResponse` (`src/lib/chat/contract.ts`): `reply` text, a headline `answer` (`title`, `value`, `detail`) and a `scene`. The scene fields used per type are listed below.
 
 **Highlight colours** (`scene.highlights[].tone`) mean the same thing everywhere:
-- `primary` (lime, raised): what the answer names or counts.
-- `secondary` (sage): the reference room the question is about, e.g. the start, the entry, the room being soundproofed.
+- `primary` (orange, raised): what the answer names or counts.
+- `secondary` (light blue): the reference room the question is about, e.g. the start, the entry, the room being soundproofed.
 - `muted` (faint tint): background candidates, e.g. the runners-up for "largest room".
 
 On a single floor the camera frames the `primary` + `secondary` spaces (never tighter than 45% of the floor or 30 m).
@@ -89,7 +89,7 @@ Open points:
 
 | Kind | Test | Headline | Scene |
 |---|---|---|---|
-| `locate` (warm-up) | — | `Quality lab 0.21` · `Coordinate measuring machine 0.21` | Item box lit lime (`assets: [id]`), its room `secondary`, a pin labelled "item · room"; action **Get directions** |
+| `locate` (warm-up) | — | `Quality lab 0.21` · `Coordinate measuring machine 0.21` | Item box lit orange (`assets: [id]`), its room `secondary`, a pin labelled "item · room"; action **Get directions** |
 | locate, several | — | `3 CNC mills` · `1 floor` | All items lit, their rooms `secondary` (labelled with a count if several share a room); floors `stack`ed when on 2–3 floors; action **Find the nearest** |
 | locate, nearest | — | `Kitchen 0.28` · `≈ 21 m from 0.38` | "I'm in X. Where is the nearest …" picks by walking distance; your room `muted` ("You · …"); action **Show me the way** |
 | `count` (warm-up) | — | `7` · `Meeting tables on Ground floor` | Every counted item lit, rooms `secondary` with `×n` badges when some room has more than one |

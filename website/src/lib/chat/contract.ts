@@ -46,7 +46,8 @@ export interface ChatResponse {
   /** Full assistant reply, plain text. */
   reply: string;
   /** Headline shown on the answer card, e.g. { title: 'Generic room N5325', value: '79.48 m²' }. */
-  answer?: { title: string; value?: string; detail?: string };
+  /** `negative`: the answer is "not possible" (e.g. no step-free route); shown without the orange answer accent. */
+  answer?: { title: string; value?: string; detail?: string; negative?: boolean };
   scene: SceneDirective;
   /** Follow-up buttons under the answer. `send: false` puts the text in the input for the user to finish. */
   actions?: { label: string; message: string; send?: boolean }[];
@@ -98,12 +99,12 @@ export type Tone = 'primary' | 'secondary' | 'muted';
 export interface SceneDirective {
   focus: SceneFocus;
   /**
-   * Spaces to colour. `primary`: what the answer names or counts (lime, raised).
-   * `secondary`: the reference room the question is about, e.g. the start, entry or target (sage).
-   * `muted`: background candidates, e.g. the runners-up for "largest room" (faint tint).
+   * Spaces to colour. `primary`: what the answer names or counts (orange, raised).
+   * `secondary`: the reference room the question is about, e.g. the start, entry or target (light blue).
+   * `muted`: background candidates, e.g. the runners-up for "largest room" (faint blue tint).
    */
   highlights?: { spaceId: string; tone: Tone; label?: string }[];
-  /** Pins for assets or points. `muted` markers draw as small flat warnings (e.g. doors that are too narrow). */
+  /** Pins for assets or points. `primary` = the answer (orange head, answer label); `muted` = small flat warnings (e.g. doors that are too narrow). */
   markers?: (FloorPoint & { label: string; tone?: Tone })[];
   /**
    * Routes, one entry per leg. `steps` are turn-by-turn directions (filled in by the API when omitted). `spacePath` is the ordered list of spaces walked through (what the route check
@@ -113,7 +114,7 @@ export interface SceneDirective {
   routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string }[];
   /** Straight 3D lines, e.g. sensor links between room centroids. `breakdown` also draws the across and up legs (dashed). */
   links?: { from: FloorPoint; to: FloorPoint; label?: string; breakdown?: boolean }[];
-  /** Asset ids to light up (their footprint boxes turn lime). */
+  /** Asset ids to light up (their footprint boxes turn orange). */
   assets?: string[];
   /** Opening or vertical-connector ids to mark as closed. */
   closed?: string[];

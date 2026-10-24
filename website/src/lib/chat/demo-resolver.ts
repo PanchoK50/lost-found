@@ -270,12 +270,13 @@ function locateAssets(ctx: Context, type: string, named?: Asset): ChatResponse {
       return {
         kind: 'locate',
         reply: `The nearest ${label} to ${start.name} is ${nearest.name} in ${where(nearest)}, about ${metres.toFixed(0)} m away. There ${candidates.length === 2 ? 'is 1 other' : `are ${candidates.length - 1} others`} in the building.`,
-        answer: { title: nearest.name, value: room.name, detail: `${ctx.floors.get(room.floor_id)?.name} · ≈ ${metres.toFixed(0)} m from ${start.ref}` },
+        answer: { title: nearest.name, value: room.name, detail: `${ctx.floors.get(room.floor_id)?.name} · ≈\u00a0${metres.toFixed(0)}\u00a0m from ${start.ref}` },
         scene: {
           focus: focusFor(ctx, [start.floor_id, room.floor_id]),
           // The item is the answer (lit, with the label); its room is context.
-          highlights: [{ spaceId: room.id, tone: 'secondary' }, ...(room.id === start.id ? [] : [{ spaceId: start.id, tone: 'muted' as const, label: `You · ${start.name}` }])],
-          markers: [{ ...assetMarker(nearest), label: `${nearest.name} · ${room.name}` }],
+          // The item is the answer (orange box and pin); you are the reference room; the item's room is context.
+          highlights: [{ spaceId: room.id, tone: 'muted' }, ...(room.id === start.id ? [] : [{ spaceId: start.id, tone: 'secondary' as const, label: `You · ${start.name}` }])],
+          markers: [{ ...assetMarker(nearest), label: `${nearest.name} · ${room.name}`, tone: 'primary' as const }],
           assets: [nearest.id],
         },
         actions: [{ label: 'Show me the way', message: `How do I get from ${start.name} to ${room.name}?`, send: true }],
@@ -303,7 +304,7 @@ function locateAssets(ctx: Context, type: string, named?: Asset): ChatResponse {
         const n = candidates.filter(a => a.space_id === spaceId).length;
         return { spaceId, tone: 'secondary' as const, label: n > 1 && rooms.length <= 6 ? `${spaces.get(spaceId)?.name} · ${n}` : undefined };
       }),
-      markers: candidates.length <= 12 ? candidates.map(a => ({ ...assetMarker(a), label: candidates.filter(b => b.space_id === a.space_id).length > 1 ? '' : many ? a.name : `${a.name} · ${spaces.get(a.space_id)?.name}` })) : [],
+      markers: candidates.length <= 12 ? candidates.map(a => ({ ...assetMarker(a), label: candidates.filter(b => b.space_id === a.space_id).length > 1 ? '' : many ? a.name : `${a.name} · ${spaces.get(a.space_id)?.name}`, tone: 'primary' as const })) : [],
       assets: candidates.map(a => a.id),
     },
     actions: many
@@ -512,16 +513,19 @@ function routeResponse(ctx: Context, kind: ChatResponse['kind'], stops: Space[],
   const passed = [...new Set(legs.flatMap(leg => leg.spacePath))].filter(id => id !== OUTSIDE && !stopIds.has(id));
   const via = describeVia(ctx, legs, stops);
   const notes = ruleNotes(rules);
-  const value = distance === undefined ? `≈ ${total.toFixed(0)} m` : `${total.toFixed(2)} m`;
+  const value = distance === undefined ? `≈\u00a0${total.toFixed(0)}\u00a0m` : `${total.toFixed(2)}\u00a0m`;
+  const startFloor = ctx.floorOf(start).name, endFloor = ctx.floorOf(end).name;
+  const floorsText = startFloor === endFloor ? startFloor : `${startFloor} → ${endFloor}`;
   const label = (sp: Space, i: number) => labels.get(sp.id) ?? (i === 0 ? `Start · ${sp.name}` : i === stops.length - 1 ? sp.name : `Stop ${i} · ${sp.name}`);
   return {
     kind,
     reply: `${kind === 'errand' ? 'In total it' : `From ${start.name} to ${end.name} it`} is about ${total.toFixed(0)} m, roughly ${minutes} min on foot${via.length ? `, via ${via.join(', ')}` : ''}.${closed.length ? ` I avoided ${closed.map(c => c.name).join(' and ')}.` : ''}${rules.stepFree ? ' No stairs or steps on the way.' : ''}`,
-    answer: { title: kind === 'errand' ? `${start.ref} → pick up → ${end.ref}` : stops.map(sp => sp.ref).join(' → '), value, detail: [`${floorIds.length} floor${floorIds.length === 1 ? '' : 's'}`, `about ${minutes} min`, ...notes].join(' · ') },
+    answer: { title: kind === 'errand' ? `${start.ref} → pick up → ${end.ref}` : stops.map(sp => sp.ref).join(' → '), value, detail: [floorsText, `about\u00a0${minutes}\u00a0min`, ...notes].join(' · ') },
     scene: {
       focus: floorIds.length === 1 ? { mode: 'floor', floorId: floorIds[0] } : { mode: 'stack', floorIds },
       highlights: [
-        ...stops.map((sp, i) => ({ spaceId: sp.id, tone: i === 0 ? 'secondary' as const : 'primary' as const, label: label(sp, i) })),
+        // Only the destination is the answer (orange); the start and any stops in between are reference rooms.
+        ...stops.map((sp, i) => ({ spaceId: sp.id, tone: i === stops.length - 1 ? 'primary' as const : 'secondary' as const, label: label(sp, i) })),
         ...passed.map(id => ({ spaceId: id, tone: 'muted' as const })),
       ],
       // Draw only the floors on view: rides through intermediate floors become one vertical hop.
@@ -560,7 +564,7 @@ function noRoute(ctx: Context, from: Space, to: Space | undefined, rules: WalkRu
   return {
     kind: rules.stepFree ? 'route_step_free' : closed.length ? 'route_with_closure' : 'route',
     reply,
-    answer: { title: to ? `${from.ref} → ${to.ref}` : from.name, value: `No${constraint} route`, detail: why || undefined },
+    answer: { title: to ? `${from.ref} → ${to.ref}` : from.name, value: `No${constraint} route`, detail: why || undefined, negative: true },
     scene: {
       focus: floors.length === 1 ? { mode: 'floor', floorId: floors[0] } : { mode: 'stack', floorIds: floors },
       highlights: [
@@ -629,7 +633,8 @@ function wideDelivery(ctx: Context, start: Space, width: number): ChatResponse {
     reply: `A ${width} m wide load coming in at ${start.name} can reach ${plural(n, 'room')} on ${floor.name}, avoiding stairs and steps and only using doors at least ${width} m wide.${blocking.length ? ` ${plural(blocking.length, 'door')} on this floor ${blocking.length === 1 ? 'is' : 'are'} too narrow and block the rest.` : ''}`,
     answer: { title: `Rooms a ${width} m load can reach on ${floor.name}`, value: String(n), detail: `From ${start.name} · no steps · doors ≥ ${width} m` },
     scene: {
-      focus: { mode: 'floor', floorId: floor.id },
+      // Show where the load comes in, even when it's on another floor.
+      focus: start.floor_id === floor.id ? { mode: 'floor', floorId: floor.id } : { mode: 'stack', floorIds: [start.floor_id, floor.id] },
       highlights: [
         ...rooms.filter(space => space.id !== start.id).map(space => ({ spaceId: space.id, tone: 'primary' as const })),
         { spaceId: start.id, tone: rooms.some(space => space.id === start.id) ? 'primary' : 'secondary', label: `Entry · ${start.name}` },
@@ -651,8 +656,11 @@ function stepFreeReachable(ctx: Context, start: Space): ChatResponse {
     reply: `Coming in at ${start.name}, a wheelchair user can reach ${plural(n, 'room')} on ${floor.name} without stairs or steps${closed.length ? ` while ${closedNames} ${closed.length === 1 ? 'is' : 'are'} out of service` : ''}.`,
     answer: { title: `Step-free rooms on ${floor.name}`, value: String(n), detail: closed.length ? `${closedNames} closed · from ${start.name}` : `From ${start.name}` },
     scene: {
-      focus: { mode: 'floor', floorId: floor.id },
-      highlights: rooms.map(space => ({ spaceId: space.id, tone: 'primary' as const })),
+      focus: start.floor_id === floor.id ? { mode: 'floor', floorId: floor.id } : { mode: 'stack', floorIds: [start.floor_id, floor.id] },
+      highlights: [
+        ...rooms.filter(space => space.id !== start.id).map(space => ({ spaceId: space.id, tone: 'primary' as const })),
+        { spaceId: start.id, tone: rooms.some(space => space.id === start.id) ? 'primary' as const : 'secondary' as const, label: `Entry · ${start.name}` },
+      ],
       closed: closed.map(c => c.id),
     },
   };

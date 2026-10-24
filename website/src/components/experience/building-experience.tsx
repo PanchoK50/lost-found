@@ -93,6 +93,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const transcript = useRef<HTMLElement>(null);
   const dock = useRef<HTMLElement>(null);
   const floorList = useRef<HTMLDivElement>(null);
+  const latestQuestion = useRef<HTMLParagraphElement>(null);
   const started = messages.length > 0;
   const floors = [...building.floors].sort((a, b) => a.level - b.level);
   const focusedFloor = directive.focus.mode === 'floor' ? directive.focus.floorId : undefined;
@@ -120,10 +121,21 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     window.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
   }, [wide, started]);
-  useEffect(() => { floorList.current?.querySelector('.active')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }, [focusedFloor]);
-  useEffect(() => { transcriptEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, busy, expanded]);
+  useEffect(() => {
+    const list = floorList.current;
+    if (!list) return;
+    const active = list.querySelector('.active');
+    if (active) active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    else list.scrollTo({ left: 0, behavior: 'smooth' });
+  }, [focusedFloor]);
+  // Show the latest question with its answer card at the top, not the end of a long step list.
+  useEffect(() => {
+    const target = busy ? transcriptEnd.current : latestQuestion.current ?? transcriptEnd.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: busy ? 'end' : 'start' });
+  }, [messages, busy, expanded]);
 
-  const showOverview = useCallback(() => setDirective(overview), []);
+  // Whole building, keeping the current answer's highlights and route.
+  const showOverview = useCallback(() => setDirective(current => ({ ...current, focus: { mode: 'building' } })), []);
   /** Back to the start screen: whole building, "Ask me anything", suggestions. */
   const startOver = useCallback(() => {
     setMessages([]);
@@ -224,10 +236,11 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             )}
             <div className="transcript-scroll">
               {visible.map(message => message.role === 'user'
-                ? <p key={message.id} className="bubble bubble--user">{message.content}</p>
+                ? <p key={message.id} ref={message.id === messages[lastUser]?.id ? latestQuestion : undefined} className="bubble bubble--user">{message.content}</p>
                 : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
+                    <AgentAvatar />
                     {message.response?.answer && (
-                      <button type="button" className="answer-card" onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
+                      <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
                         <span className="answer-title">{message.response.answer.title}</span>
                         {message.response.answer.value && <span className="answer-value">{message.response.answer.value}</span>}
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
@@ -269,7 +282,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                       />
                     ) : null}
                   </article>)}
-              {busy && <p className="bubble bubble--assistant bubble--thinking" aria-label="Thinking"><i /><i /><i /></p>}
+              {busy && <div className="bubble bubble--thinking" role="status"><AgentAvatar thinking />Looking it up…</div>}
               <div ref={transcriptEnd} />
             </div>
           </section>
@@ -277,6 +290,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
         <section className="dock" ref={dock}>
           {!started && <div className="hero">
+            <AgentAvatar size="lg" />
             <p className="eyebrow">{building.building.name} · {building.floors.length} floors · {building.spaces.length} spaces</p>
             <h1>Ask me anything.</h1>
           </div>}
@@ -312,6 +326,35 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 function withoutDemo(world: WorldState): WorldState {
   const demo = new Set(world.players.filter(p => p.demo).map(p => p.id));
   return { ...world, players: world.players.filter(p => !demo.has(p.id)), presence: world.presence.filter(p => !demo.has(p.playerId)), pings: world.pings.filter(p => !demo.has(p.fromId)) };
+}
+
+/**
+ * The building's assistant, drawn after Synera's agent robots: a glossy white head with a navy visor and a
+ * glowing light-blue face. The face pulses while it thinks.
+ */
+function AgentAvatar({ thinking = false, size }: { thinking?: boolean; size?: 'lg' }) {
+  return (
+    <svg className={`agent-avatar${size === 'lg' ? ' agent-avatar--lg' : ''}${thinking ? ' agent-avatar--thinking' : ''}`} viewBox="0 0 64 64" aria-hidden>
+      <defs>
+        <radialGradient id="agent-head" cx="40%" cy="28%" r="80%"><stop offset="0" stopColor="#ffffff" /><stop offset=".7" stopColor="#eef1f6" /><stop offset="1" stopColor="#cfd6e2" /></radialGradient>
+        <linearGradient id="agent-visor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1b2a6b" /><stop offset=".55" stopColor="#0b1440" /><stop offset="1" stopColor="#3a2c8f" /></linearGradient>
+        <filter id="agent-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+      {/* head */}
+      <rect x="4" y="5" width="56" height="52" rx="24" fill="url(#agent-head)" stroke="#d3dae6" strokeWidth="1" />
+      {/* visor */}
+      <rect x="11" y="17" width="42" height="25" rx="12.5" fill="url(#agent-visor)" />
+      <ellipse cx="25" cy="21.5" rx="10" ry="2.2" fill="#ffffff" opacity=".18" />
+      {/* face: Synera's glowing dot-and-bar pattern */}
+      <g className="agent-face" fill="#bfe3ff" filter="url(#agent-glow)">
+        <circle cx="20" cy="29.5" r="1.6" />
+        <rect x="24" y="26" width="3" height="7" rx="1.5" />
+        <rect x="29.5" y="23.5" width="3" height="12" rx="1.5" />
+        <rect x="35" y="26" width="3" height="7" rx="1.5" />
+        <circle cx="42.5" cy="29.5" r="1.6" />
+      </g>
+    </svg>
+  );
 }
 
 /** Benchmark replies end with an "Answer: …" line; the headline card already shows it. */
