@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/world/world.css";
 
 /* Mobile-first: base styles are the phone layout; the desktop layout is the min-width: 900px block at the end. */
 :root {

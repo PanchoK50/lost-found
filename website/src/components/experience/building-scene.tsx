@@ -8,6 +8,8 @@ import type { Line2 } from 'three-stdlib';
 import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
 import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
+import type { WorldState } from '@/lib/world/types';
+import { worldAnchors } from '@/components/world/world-anchors';
 
 const palette = {
   background: '#f2f2ee',
@@ -33,20 +35,23 @@ interface Props {
   directive: SceneDirective;
   insets: SceneInsets;
   onFocusFloor(floorId: string): void;
+  /** People and pins from the shared world; they stay when the answer changes (docs/MULTIPLAYER.md §11). */
+  world?: WorldState;
+  onPin?(pinId: string): void;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
-interface Anchor {
+export interface Anchor {
   key: string;
   position: [number, number, number];
   content: ReactNode;
   /** `above`: a callout that floats over its point with a tail, so the point itself stays visible. */
   placement?: 'above' | 'center';
   /** Anchors in a group are spread out so they never overlap (e.g. floor tags 3 m apart). */
-  group?: 'floors';
+  group?: 'floors' | 'counts';
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
@@ -58,6 +63,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
     ...(hovered && !overview ? hoverAnchor(model, poses, hovered) : []),
   ], [model, poses, directive, overview, onFocusFloor, hovered]);
+  const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onFocusFloor]);
+  const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const elements = useRef(new Map<string, HTMLDivElement>());
   const register = useCallback((key: string) => (el: HTMLDivElement | null) => {
     if (el) elements.current.set(key, el); else elements.current.delete(key);
@@ -82,10 +89,13 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         {directive.focus.mode === 'floor' && directive.focus.around && (
           <Cursor key={`cursor-${directiveKey}`} position={worldAt(model, poses, { floorId: directive.focus.floorId, position: directive.focus.around }, 1.7)} />
         )}
-        <Projector anchors={anchors} elements={elements} />
+        <Projector anchors={projected} elements={elements} />
       </Canvas>
       <div className="scene-anchors" key={directiveKey}>
         {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
+      </div>
+      <div className="scene-anchors">
+        {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
     </div>
   );
@@ -103,14 +113,16 @@ function Projector({ anchors, elements }: { anchors: Anchor[]; elements: RefObje
       const p = v.set(...anchor.position).project(camera);
       placed.push({ anchor, el, x: ((p.x + 1) / 2) * size.width, y: ((1 - p.y) / 2) * size.height, visible: p.z < 1 });
     }
-    // Floor tags: one evenly spaced column in floor order, centred where the floors are.
-    const floors = placed.filter(a => a.anchor.group === 'floors');
-    if (floors.length > 1) {
-      const order = [...floors].sort((a, b) => b.y - a.y); // lowest floor (largest y) first
-      const column = Math.max(...floors.map(a => a.x));
-      const mean = floors.reduce((sum, a) => sum + a.y, 0) / floors.length;
-      const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
-      order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
+    // Floor tags (and the world's per-floor counts): one evenly spaced column in floor order, centred where the floors are.
+    for (const group of ['floors', 'counts'] as const) {
+      const floors = placed.filter(a => a.anchor.group === group);
+      if (floors.length > 1) {
+        const order = [...floors].sort((a, b) => b.y - a.y); // lowest floor (largest y) first
+        const column = Math.max(...floors.map(a => a.x));
+        const mean = floors.reduce((sum, a) => sum + a.y, 0) / floors.length;
+        const spread = Math.max(FLOOR_TAG_GAP_PX, (order[0].y - order.at(-1)!.y) / (order.length - 1));
+        order.forEach((a, i) => { a.x = column; a.y = mean + ((order.length - 1) / 2 - i) * spread; });
+      }
     }
     for (const { anchor, el, x, y, visible } of placed) {
       // Keep labels fully on screen; narrow phone screens otherwise clip long room names.
