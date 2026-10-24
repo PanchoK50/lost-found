@@ -136,12 +136,12 @@
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 1.0,
+  "qa_parity": 0.8,
   "qa_by_kind": {
    "largest_room": "1/1",
    "floor_area_total": "1/1",
    "wide_delivery_count": "1/1",
-   "errand": "1/1",
+   "errand": "0/1",
    "straight_line_3d": "1/1"
   },
   "issues": 43
@@ -296,12 +296,12 @@
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 1.0,
+  "qa_parity": 0.6666666666666666,
   "qa_by_kind": {
    "largest_room": "1/1",
    "floor_area_total": "1/1",
-   "wide_delivery_count": "1/1",
-   "errand": "1/1",
+   "wide_delivery_count": "0/1",
+   "errand": "0/1",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
   },
@@ -393,12 +393,12 @@
   "door_recall": 1.0,
   "door_precision": 1.0,
   "connector_link_recall": 1.0,
-  "qa_parity": 1.0,
+  "qa_parity": 0.8333333333333334,
   "qa_by_kind": {
    "largest_room": "1/1",
    "floor_area_total": "1/1",
    "wide_delivery_count": "1/1",
-   "errand": "1/1",
+   "errand": "0/1",
    "shared_walls_count": "1/1",
    "straight_line_3d": "1/1"
   },

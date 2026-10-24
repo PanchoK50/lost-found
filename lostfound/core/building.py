@@ -1,12 +1,11 @@
 """Building: the starter's BuildingMap plus indices, width-aware graphs and temporary edits.
 
-The route model (anchors, opening edges, stair/lift costs, parallel edges, the shared "outside" node) is
-inherited unchanged from starter_agent.building_map, because the expected answers were computed with it."""
+The route model (kit 1.1.0: door-to-door walking 15 cm off the walls, stairs 2 m and lifts 15 m + 1 m per metre
+climbed, no way round the outside) is inherited unchanged from starter_agent.building_map, because the graded
+answers are computed with it. Walking lengths per space are expensive, so they are cached per building file."""
 
 import contextlib
 import functools
-import itertools
-import math
 from collections import defaultdict
 from collections.abc import Iterator
 from pathlib import Path
@@ -14,18 +13,11 @@ from pathlib import Path
 import networkx as nx
 from shapely.geometry import Polygon
 
-from starter_agent.building_map import (
-    DOOR_PREFIX,
-    LIFT,
-    LIFT_COST_PER_FLOOR_M,
-    LIFT_WAIT_COST_M,
-    OUTSIDE,
-    STAIRS_COST_PER_FLOOR_M,
-    BuildingMap,
-    MapError,
-)
+from starter_agent.building_map import DOOR_PREFIX, OUTSIDE, BuildingMap, MapError
 
 __all__ = ["Building", "MapError", "OUTSIDE", "DOOR_PREFIX", "ROOMISH_TYPES", "WALL_NEIGHBOUR_TYPES"]
+
+_WALKS_CACHE: dict[str, dict] = {}  # resolved building directory -> {space id: walks}, for unedited buildings
 
 # Space types that count as "rooms" in room counts (reachability, deliveries, what-if exits). Halls,
 # corridors, stairs, lifts and outdoor areas do not. Shared-wall counts are the exception: their wording
@@ -43,12 +35,12 @@ class Building(BuildingMap):
         self.spaces_by_floor: dict[str, list[dict]] = defaultdict(list)
         for space in self.spaces.values():
             self.spaces_by_floor[space["floor_id"]].append(space)
-        self._anchors: dict[str, tuple[float, float]] = {}
 
     @classmethod
     def load(cls, path: Path) -> "Building":
         building = super().load(path)
         building.directory = path if path.is_dir() else path.parent
+        building.walks = _WALKS_CACHE.setdefault(str(Path(building.directory).resolve()), {})
         return building
 
     @property
@@ -61,12 +53,6 @@ class Building(BuildingMap):
     def polygon(self, space_id: str) -> Polygon:
         return Polygon(self.spaces[space_id]["polygon"])
 
-    def anchor(self, space_id: str) -> tuple[float, float]:
-        if space_id not in self._anchors:
-            point = self.polygon(space_id).representative_point()
-            self._anchors[space_id] = (point.x, point.y)
-        return self._anchors[space_id]
-
     def level(self, floor_id: str) -> int:
         return self.floors[floor_id]["level"]
 
@@ -76,40 +62,19 @@ class Building(BuildingMap):
     # ---------- graph ----------
 
     def graph(self, step_free: bool = False, min_width: float | None = None) -> nx.MultiGraph:
-        """Same graph as BuildingMap.graph, optionally dropping openings narrower than min_width."""
-        graph = nx.MultiGraph()
-        anchors = {space_id: self.anchor(space_id) for space_id in self.spaces if space_id not in self.closed}
-        graph.add_nodes_from(anchors)
-        for opening in self.openings.values():
-            if opening["id"] in self.closed or (step_free and not opening["step_free"]):
-                continue
-            if min_width is not None and opening["width_m"] + 1e-9 < min_width:
-                continue
-            door = DOOR_PREFIX + opening["id"]
-            for space_id in opening["space_ids"]:
-                if space_id == OUTSIDE:
-                    graph.add_edge(OUTSIDE, door, weight=0.0, via=opening["id"])
-                elif space_id in anchors:
-                    distance = math.dist(anchors[space_id], opening["position"])
-                    graph.add_edge(space_id, door, weight=distance, via=opening["id"])
-        for connector in self.connectors.values():
-            if connector["id"] in self.closed or (step_free and not connector["step_free"]):
-                continue
-            stops = sorted(
-                zip(connector["floor_ids"], connector["space_ids"], strict=True),
-                key=lambda stop: self.level(stop[0]),
-            )
-            for (low_floor, low_space), (high_floor, high_space) in itertools.pairwise(stops):
-                if low_space not in anchors or high_space not in anchors:
-                    continue
-                span = abs(self.level(high_floor) - self.level(low_floor))
-                cost = (
-                    LIFT_WAIT_COST_M + LIFT_COST_PER_FLOOR_M * span
-                    if connector["kind"] == LIFT
-                    else STAIRS_COST_PER_FLOOR_M * span
-                )
-                graph.add_edge(low_space, high_space, weight=cost, via=connector["id"])
+        """The kit's graph, optionally without openings narrower than min_width (wide loads)."""
+        graph = super().graph(step_free)
+        if min_width is not None:
+            narrow = [
+                DOOR_PREFIX + opening["id"]
+                for opening in self.openings.values()
+                if opening["width_m"] + 1e-9 < min_width and DOOR_PREFIX + opening["id"] in graph
+            ]
+            graph.remove_nodes_from(narrow)
         return graph
+
+    def entrance_nodes(self) -> list[str]:
+        return [DOOR_PREFIX + opening["id"] for opening in self.openings.values() if OUTSIDE in opening["space_ids"]]
 
     def distances_from(
         self, source: str, step_free: bool = False, min_width: float | None = None
@@ -132,11 +97,15 @@ class Building(BuildingMap):
 
     @contextlib.contextmanager
     def temporary_opening(self, opening: dict) -> Iterator[dict]:
+        shared, self.walks = self.walks, dict(self.walks)  # never pollute the per-file cache
         self.openings[opening["id"]] = opening
+        for space_id in opening["space_ids"]:
+            self.walks.pop(space_id, None)
         try:
             yield opening
         finally:
             del self.openings[opening["id"]]
+            self.walks = shared
 
     # ---------- lookups ----------
 

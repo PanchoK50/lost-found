@@ -11,8 +11,8 @@ from tests.conftest import building, load_jsonl
 QUESTIONS = load_jsonl("questions.jsonl")
 
 
-def run_skill(directory, question) -> tuple:
-    b = building(directory)
+def run_skill(directory, question, b=None) -> tuple:
+    b = b or building(directory)
     kind, inputs = question["kind"], question["inputs"]
     match kind:
         case "largest_room" | "floor_area_total":

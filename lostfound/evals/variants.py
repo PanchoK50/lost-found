@@ -53,12 +53,16 @@ def rules_variant(_model: str | None, _effort: str | None, **_options) -> Varian
 
 def oracle_variant(_model: str | None, _effort: str | None, **_options) -> Variant:
     """Upper bound: the labelled structured inputs go straight into the skills (benchmark sets only)."""
-    from tests.test_skills_oracle import run_skill
+    import tests.test_skills_oracle as oracle
 
     from lostfound.agent.format import answer_line
+    from lostfound.core.building import Building
 
     def run(item: dict) -> Outcome:
-        building, result = run_skill(Path(item["building_dir"]), item)
+        # A fresh Building per question: what-if questions edit the building temporarily, so instances must not
+        # be shared between threads (the test module caches one per directory).
+        building = Building.load(Path(item["building_dir"]))
+        _, result = oracle.run_skill(Path(item["building_dir"]), item, building)
         return Outcome(reply=answer_line(building, item["kind"], result), path="oracle")
 
     return run

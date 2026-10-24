@@ -379,6 +379,9 @@ class Toolbox:
             "step_free": step_free,
             "synthetic": True,
         }
+        self.building.walks = dict(self.building.walks)  # edited building: stop sharing the per-file walk cache
+        for space_id in (first_id, second_id):
+            self.building.walks.pop(space_id, None)
         self.building.openings[opening["id"]] = opening
         self.building.data["openings"].append(opening)
         edit = {"action": "add_door", "opening": opening}

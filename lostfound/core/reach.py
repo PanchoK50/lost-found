@@ -2,7 +2,7 @@
 
 import networkx as nx
 
-from lostfound.core.building import OUTSIDE, ROOMISH_TYPES, Building
+from lostfound.core.building import ROOMISH_TYPES, Building
 
 
 def reachable_spaces(
@@ -23,5 +23,10 @@ def rooms_reached(building: Building, reached: set[str], floor_id: str, types=RO
 
 
 def exit_distances(building: Building, step_free: bool = False) -> dict[str, float]:
-    """Route-model distance from every space to its nearest entrance (all entrances meet at 'outside')."""
-    return building.distances_from(OUTSIDE, step_free)
+    """Route-model distance from every space to its nearest entrance (the entrance door itself; there is no
+    way round the outside since kit 1.1.0)."""
+    graph = building.graph(step_free)
+    sources = [node for node in building.entrance_nodes() if node in graph]
+    if not sources:
+        return {}
+    return nx.multi_source_dijkstra_path_length(graph, sources, weight="weight")

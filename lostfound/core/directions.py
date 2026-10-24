@@ -6,7 +6,7 @@ import math
 
 import networkx as nx
 
-from lostfound.core.building import DOOR_PREFIX, OUTSIDE, Building, MapError
+from lostfound.core.building import DOOR_PREFIX, Building, MapError
 
 TURN_DEGREES = 35
 LANDMARK_CATEGORIES = ("machine", "equipment", "fixture", "furniture")
@@ -34,10 +34,10 @@ def route_details(
         nodes += leg_nodes if not nodes else leg_nodes[1:]
     return {
         "length_m": round(length, 2),
-        "space_path": [node for node in nodes if not node.startswith(DOOR_PREFIX)],
+        "space_path": building.spaces_passed(graph, nodes),
         "polylines": _polylines(building, nodes),
         "steps": _steps(building, graph, nodes),
-        "highlights": [node for node in nodes if node in building.spaces],
+        "highlights": building.spaces_passed(graph, nodes),
         "step_free": step_free,
     }
 
@@ -92,36 +92,36 @@ def landmark(building: Building, space_id: str, near: tuple[float, float]) -> st
 
 
 def _steps(building: Building, graph: nx.MultiGraph, nodes: list[str]) -> list[str]:
+    """One step per door or floor change, with the turn at the door and a landmark in the room entered."""
     steps = [f"Start in {building.label(nodes[0])}."]
     walked = 0.0
     previous_point = _point(building, nodes[0])
-    for here, following in itertools.pairwise(nodes):
-        edge = min(graph[here][following].values(), key=lambda candidate: candidate["weight"])
+    for index, (here, following) in enumerate(itertools.pairwise(nodes), start=1):
+        edge = building.cheapest(graph, here, following)
         walked += edge["weight"]
-        element = edge["via"]
-        if element in building.connectors:
-            connector = building.connectors[element]
+        if "via" in edge:
+            connector = building.connectors[edge["via"]]
             target_floor = building.floor_name(building.spaces[following]["floor_id"])
             verb = "Take" if connector["kind"] == "lift" else "Use"
             steps.append(f"{verb} {connector['name']} to {target_floor}.")
             walked, previous_point = 0.0, _point(building, following)
             continue
-        if following == OUTSIDE:
-            steps.append(f"Walk about {walked:.0f} m and leave through the entrance.")
-            walked = 0.0
-            continue
-        if here.startswith(DOOR_PREFIX) and following in building.spaces:
-            door_point = _point(building, here)
-            target_point = _point(building, following)
+        if following.startswith(DOOR_PREFIX) and index + 1 < len(nodes):
+            entered = building.cheapest(graph, following, nodes[index + 1]).get("space")
+            if entered is None:
+                continue
+            door_point = _point(building, following)
+            target_point = building.anchor(entered)
             turn = _turn(previous_point, door_point, target_point) if previous_point else "go"
-            opening = building.openings[here.removeprefix(DOOR_PREFIX)]
-            passage = {"door": "through the door", "entrance": "in through the entrance"}.get(opening["kind"], "through the opening")
-            thing = landmark(building, following, door_point)
-            if following == nodes[-1]:
+            opening = building.openings[following.removeprefix(DOOR_PREFIX)]
+            passage = "through the door" if opening["kind"] == "door" else "through the opening"
+            thing = landmark(building, entered, door_point)
+            arrived = entered == nodes[-1]
+            if arrived:
                 tail = f", you have arrived{f' (look for the {thing})' if thing else ''}."
             else:
                 tail = f"{f', past the {thing}' if thing else ''}."
-            steps.append(f"After about {walked:.0f} m, {turn} {passage} into {building.spaces[following]['name']}{tail}")
+            steps.append(f"After about {walked:.0f} m, {turn} {passage} into {building.spaces[entered]['name']}{tail}")
             walked, previous_point = 0.0, door_point
     if len(steps) > MAX_STEPS:
         steps = [*steps[:2], *[step for step in steps[2:-2] if step.startswith(("Take", "Use"))], *steps[-2:]]
