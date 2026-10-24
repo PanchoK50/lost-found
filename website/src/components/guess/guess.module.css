@@ -1,0 +1,174 @@
+/*
+ * Building GeoGuessr. Mobile first (phone layout is the base, desktop is the min-width: 900px block at the end).
+ * Andy's Synera tokens from globals.css: --ink blue, --accent orange for actions, --glass, --shadow, --route gradient.
+ */
+
+.game { position: fixed; inset: 0; overflow: hidden; background: var(--paper); }
+.game kbd { margin-left: 8px; padding: 2px 6px; border-radius: 6px; background: rgba(255, 255, 255, .22); font: 600 11px/1.4 inherit; letter-spacing: .02em; text-transform: uppercase; }
+
+/* ---------- top bar ---------- */
+.hud { position: absolute; z-index: 6; top: calc(8px + var(--safe-top)); left: calc(10px + var(--safe-left)); right: calc(10px + var(--safe-right)); display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border-radius: 12px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--ink); font-weight: 700; text-decoration: none; }
+.brand span { display: none; }
+.logo { height: 40px; display: flex; align-items: center; padding: 0 14px; border-radius: 12px; background: var(--ink); color: #fff; font-weight: 600; letter-spacing: -.01em; box-shadow: var(--shadow); }
+.logo b { color: var(--accent); font-weight: 800; }
+/* GeoGuessr's score panel: dark, compact, uppercase captions. */
+.stats { display: flex; min-width: 0; border-radius: 12px; background: var(--ink); color: #fff; box-shadow: var(--shadow); overflow: hidden; }
+.stats span { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 5px 12px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stats span + span { border-left: 1px solid rgba(255, 255, 255, .14); }
+.stats span:first-child { display: none; }
+.stats small { font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--blue-weak); }
+
+/* ---------- clue ---------- */
+.clue { position: absolute; z-index: 3; top: calc(58px + var(--safe-top)); left: calc(10px + var(--safe-left)); right: calc(10px + var(--safe-right)); bottom: calc(50dvh + 8px); display: flex; flex-direction: column; border-radius: 20px; border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden;
+  /* Blueprint paper. */
+  background-color: #fff; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 22px 22px; background-position: -1px -1px;
+  transition: top .35s ease, left .35s ease, right .35s ease, bottom .35s ease, width .35s ease; }
+.clueTitle { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 10px 14px 0; font-size: 13px; color: var(--muted); }
+.clueTitle b { color: var(--ink); font-size: 16px; letter-spacing: -.01em; }
+.clueTitle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game[data-big] .clue { bottom: calc(100dvh - 58px - 96px - var(--safe-top)); }
+.game[data-big] .clueTitle span, .game[data-big] .silhouette figcaption { display: none; }
+/* After the guess the clue shrinks to a thumbnail on the map, for comparing. */
+.game[data-phase="reveal"] .clue { top: calc(58px + var(--safe-top)); right: auto; width: 104px; bottom: calc(100dvh - 58px - 104px - var(--safe-top)); }
+.game[data-phase="reveal"] .clueTitle, .game[data-phase="reveal"] .silhouette figcaption { display: none; }
+
+.silhouette { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0; padding: 4px 8px 8px; }
+.silhouette svg { flex: 1; min-height: 0; width: 100%; overflow: visible; }
+.silhouette figcaption { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.silhouette figcaption span { display: inline-flex; align-items: center; gap: 5px; }
+.silhouette figcaption i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; }
+.legendWall { background: var(--ink); }
+.legendDoor { background: repeating-linear-gradient(90deg, var(--blue) 0 3px, transparent 3px 5px); }
+.legendEntrance { background: var(--accent); }
+.floorFill { fill: rgba(0, 79, 171, .07); animation: fade .5s ease both; }
+.wall { stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw .9s cubic-bezier(.6, 0, .3, 1) forwards; }
+.door { stroke: var(--blue); stroke-width: .7; stroke-dasharray: 1 1.1; opacity: 0; animation: fade .3s ease .8s forwards; }
+.entrance { stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; opacity: 0; animation: fade .3s ease .8s forwards; }
+.youAreHere { fill: var(--accent); stroke: #fff; stroke-width: .8; }
+.youPulse { fill: var(--accent); transform-box: fill-box; transform-origin: center; animation: pulse 1.8s ease-out infinite; }
+
+/* ---------- map ---------- */
+.mapCard { position: absolute; z-index: 2; top: 50dvh; left: calc(10px + var(--safe-left)); right: calc(10px + var(--safe-right)); bottom: calc(10px + var(--safe-bottom)); display: flex; flex-direction: column; border-radius: 20px; background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden;
+  transition: top .35s ease, left .35s ease, right .35s ease, bottom .35s ease, border-radius .35s ease; }
+.game[data-big] .mapCard { top: calc(58px + 96px + 8px + var(--safe-top)); }
+.game[data-phase="reveal"] .mapCard { top: 0; left: 0; right: 0; bottom: 0; border-radius: 0; border: 0; box-shadow: none; }
+/* Start and end: the building gets its own window above the panel, so the camera has room to frame it. */
+.game[data-phase="start"] .mapCard, .game[data-phase="end"] .mapCard { top: calc(58px + var(--safe-top)); bottom: calc(100dvh - 58px - 26dvh - var(--safe-top)); }
+.map { position: relative; flex: 1; min-height: 0; }
+.rail { position: absolute; z-index: 2; top: 8px; left: 8px; right: 56px; width: fit-content; max-width: calc(100% - 64px); display: flex; gap: 2px; padding: 3px; overflow-x: auto; scrollbar-width: none; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.rail::-webkit-scrollbar { display: none; }
+.rail button { flex: none; min-width: 44px; height: 40px; border: 0; border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; color: var(--muted); transition: background .2s, color .2s; }
+.rail button.active { background: var(--ink); color: #fff; }
+.grow { position: absolute; z-index: 2; top: 8px; right: 8px; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--ink); font-size: 20px; box-shadow: var(--shadow); }
+.attribution { position: absolute; z-index: 1; right: 8px; bottom: 4px; margin: 0; max-width: calc(100% - 16px); font-size: 9px; color: var(--muted); text-align: right; pointer-events: none; }
+.guess { flex: none; height: 58px; margin: 0 8px 8px; border: 0; border-radius: 14px; background: var(--accent); color: #fff; font-size: 18px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; transition: background .2s, transform .1s; }
+.guess:not(:disabled):active { background: var(--accent-hover); transform: scale(.98); }
+.guess:disabled { background: #e6e9ef; color: var(--muted); font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.guess:disabled kbd { display: none; }
+
+/* ---------- start and end panel: bottom sheet on phones ---------- */
+.panel, .sheet { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 78dvh; overflow-y: auto; padding: 18px calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left)); background: rgba(255, 255, 255, .96); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-radius: 24px 24px 0 0; box-shadow: 0 -12px 40px rgba(0, 36, 120, .14); animation: up .4s cubic-bezier(.2, .9, .3, 1) both; }
+.panel { display: flex; flex-direction: column; gap: 14px; max-height: calc(100dvh - 58px - 26dvh - 10px - var(--safe-top)); }
+.eyebrow { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); }
+.title { margin: -6px 0 0; font-size: 34px; line-height: 1; letter-spacing: -.04em; font-weight: 600; color: var(--ink); }
+.title b { color: var(--accent); font-weight: 800; }
+.lead { margin: 0; color: var(--text); line-height: 1.45; }
+.lead b { color: var(--ink); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > span { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.field select { height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; font-size: 16px; color: var(--ink); }
+.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.modes button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); }
+.modes button i { font-style: normal; font-size: 22px; line-height: 1.2; }
+.modes button b { font-size: 13px; }
+.modes button small { font-size: 11px; color: var(--muted); }
+.modes button:disabled { opacity: .5; }
+.modes .modeOn { border-color: var(--accent); background: var(--accent-soft); }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: #eef1f6; }
+.segmented button { display: flex; flex-direction: column; align-items: center; padding: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); }
+.segmented button b { font-size: 15px; color: var(--ink); }
+.segmented button small { font-size: 11px; }
+.segmented button.active { background: #fff; box-shadow: 0 1px 4px rgba(0, 36, 120, .12); }
+.warning { margin: 0; padding: 10px 12px; border-radius: 12px; background: #fdecec; color: #a3262a; font-size: 14px; }
+.seed { margin: -4px 0 0; text-align: center; font-size: 12px; color: var(--muted); }
+.seed code { padding: 1px 6px; border-radius: 6px; background: #eef1f6; color: var(--ink); }
+
+.primary, .secondary, .ghost { min-height: 54px; padding: 0 22px; border-radius: 999px; font-size: 17px; font-weight: 700; transition: background .2s, transform .1s; }
+.primary { border: 0; background: var(--accent); color: #fff; box-shadow: 0 8px 24px rgba(240, 92, 3, .28); }
+.primary:active { background: var(--accent-hover); transform: scale(.98); }
+.secondary { border: 0; background: var(--ink); color: #fff; }
+.ghost { min-height: 44px; border: 0; background: transparent; color: var(--blue); font-size: 15px; font-weight: 600; }
+
+/* ---------- round result ---------- */
+.result { position: relative; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+.resultPoints { margin: 0; font-size: 15px; font-weight: 600; color: var(--muted); }
+.resultPoints strong { display: block; font-size: 48px; line-height: 1; letter-spacing: -.04em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar { height: 12px; border-radius: 999px; background: #e6e9ef; overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: inherit; background: var(--route); }
+.resultLine, .resultAnswer { margin: 0; line-height: 1.4; }
+.resultLine b, .resultAnswer b { color: var(--ink); }
+.resultAnswer { font-size: 14px; color: var(--muted); }
+.quip { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--accent-soft); color: var(--ink); font-style: italic; font-size: 14px; }
+.quip cite { font-style: normal; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.result .primary { margin-top: 4px; }
+
+/* ---------- summary ---------- */
+.summary { display: flex; flex-direction: column; gap: 12px; }
+.total { margin: 0; color: var(--muted); font-size: 18px; font-weight: 600; }
+.total strong { font-size: 56px; line-height: 1; letter-spacing: -.05em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rank { margin: 0; font-size: 17px; font-weight: 700; color: var(--ink); }
+.rounds { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rounds li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; animation: up .35s ease both; }
+.rounds li:nth-child(2) { animation-delay: .06s; } .rounds li:nth-child(3) { animation-delay: .12s; } .rounds li:nth-child(4) { animation-delay: .18s; } .rounds li:nth-child(5) { animation-delay: .24s; }
+.roundNo { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; }
+.roundRoom { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--ink); }
+.roundRoom small { font-weight: 400; color: var(--muted); }
+.roundPoints { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.actions { display: flex; flex-direction: column; gap: 8px; }
+/* The main button stays under the thumb while the panel scrolls. */
+.panel > .primary { position: sticky; bottom: 0; flex: none; }
+.actions { position: sticky; bottom: 0; padding-top: 14px; background: linear-gradient(rgba(255, 255, 255, 0), #fff 14px); }
+
+/* ---------- confetti ---------- */
+.confetti { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; left: 50%; bottom: 40%; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: burst 1.4s cubic-bezier(.15, .7, .3, 1) var(--d) forwards; }
+
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pulse { from { transform: scale(1); opacity: .5; } to { transform: scale(4); opacity: 0; } }
+@keyframes up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes burst {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  100% { opacity: 0; transform: translate(var(--x), -55vh) rotate(calc(var(--r) * 3)); }
+}
+
+/* ---------- desktop: the clue is the main view, the map a corner card that grows on hover (GeoGuessr) ---------- */
+@media (min-width: 900px) {
+  .hud { top: 20px; left: 24px; right: 24px; }
+  .brand span { display: inline; }
+  .stats span { padding: 7px 18px; font-size: 17px; }
+  .stats span:first-child { display: flex; }
+
+  .clue { top: 80px; left: 24px; right: 24px; bottom: 24px; border-radius: 24px; }
+  .clueTitle { padding: 20px 24px 0; font-size: 15px; }
+  .clueTitle b { font-size: 22px; }
+  .silhouette { padding: 12px 420px 20px 40px; }
+  .game[data-big] .clue { bottom: 24px; }
+  .game[data-big] .clueTitle span, .game[data-big] .silhouette figcaption { display: flex; }
+  .game[data-phase="reveal"] .clue { z-index: 5; top: 80px; width: 180px; bottom: calc(100dvh - 80px - 180px); }
+  .game[data-phase="reveal"] .silhouette { padding: 8px; }
+
+  .mapCard { z-index: 4; top: calc(100dvh - 24px - 360px); left: calc(100vw - 24px - 400px); right: 24px; bottom: 24px; }
+  .game[data-phase="start"] .mapCard, .game[data-phase="end"] .mapCard { top: 80px; left: 468px; bottom: 24px; border-radius: 24px; }
+  .game[data-phase="round"] .mapCard:hover, .game[data-phase="round"] .mapCard:focus-within, .game[data-big][data-phase="round"] .mapCard { top: calc(100dvh - 24px - min(600px, 100dvh - 104px)); left: calc(100vw - 24px - min(760px, 100vw - 48px)); }
+  .guess { height: 52px; font-size: 16px; }
+  .guess:not(:disabled):hover { background: var(--accent-hover); }
+
+  .panel { top: 80px; left: 24px; right: auto; bottom: 24px; width: 420px; max-height: none; padding: 26px; border-radius: 24px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .sheet { left: 50%; right: auto; bottom: 24px; width: 520px; transform: translateX(-50%); padding: 22px 26px; border-radius: 24px; box-shadow: var(--shadow); border: 1px solid var(--line); animation: none; }
+  .title { font-size: 44px; }
+  .primary:hover { background: var(--accent-hover); }
+  .ghost:hover { text-decoration: underline; }
+}
