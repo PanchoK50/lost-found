@@ -25,11 +25,14 @@ from starter_agent.building_map import (
     MapError,
 )
 
-__all__ = ["Building", "MapError", "OUTSIDE", "DOOR_PREFIX", "ROOMISH_TYPES"]
+__all__ = ["Building", "MapError", "OUTSIDE", "DOOR_PREFIX", "ROOMISH_TYPES", "WALL_NEIGHBOUR_TYPES"]
 
-# Space types that count as "rooms" in the benchmark's room counts (corridors, stairs, lifts and
-# outdoor areas never do). Verified against every labelled answer in tests/test_skills_oracle.py.
-ROOMISH_TYPES = frozenset({"room", "hall"})
+# Space types that count as "rooms" in room counts (reachability, deliveries, what-if exits). Halls,
+# corridors, stairs, lifts and outdoor areas do not. Shared-wall counts are the exception: their wording
+# only excludes corridors, stairwells and lifts, so halls count there (WALL_NEIGHBOUR_TYPES).
+# Both verified against every labelled answer in tests/test_skills_oracle.py.
+ROOMISH_TYPES = frozenset({"room"})
+WALL_NEIGHBOUR_TYPES = frozenset({"room", "hall"})
 
 
 class Building(BuildingMap):

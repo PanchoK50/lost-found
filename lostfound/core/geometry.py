@@ -5,7 +5,7 @@ import math
 from shapely.geometry import LineString, MultiLineString, Point
 from shapely.ops import linemerge
 
-from lostfound.core.building import ROOMISH_TYPES, Building, MapError
+from lostfound.core.building import WALL_NEIGHBOUR_TYPES, Building, MapError
 
 WALL_THICKNESS_M = 0.35
 MIN_SHARED_WALL_M = 1.0
@@ -50,12 +50,12 @@ def shared_wall_length(building: Building, first: str, second: str) -> float:
 
 
 def shared_walls(building: Building, space_id: str) -> list[tuple[str, float]]:
-    """Rooms on the same floor sharing at least 1 m of wall (corridors, stairs, lifts, outdoor excluded)."""
+    """Rooms and halls on the same floor sharing at least 1 m of wall (corridors, stairs, lifts, outdoor excluded)."""
     floor_id = building.spaces[space_id]["floor_id"]
     outline = building.polygon(space_id)
     neighbours = []
     for other in building.spaces_by_floor[floor_id]:
-        if other["id"] == space_id or other["type"] not in ROOMISH_TYPES:
+        if other["id"] == space_id or other["type"] not in WALL_NEIGHBOUR_TYPES:
             continue
         if building.polygon(other["id"]).distance(outline) > WALL_THICKNESS_M:
             continue

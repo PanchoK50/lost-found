@@ -176,7 +176,8 @@ PYTHON_TOOL = {
           skills.<kind>(b, ...) for: """
     )
     + ", ".join(sorted(skills.SKILLS))
-    + ". Counts of 'rooms' use space type in {'room','hall'}. Never re-implement geometry the library already has.",
+    + ". Room counts use space type 'room' only (not halls, corridors, stairs, lifts, outdoor); "
+    "shared-wall neighbours also include halls. Never re-implement geometry the library already has.",
     "input_schema": _schema({"code": _string("Python code; print() what you need.")}),
 }
 

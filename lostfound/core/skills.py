@@ -88,7 +88,7 @@ def errand(
 def wide_delivery_count(building: Building, start: str, floor_id: str, min_width: float) -> dict:
     """Rooms on a floor a load of this width reaches: no stairs or steps, every door at least min_width."""
     reached = reach.reachable_spaces(building, start, step_free=True, min_width=min_width)
-    rooms = reach.rooms_reached(building, reached, floor_id, types={"room"})
+    rooms = reach.rooms_reached(building, reached, floor_id)
     return {"count": len(rooms), "floor": building.floor_name(floor_id), "min_width_m": min_width}
 
 
