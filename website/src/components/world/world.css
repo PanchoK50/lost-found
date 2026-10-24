@@ -209,3 +209,11 @@
 .message-status--off { background: #fde8e8; color: #b4232a; }
 .message-text { margin: 6px 0 0; font-size: 14px; }
 .message-answer { margin: 6px 0 0; padding: 8px 10px; background: #f6f8f0; border-radius: 10px; font-size: 14px; }
+
+/* Location chip in the HUD and the "I'm here" tip action (location is picked by hand, no GPS) */
+.location-chip { display: flex; align-items: center; gap: 4px; max-width: 46vw; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); font-size: 13px; font-weight: 600; color: inherit; }
+.location-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.location-chip--unset { border-style: dashed; color: var(--muted); }
+.scene-tip-here { font-size: 12px; font-weight: 600; }
+.location-sharing { margin-top: 10px; }
+.link-button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }

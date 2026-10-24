@@ -50,6 +50,10 @@ interface Props {
   onPerson?(playerId: string): void;
   /** Offered on a tapped room: walk there from where the player is. */
   onRoute?(spaceId: string): void;
+  /** "I'm here": set this room as the player's location (picked by hand; there is no GPS indoors). */
+  onSetLocation?(spaceId: string): void;
+  /** The room the player said they are in, if any. */
+  myRoom?: string;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -65,7 +69,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
@@ -80,8 +84,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     ...answerAnchors(model, poses, directive),
     ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
     ...(hovered && !overview && hovered !== picked ? hoverAnchor(model, poses, hovered) : []),
-    ...(picked ? hoverAnchor(model, poses, picked, onRoute) : []),
-  ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute]);
+    ...(picked ? hoverAnchor(model, poses, picked, onRoute, onSetLocation, myRoom) : []),
+  ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute, onSetLocation, myRoom]);
   const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onPerson, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onPerson, onFocusFloor]);
   const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const routePaths = useMemo(() => (directive.routes ?? []).map(r => (r.points ?? []).filter(p => shown(poses, p.floorId)).map(p => worldAt(model, poses, p, ROUTE_HEIGHT))), [directive.routes, model, poses]);
@@ -455,12 +459,29 @@ function floorAnchors(model: BuildingModel, poses: Map<string, FloorPose>, onFoc
   }));
 }
 
-function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: string, onRoute?: (spaceId: string) => void): Anchor[] {
+function hoverAnchor(
+  model: BuildingModel,
+  poses: Map<string, FloorPose>,
+  spaceId: string,
+  onRoute?: (spaceId: string) => void,
+  onSetLocation?: (spaceId: string) => void,
+  myRoom?: string,
+): Anchor[] {
   const m = model.spaces.get(spaceId);
   const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
   if (!m || !f) return [];
   const pose = poses.get(f.floor.id)!;
-  return [{ key: `hv-${spaceId}`, placement: 'above', priority: 4, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: <div className={`scene-tip${onRoute ? ' scene-tip--actions' : ''}`}><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span>{onRoute && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}</div> }];
+  const actions = onRoute || onSetLocation;
+  const here = myRoom === spaceId;
+  return [{ key: `hv-${spaceId}`, placement: 'above', priority: 4, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: (
+    <div className={`scene-tip${actions ? ' scene-tip--actions' : ''}`}>
+      <strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span>
+      {onRoute && !here && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}
+      {onSetLocation && (here
+        ? <span className="scene-tip-here">📍 You are here</span>
+        : <button type="button" onClick={() => onSetLocation(spaceId)}>I&apos;m here</button>)}
+    </div>
+  ) }];
 }
 
 /** Routes, link lines and markers, positioned against the target floor poses. */

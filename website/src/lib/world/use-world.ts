@@ -75,7 +75,7 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
   const space = room ? building.spaces.find(s => s.id === room) : undefined;
   const audience: Audience | undefined = !settings || settings.share === 'off' ? undefined
     : settings.share === 'team' ? 'team'
-    : profile?.groups[0] ? `group:${profile.groups[0]}` : undefined;
+    : profile?.groups[0] ? `group:${profile.groups[0]}` : 'team'; // no group yet: share with the team
   const presenceKey = identity && JSON.stringify([space?.id, audience, settings?.precision, settings?.duration]);
   useEffect(() => {
     if (!presenceKey || !playerId || !settings) return;

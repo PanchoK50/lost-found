@@ -9,7 +9,8 @@ import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
 import { detectCategory } from '@/lib/world/mode';
-import { useProfile } from '@/lib/world/profile';
+import { saveProfile, useProfile } from '@/lib/world/profile';
+import { LocationSheet } from '@/components/world/location-sheet';
 import { DemoLoginSheet, useSignedIn } from '@/components/auth/demo-login';
 import { authHeader, supabaseBrowser } from '@/lib/supabase/browser';
 import { useWorld } from '@/lib/world/use-world';
@@ -71,7 +72,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const hideDemo = settings?.demoPlayers === false;
   const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages'>();
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location'>();
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
   const conversationId = useRef<string | undefined>(undefined);
@@ -196,6 +197,13 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const askRef = useRef(ask);
   useEffect(() => { askRef.current = ask; });
   const myRoom = profile?.rooms[building.building.id];
+  // Location is picked by hand ("I'm here" on a room, or the location chip): the plans are not where we are.
+  const setLocation = useCallback((spaceId: string | undefined) => {
+    if (!profile) return;
+    const rooms = { ...profile.rooms };
+    if (spaceId) rooms[building.building.id] = spaceId; else delete rooms[building.building.id];
+    saveProfile({ ...profile, rooms });
+  }, [profile, building.building.id]);
   const routeTo = useCallback((spaceId: string) => {
     const from = building.spaces.find(s => s.id === myRoom), to = building.spaces.find(s => s.id === spaceId);
     if (!to) return;
@@ -205,7 +213,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} /></div>
+      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
@@ -214,7 +222,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
           <nav className="building-switch" aria-label="Building">
             {buildings.map(b => <Link key={b.id} href={`/?building=${b.id}`} className={b.id === building.building.id ? 'active' : ''} aria-current={b.id === building.building.id ? 'page' : undefined}>{b.name}</Link>)}
           </nav>
-          <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')} />
+          <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
+            location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />
         </header>
         <nav className="floor-rail" aria-label="Floors">
           <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
@@ -316,6 +325,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
       {openPin && profile && <PinCard key={openPin.id} pin={openPin} building={building} profile={profile} world={world} act={act} onClose={closePin} />}
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
+      {sheet === 'location' && profile && <LocationSheet building={building} room={myRoom} sharing={settings?.share !== 'off'} onChange={setLocation} onSettings={() => setSheet('settings')} onClose={closeSheet} />}
       {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
 
       <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>

@@ -47,7 +47,7 @@ export interface SentRecord {
 }
 
 export const defaultSettings: Record<MultiplayerMode, Settings> = {
-  team: { share: 'groups', precision: 'room', duration: 'leave', pingFrom: 'team', demoPlayers: true },
+  team: { share: 'team', precision: 'room', duration: 'leave', pingFrom: 'team', demoPlayers: true },
   public: { share: 'off', precision: 'floor', duration: '15m', pingFrom: 'groups', demoPlayers: true },
   home: { share: 'team', precision: 'room', duration: 'always', pingFrom: 'team', demoPlayers: true },
 };
