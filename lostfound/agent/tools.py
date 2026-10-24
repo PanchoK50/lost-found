@@ -274,7 +274,10 @@ class Toolbox:
                 self.turn["highlights"].append(space_id)
 
     def definitions(self) -> list[dict]:
-        return [{**tool, "strict": True} for tool in self.schemas]
+        # The API allows at most 20 strict tools: keep the answer tools strict (exact arguments matter for the
+        # benchmark); edit tools and run_python validate their arguments themselves.
+        relaxed = {tool["name"] for tool in [*EDIT_TOOLS, PYTHON_TOOL]}
+        return [{**tool, "strict": tool["name"] not in relaxed} for tool in self.schemas]
 
     def call(self, name: str, arguments: dict) -> tuple[str, bool]:
         """Returns (json text, is_error)."""
