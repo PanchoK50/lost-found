@@ -1,0 +1,5 @@
+# Team-only analysis resources; excluded from Vercel deployment uploads.
+notebooks/
+scripts/create-notebook.py
+.data/
+.venv/

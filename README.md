@@ -73,3 +73,7 @@ The evaluator accepts an `answer(building_directory: Path, question_text: str) -
 Dataset licenses vary (CC BY 4.0, ODbL 1.0, CC0). Read the upstream `ATTRIBUTION.md` before importing or redistributing data and preserve required attribution. The starter's original sample is independent of that dataset.
 
 Build note: development and production builds use Next.js's supported Webpack option with Tailwind PostCSS. This avoids a Turbopack CSS-worker port-permission failure in the initial development environment.
+
+## Explore the challenge data
+
+Open `notebooks/data-explorer.html` in a browser for an offline overview and interactive floor plans of a real development factory. For editable analysis, use `notebooks/data-exploration.ipynb` (executed outputs included). See `notebooks/README.md` for setup and data provenance. These are development-only resources outside `src/` and `public/`, with no product imports, routes, or navigation links. `.vercelignore` excludes them from Vercel deployment uploads. This exploration snapshot is separate from the app's original demo fixture.

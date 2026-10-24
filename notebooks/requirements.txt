@@ -1,0 +1,4 @@
+# Notebook editing/execution; HTML generation has no third-party dependencies.
+ipykernel>=6.29,<7
+nbclient>=0.10,<0.11
+nbformat>=5.10,<6
