@@ -1,17 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import { durationMs, settingsFor, type Profile } from './profile';
 import { initialsOf } from './rules';
-import { authHeader } from '@/lib/supabase/browser';
+import { authHeader, supabaseBrowser } from '@/lib/supabase/browser';
 import type { Audience, WorldAction, WorldState } from './types';
 
+/** Safety refresh (expired pins and pings, a missed signal). Changes themselves arrive over Realtime. */
+const REFRESH_MS = 60_000;
+/** Without Supabase (local work) there is no Realtime: fall back to polling. */
 const POLL_MS = 2000;
+const ONLINE_CHANNEL = 'online';
 type Act = (action: DistributiveOmit<WorldAction, 'buildingId'>) => Promise<{ ok: true } | { ok: false; error: string }>;
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /**
- * The shared world for one building: polls GET /api/world every 2 s (204 when nothing changed) and right
- * after every action. Also keeps the server's copy of this player and their presence in sync with the profile.
+ * The shared world for one building. With Supabase it does not poll: it loads once, listens on a Realtime
+ * channel for "changed" signals from the server and then fetches its own view (204 when nothing changed),
+ * refreshes once a minute and when the tab becomes visible, and gets who is online from Realtime Presence
+ * (no database traffic). Without Supabase it polls every 2 s. Also keeps the server's copy of this player and
+ * their presence in sync with the profile.
  */
 export function useWorld(building: Building, profile: Profile | null): { world?: WorldState; act: Act } {
   const buildingId = building.building.id;
@@ -21,9 +28,8 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
   const profileRef = useRef(profile);
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
-  // Who is online changes without a world version bump: the poll sends both, so the server answers 204 only if neither changed.
-  const onlineKey = useRef('');
-  const accept = useCallback((state: WorldState) => { version.current = state.version; onlineKey.current = (state.online ?? []).join(','); setWorld(state); }, []);
+  const [online, setOnline] = useState<string[]>([]);
+  const accept = useCallback((state: WorldState) => { version.current = state.version; setWorld(state); }, []);
   // The signed-in user's access token, kept for the page-close beacon (which cannot send headers).
   const token = useRef<string | undefined>(undefined);
 
@@ -50,22 +56,44 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
     return res.ok ? { ok: true } : { ok: false, error: data.error ?? 'Something went wrong.' };
   }, [buildingId, post, upsertPlayer]);
 
-  // Polling.
+  // Loading: once, then on Realtime "changed" signals, a safety refresh, and when the tab comes back.
   useEffect(() => {
     if (!playerId) return;
     let alive = true;
     version.current = 0;
-    const poll = async () => {
+    const load = async () => {
       try {
-        const params = new URLSearchParams({ buildingId, playerId, since: String(version.current), online: onlineKey.current });
+        const params = new URLSearchParams({ buildingId, playerId, since: String(version.current) });
         const res = await fetch(`/api/world?${params}`, { cache: 'no-store', headers: await authHeader() });
         if (alive && res.status === 200) accept(await res.json());
-      } catch { /* offline for a moment; the next poll retries */ }
+      } catch { /* offline for a moment; the next signal or refresh retries */ }
     };
-    void poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => { alive = false; clearInterval(timer); };
+    void load();
+    const client = supabaseBrowser();
+    const channel = client?.channel(`world:${buildingId}`)
+      .on('broadcast', { event: 'changed' }, ({ payload }) => { if (!(payload?.version <= version.current)) void load(); })
+      .subscribe(status => { if (status === 'SUBSCRIBED') void load(); });
+    const timer = setInterval(load, client ? REFRESH_MS : POLL_MS);
+    const onVisible = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      if (channel) void client!.removeChannel(channel);
+    };
   }, [buildingId, playerId, accept]);
+
+  // Online: Realtime Presence, independent of location sharing. Lives in Supabase's realtime server, not the database.
+  useEffect(() => {
+    const client = supabaseBrowser();
+    if (!client || !playerId) return;
+    const channel = client.channel(ONLINE_CHANNEL, { config: { presence: { key: playerId } } });
+    channel
+      .on('presence', { event: 'sync' }, () => setOnline(Object.keys(channel.presenceState()).sort()))
+      .subscribe(status => { if (status === 'SUBSCRIBED') void channel.track({ playerId, at: Date.now() }); });
+    return () => { void client.removeChannel(channel); };
+  }, [playerId]);
 
   // This player, whenever the name, role or groups change.
   const identity = profile && JSON.stringify([profile.id, profile.name, profile.role, profile.groups]);
@@ -98,5 +126,6 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
     return () => window.removeEventListener('pagehide', leave);
   }, [leaving, buildingId, playerId]);
 
-  return { world, act };
+  const merged = useMemo(() => world && { ...world, online }, [world, online]);
+  return { world: merged, act };
 }
