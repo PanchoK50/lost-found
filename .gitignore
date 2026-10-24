@@ -46,3 +46,7 @@ next-env.d.ts
 /.venv/
 **/__pycache__/
 **/.ipynb_checkpoints/
+
+.zcode/
+agent_output/
+.direnv/
