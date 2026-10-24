@@ -2,8 +2,11 @@
 import type { Building } from '@/lib/buildings/types';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { runDemo, scheduleDemo } from './demo-players';
-import { applyAction, createWorld, prune, type StoredWorld } from './rules';
-import type { WorldAction } from './types';
+import { applyAction, createWorld, initialsOf, prune, type StoredWorld } from './rules';
+import type { Player, Role, WorldAction } from './types';
+
+/** Scripted demo players (docs/MULTIPLAYER.md §9) on the Supabase store: off unless WORLD_DEMO_PLAYERS=on. */
+const DEMO_PLAYERS = process.env.WORLD_DEMO_PLAYERS === 'on';
 
 /** Storage behind one interface, so a Redis store can replace the memory one without touching the UI (§6). */
 export interface WorldStore {
@@ -43,9 +46,30 @@ class MemoryStore implements WorldStore {
  */
 class SupabaseStore implements WorldStore {
   private static readonly RETRIES = 5;
+  private static readonly PROFILES_TTL_MS = 30_000;
+  private profiles?: { at: number; players: Player[] };
   constructor(private readonly db: NonNullable<ReturnType<typeof supabaseAdmin>>) {}
 
+  /** Every account is a player in every building, so teammates can be asked or pinged even when offline. */
+  private async accounts(): Promise<Player[]> {
+    if (this.profiles && Date.now() - this.profiles.at < SupabaseStore.PROFILES_TTL_MS) return this.profiles.players;
+    const { data, error } = await this.db.from('profiles').select('id, display_name, role, groups');
+    if (error) return this.profiles?.players ?? [];
+    const players = data.map(p => ({ id: p.id as string, name: p.display_name as string, role: p.role as Role, groups: (p.groups as string[]) ?? [], initials: initialsOf(p.display_name) }));
+    this.profiles = { at: Date.now(), players };
+    return players;
+  }
+
   private async load(building: Building): Promise<{ world: StoredWorld; version: number }> {
+    const { world, version } = await this.loadStored(building);
+    const accounts = await this.accounts();
+    const known = new Map(world.players.map(p => [p.id, p]));
+    // Accounts first (their current name and role), then anything else already in the world.
+    const players = [...accounts.map(a => ({ ...known.get(a.id), ...a })), ...world.players.filter(p => !accounts.some(a => a.id === p.id))];
+    return { world: { ...world, players }, version };
+  }
+
+  private async loadStored(building: Building): Promise<{ world: StoredWorld; version: number }> {
     const id = building.building.id;
     const { data, error } = await this.db.from('worlds').select('state, version').eq('building_id', id).maybeSingle();
     if (error) throw new Error(`Loading the world failed: ${error.message}`);
@@ -53,13 +77,13 @@ class SupabaseStore implements WorldStore {
     const world = createWorld(building);
     const inserted = await this.db.from('worlds').insert({ building_id: id, state: world, version: world.version });
     if (inserted.error && inserted.error.code !== '23505') throw new Error(`Creating the world failed: ${inserted.error.message}`);
-    return inserted.error ? this.load(building) : { world, version: world.version };
+    return inserted.error ? this.loadStored(building) : { world, version: world.version };
   }
 
   async get(building: Building, now: number) {
     const { world: loaded, version } = await this.load(building);
-    // Demo players are seeded on first use and their due reactions run on every read (§9), like in memory.
-    const world = runDemo(loaded, building, now);
+    // Scripted demo players only when explicitly enabled; normally the people here are the real accounts.
+    const world = DEMO_PLAYERS ? runDemo(loaded, building, now) : loaded;
     const pruned = prune(world, now);
     if (world !== loaded || pruned) {
       // Demo reactions or expiry changed the world: save it (if someone else saved first, theirs is as fresh).
@@ -72,9 +96,10 @@ class SupabaseStore implements WorldStore {
   async apply(building: Building, action: WorldAction, now: number) {
     for (let attempt = 0; attempt < SupabaseStore.RETRIES; attempt++) {
       const { world: loaded, version } = await this.load(building);
-      const world = runDemo(loaded, building, now);
+      const world = DEMO_PLAYERS ? runDemo(loaded, building, now) : loaded;
       prune(world, now);
-      const next = scheduleDemo(applyAction(world, action, building, now), action, now);
+      const applied = applyAction(world, action, building, now);
+      const next = DEMO_PLAYERS ? scheduleDemo(applied, action, now) : applied;
       const { data, error } = await this.db
         .from('worlds')
         .update({ state: next, version: next.version, updated_at: new Date(now).toISOString() })

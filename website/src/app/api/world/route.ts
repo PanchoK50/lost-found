@@ -1,6 +1,7 @@
 import { getCatalogEntry } from '@/lib/buildings/catalog';
 import { viewFor, WorldError } from '@/lib/world/rules';
 import { worldStore } from '@/lib/world/store';
+import { supabaseAdmin, supabaseConfigured, userFrom } from '@/lib/supabase/server';
 import type { WorldAction } from '@/lib/world/types';
 
 // GET /api/world?buildingId=…&playerId=…&since=<version> → 200 WorldState, or 204 if nothing changed since `since`.
@@ -14,11 +15,28 @@ export async function GET(request: Request) {
 }
 
 // POST /api/world, body: WorldAction → 200 { ok: true, state } or 400 { error }.
+// With Supabase configured, only signed-in users act, and only as themselves; their name, role and groups come
+// from their profile, not from the browser.
 export async function POST(request: Request) {
   let action: WorldAction;
-  try { action = await request.json(); } catch { return Response.json({ error: 'Send JSON.' }, { status: 400 }); }
+  let accessToken: unknown;
+  try {
+    const { accessToken: token, ...rest } = await request.json();
+    accessToken = token;
+    action = rest as WorldAction;
+  } catch { return Response.json({ error: 'Send JSON.' }, { status: 400 }); }
   const entry = getCatalogEntry(action?.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
+  if (supabaseConfigured) {
+    const headers = typeof accessToken === 'string' ? new Headers({ authorization: `Bearer ${accessToken}` }) : request.headers;
+    const user = await userFrom(new Request(request.url, { headers }));
+    if (!user) return Response.json({ error: 'Sign in to take part.' }, { status: 401 });
+    if (actorOf(action) !== user.id) return Response.json({ error: 'You can only act as yourself.' }, { status: 403 });
+    if (action.type === 'player.upsert') {
+      const { data: profile } = await supabaseAdmin()!.from('profiles').select('display_name, role, groups').eq('id', user.id).single();
+      if (profile) action = { ...action, player: { ...action.player, name: profile.display_name, role: profile.role, groups: profile.groups } };
+    }
+  }
   try {
     const world = await worldStore.apply(entry.building, action, Date.now());
     return Response.json({ ok: true, state: viewFor(world, actorOf(action)) });

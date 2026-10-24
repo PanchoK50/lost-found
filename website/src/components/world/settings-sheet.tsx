@@ -85,9 +85,11 @@ export function SettingsSheet({ building, profile, world, category, act, onClose
         <p className="field-label">Who can ping me</p>
         <Segmented<Settings['pingFrom']> label="Who can ping me" value={settings.pingFrom} onChange={v => set('pingFrom', v)}
           options={[{ value: 'everyone', label: 'Everyone' }, { value: 'team', label: 'Team' }, { value: 'groups', label: 'My groups' }, { value: 'nobody', label: 'Nobody' }]} />
-        <p className="field-label">Demo players</p>
-        <Segmented<'on' | 'off'> label="Show demo players" value={settings.demoPlayers ? 'on' : 'off'} onChange={v => set('demoPlayers', v === 'on')}
-          options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]} />
+        {world?.players.some(p => p.demo) && <>
+          <p className="field-label">Demo players</p>
+          <Segmented<'on' | 'off'> label="Show demo players" value={settings.demoPlayers ? 'on' : 'off'} onChange={v => set('demoPlayers', v === 'on')}
+            options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]} />
+        </>}
       </section>
 
       <section>

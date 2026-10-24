@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import { durationMs, settingsFor, type Profile } from './profile';
 import { initialsOf } from './rules';
+import { authHeader } from '@/lib/supabase/browser';
 import type { Audience, WorldAction, WorldState } from './types';
 
 const POLL_MS = 2000;
@@ -21,9 +22,13 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
   useEffect(() => { profileRef.current = profile; }, [profile]);
 
   const accept = useCallback((state: WorldState) => { version.current = state.version; setWorld(state); }, []);
+  // The signed-in user's access token, kept for the page-close beacon (which cannot send headers).
+  const token = useRef<string | undefined>(undefined);
 
   const post = useCallback(async (action: WorldAction) => {
-    const res = await fetch('/api/world', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
+    const auth = await authHeader();
+    token.current = auth.Authorization?.slice('Bearer '.length);
+    const res = await fetch('/api/world', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth }, body: JSON.stringify(action) });
     const data = await res.json().catch(() => ({ error: 'Something went wrong.' }));
     if (res.ok) accept(data.state);
     return { res, data };
@@ -85,7 +90,7 @@ export function useWorld(building: Building, profile: Profile | null): { world?:
   const leaving = settings?.duration === 'leave' && !!space && !!audience;
   useEffect(() => {
     if (!leaving || !playerId) return;
-    const leave = () => navigator.sendBeacon('/api/world', JSON.stringify({ type: 'presence.clear', buildingId, playerId } satisfies WorldAction));
+    const leave = () => navigator.sendBeacon('/api/world', JSON.stringify({ ...({ type: 'presence.clear', buildingId, playerId } satisfies WorldAction), accessToken: token.current }));
     window.addEventListener('pagehide', leave);
     return () => window.removeEventListener('pagehide', leave);
   }, [leaving, buildingId, playerId]);
