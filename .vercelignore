@@ -4,10 +4,10 @@ scripts/create-notebook.py
 .data/
 .venv/
 # Not needed by the deployment (the agent reads building.json; the web app bundles its own buildings).
-data/**/*.png
-data/**/*.svg
-evals/
-submissions/
-agent_output/
-tests/
-buildings/
+/data/**/*.png
+/data/**/*.svg
+/evals/
+/submissions/
+/agent_output/
+/tests/
+/buildings/
