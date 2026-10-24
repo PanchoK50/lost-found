@@ -7,7 +7,7 @@ import { applyEdits, loadEdits } from '@/lib/buildings/edits';
 export const metadata: Metadata = { title: 'Building GeoGuessr · Lost & Found', description: 'See a room, find it on the map. Points by walking distance.' };
 
 export default async function GuessPage({ searchParams }: PageProps<'/guess'>) {
-  const { building, seed, level } = await searchParams;
+  const { building, seed, level, mode } = await searchParams;
   // The hidden benchmark buildings stay out of the game (docs/GEOGUESSR.md §7).
   const playable = (await listBuildings()).filter(b => b.split !== 'test');
   const requested = typeof building === 'string' && playable.some(b => b.id === building) ? building : undefined;
@@ -23,6 +23,7 @@ export default async function GuessPage({ searchParams }: PageProps<'/guess'>) {
       buildings={buildings}
       seed={typeof seed === 'string' && seed ? seed.slice(0, 64) : undefined}
       difficulty={level === 'hard' ? 'hard' : 'easy'}
+      mode={mode === 'detective' || mode === 'room' ? mode : 'silhouette'}
     />
   );
 }

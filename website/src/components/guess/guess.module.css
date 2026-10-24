@@ -26,8 +26,8 @@
   background-color: #fff; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 22px 22px; background-position: -1px -1px;
   transition: top .35s ease, left .35s ease, right .35s ease, bottom .35s ease, width .35s ease; }
 .clueTitle { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 10px 14px 0; font-size: 13px; color: var(--muted); }
-.clueTitle b { color: var(--ink); font-size: 16px; letter-spacing: -.01em; }
-.clueTitle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clueTitle b { flex: none; color: var(--ink); font-size: 16px; letter-spacing: -.01em; white-space: nowrap; }
+.clueTitle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .game[data-big] .clue { bottom: calc(100dvh - 58px - 96px - var(--safe-top)); }
 .game[data-big] .clueTitle span, .game[data-big] .silhouette figcaption { display: none; }
 /* After the guess the clue shrinks to a thumbnail on the map, for comparing. */
@@ -131,6 +131,34 @@
 .panel > .primary { position: sticky; bottom: 0; flex: none; }
 .actions { position: sticky; bottom: 0; padding-top: 14px; background: linear-gradient(rgba(255, 255, 255, 0), #fff 14px); }
 
+/* ---------- detective ---------- */
+.maxPoints { margin-left: auto; flex: none; padding: 2px 9px; border-radius: 999px; background: var(--ink); color: #fff; font-style: normal; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.detective { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 0; }
+.clueCards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.clueCards li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 14px; background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0, 36, 120, .05); animation: flip .45s cubic-bezier(.2, .9, .3, 1.2) both; }
+.clueCards i { font-style: normal; font-size: 20px; line-height: 1.2; }
+.clueCards p { margin: 0; line-height: 1.4; font-size: 15px; }
+.clueCards b { color: var(--ink); }
+/* Locked clues stay pinned at the bottom of the card while the open ones scroll. */
+.locked { position: sticky; bottom: 0; margin-top: auto; display: flex; gap: 6px; padding: 8px 0 10px; overflow-x: auto; scrollbar-width: none; background: linear-gradient(rgba(255, 255, 255, 0), #fff 10px); }
+.locked button { flex: 1 0 76px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px; border: 1.5px dashed #c5ccd8; border-radius: 14px; background: rgba(255, 255, 255, .7); color: var(--ink); transition: border-color .2s, background .2s, transform .1s; }
+.locked button:active { transform: scale(.97); }
+.locked i { font-style: normal; font-size: 18px; filter: grayscale(1); opacity: .7; }
+.locked b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.locked span { font-size: 11px; font-weight: 700; color: var(--accent); }
+.penalty { margin: -4px 0 0; font-size: 13px; font-weight: 600; color: var(--accent); }
+/* After the guess the cards are unreadable as a thumbnail; the result says it all. */
+.game[data-mode="detective"][data-phase="reveal"] .clue { display: none; }
+
+/* ---------- room view ---------- */
+.roomView { position: relative; flex: 1; min-height: 0; margin: 8px; border-radius: 14px; overflow: hidden; background: #dfe4ec; }
+.roomView canvas { touch-action: none; cursor: grab; }
+.roomView canvas:active { cursor: grabbing; }
+.sign { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); font-size: 19px; pointer-events: none; user-select: none; }
+.dragHint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); margin: 0; padding: 5px 12px; border-radius: 999px; background: rgba(0, 36, 120, .78); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; animation: hint 4s ease 1.5s forwards; }
+.game[data-phase="reveal"] .roomView { margin: 0; border-radius: 0; }
+.game[data-phase="reveal"] .dragHint, .game[data-phase="reveal"] .sign, .game[data-big] .dragHint { display: none; }
+
 /* ---------- confetti ---------- */
 .confetti { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; }
 .confetti i { position: absolute; left: 50%; bottom: 40%; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: burst 1.4s cubic-bezier(.15, .7, .3, 1) var(--d) forwards; }
@@ -138,6 +166,8 @@
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pulse { from { transform: scale(1); opacity: .5; } to { transform: scale(4); opacity: 0; } }
+@keyframes flip { from { transform: rotateX(70deg) translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hint { to { opacity: 0; } }
 @keyframes up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes burst {
   0% { opacity: 1; transform: translate(0, 0) rotate(0); }
@@ -159,6 +189,13 @@
   .game[data-big] .clueTitle span, .game[data-big] .silhouette figcaption { display: flex; }
   .game[data-phase="reveal"] .clue { z-index: 5; top: 80px; width: 180px; bottom: calc(100dvh - 80px - 180px); }
   .game[data-phase="reveal"] .silhouette { padding: 8px; }
+  .detective { padding: 16px 440px 24px 24px; gap: 14px; }
+  .clueCards li { padding: 14px 16px; }
+  .clueCards p { font-size: 17px; }
+  .locked { padding-bottom: 4px; }
+  .locked button { flex-basis: 120px; flex-grow: 0; }
+  .locked button:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .roomView { margin: 14px; border-radius: 18px; }
 
   .mapCard { z-index: 4; top: calc(100dvh - 24px - 360px); left: calc(100vw - 24px - 400px); right: 24px; bottom: 24px; }
   .game[data-phase="start"] .mapCard, .game[data-phase="end"] .mapCard { top: 80px; left: 468px; bottom: 24px; border-radius: 24px; }

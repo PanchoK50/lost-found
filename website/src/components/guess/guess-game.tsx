@@ -11,14 +11,24 @@ import { WalkGraph } from '@/lib/buildings/walk';
 import { representativePoint } from '@/lib/buildings/graph';
 import { hashSeed, mulberry32, randomSeed } from '@/lib/guess/random';
 import { pickRounds, roomName, type Difficulty } from '@/lib/guess/rooms';
-import { emojiFor, guessDistance, points, scoreScale } from '@/lib/guess/score';
+import { emojiFor, guessDistance, MAX_POINTS, points, scoreScale } from '@/lib/guess/score';
+import { detectiveClues, type Clue, type ClueKind } from '@/lib/guess/clues';
 import { ClueSilhouette } from './clue-silhouette';
+import { ClueDetective } from './clue-detective';
 import { GameSummary, metres, RoundResult, type RoundOutcome } from './result-card';
 import styles from './guess.module.css';
 
 const BuildingScene = dynamic(() => import('@/components/experience/building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the map…</div> });
+const ClueRoomView = dynamic(() => import('./clue-room-view'), { ssr: false, loading: () => <div className="scene-loading">Walking in…</div> });
 
 type Phase = 'start' | 'round' | 'reveal' | 'end';
+export type Mode = 'silhouette' | 'detective' | 'room';
+
+const MODES: { id: Mode; icon: string; name: string; detail: string }[] = [
+  { id: 'silhouette', icon: '▱', name: 'Silhouette', detail: 'Outline and doors' },
+  { id: 'detective', icon: '🔎', name: 'Detective', detail: 'Clues cost points' },
+  { id: 'room', icon: '👁️', name: 'Room view', detail: 'Look around' },
+];
 
 interface Props {
   building: Building;
@@ -27,10 +37,11 @@ interface Props {
   /** From `?seed=`: replay or challenge someone with the same five rooms. */
   seed?: string;
   difficulty?: Difficulty;
+  mode?: Mode;
 }
 
 /** Building GeoGuessr: see a room, find it on the map, score by walking distance (docs/GEOGUESSR.md). */
-export function GuessGame({ building, buildingName, buildings, seed: sharedSeed, difficulty: sharedDifficulty = 'easy' }: Props) {
+export function GuessGame({ building, buildingName, buildings, seed: sharedSeed, difficulty: sharedDifficulty = 'easy', mode: sharedMode = 'silhouette' }: Props) {
   const router = useRouter();
   const id = building.building.id;
   const floors = useMemo(() => [...building.floors].sort((a, b) => a.level - b.level), [building]);
@@ -42,6 +53,9 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
 
   const [phase, setPhase] = useState<Phase>('start');
   const [difficulty, setDifficulty] = useState<Difficulty>(sharedDifficulty);
+  const [mode, setMode] = useState<Mode>(sharedMode);
+  const [clues, setClues] = useState<Clue[]>([]);
+  const [bought, setBought] = useState<ClueKind[]>([]);
   const [seed, setSeed] = useState(sharedSeed);
   const [rounds, setRounds] = useState<Space[]>([]);
   const [index, setIndex] = useState(0);
@@ -54,30 +68,43 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
   const answer = rounds[index];
   const guess = guessId ? spaces.get(guessId) : undefined;
   const total = outcomes.reduce((sum, o) => sum + o.points, 0);
+  const penalty = clues.filter(c => bought.includes(c.kind)).reduce((sum, c) => sum + c.cost, 0);
   const angle = useMemo(() => seed ? mulberry32(hashSeed(`${seed}|turn|${index}`))() * Math.PI * 2 : 0, [seed, index]);
+
+  // Built on first use (event handlers only): up to ~0.7 s on the largest buildings.
+  function walkGraph() {
+    graph.current ??= new WalkGraph(building);
+    return graph.current;
+  }
+
+  /** Fresh state for a round; detective clues are computed up front. */
+  function enterRound(room: Space, roundMode: Mode) {
+    setClues(roundMode === 'detective' ? detectiveClues(building, room, walkGraph()) : []);
+    setBought([]); setGuessId(undefined); setReveal(undefined); setView(home); setPhase('round');
+  }
 
   function start(nextSeed: string, level: Difficulty) {
     const picked = pickRounds(building, mulberry32(hashSeed(`${id}|${nextSeed}|${level}`)), level);
     setEmpty(!picked.length);
     if (!picked.length) return;
-    setSeed(nextSeed); setDifficulty(level); setRounds(picked); setIndex(0); setOutcomes([]);
-    setGuessId(undefined); setReveal(undefined); setView(home); setBigMap(false); setPhase('round');
-    window.history.replaceState(null, '', gameUrl(id, nextSeed, level));
+    setSeed(nextSeed); setDifficulty(level); setRounds(picked); setIndex(0); setOutcomes([]); setBigMap(false);
+    enterRound(picked[0], mode);
+    window.history.replaceState(null, '', gameUrl(id, nextSeed, level, mode));
   }
 
   function submitGuess() {
     if (phase !== 'round' || !answer || !guess) return;
-    graph.current ??= new WalkGraph(building);
-    const distance = guessDistance(graph.current, building, guess, answer);
-    const outcome: RoundOutcome = { answer, guess, distance, points: points(distance.metres, scale), sameFloor: guess.floor_id === answer.floor_id };
+    const distance = guessDistance(walkGraph(), building, guess, answer);
+    const outcome: RoundOutcome = { answer, guess, distance, points: Math.max(0, points(distance.metres, scale) - penalty), penalty, sameFloor: guess.floor_id === answer.floor_id };
     setOutcomes(current => [...current, outcome]);
-    setReveal(revealScene(outcome, graph.current));
+    setReveal(revealScene(outcome, walkGraph()));
     setPhase('reveal');
   }
 
   function next() {
     if (index + 1 >= rounds.length) { setPhase('end'); return; }
-    setIndex(index + 1); setGuessId(undefined); setReveal(undefined); setView(home); setPhase('round');
+    setIndex(index + 1);
+    enterRound(rounds[index + 1], mode);
   }
 
   // Enter or space places the guess, like GeoGuessr's space bar.
@@ -119,11 +146,11 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
   const panel = useRef<HTMLElement>(null);
   const insets = useInsets(map, [hud, rail], panel, `${phase}|${bigMap}`);
 
-  const shareUrl = typeof window === 'undefined' || !seed ? '' : `${window.location.origin}${gameUrl(id, seed, difficulty)}`;
+  const shareUrl = typeof window === 'undefined' || !seed ? '' : `${window.location.origin}${gameUrl(id, seed, difficulty, mode)}`;
   const focusedFloor = view.mode === 'floor' ? view.floorId : undefined;
 
   return (
-    <main className={styles.game} data-phase={phase} data-big={bigMap || undefined}>
+    <main className={styles.game} data-phase={phase} data-mode={mode} data-big={bigMap || undefined}>
       <header className={styles.hud} ref={hud}>
         <Link className={styles.brand} href={`/?building=${id}`} aria-label="Back to lost & found">◈ <span>lost & found</span></Link>
         {phase === 'round' || phase === 'reveal'
@@ -137,8 +164,14 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
 
       {answer && (phase === 'round' || phase === 'reveal') && (
         <section className={styles.clue} aria-label="Your clue">
-          <p className={styles.clueTitle}><b>Where am I?</b><span>{guess ? 'Happy with your pin? Hit Guess.' : floors.length > 1 && view.mode === 'building' ? 'Pick a floor, then tap the room.' : 'Tap the room on the map.'}</span></p>
-          <ClueSilhouette key={`${seed}-${index}`} building={building} space={answer} angle={angle} />
+          <p className={styles.clueTitle}>
+            <b>Where am I?</b>
+            <span>{guess ? 'Happy with your pin? Hit Guess.' : floors.length > 1 && view.mode === 'building' ? 'Pick a floor, then tap the room.' : 'Tap the room on the map.'}</span>
+            {mode === 'detective' && <em className={styles.maxPoints}>max {(MAX_POINTS - penalty).toLocaleString('en')}</em>}
+          </p>
+          {mode === 'silhouette' && <ClueSilhouette key={`${seed}-${index}`} building={building} space={answer} angle={angle} />}
+          {mode === 'detective' && <ClueDetective clues={clues} bought={bought} onBuy={kind => phase === 'round' && setBought(current => current.includes(kind) ? current : [...current, kind])} />}
+          {mode === 'room' && <ClueRoomView key={`${seed}-${index}`} building={building} space={answer} yaw={angle} />}
         </section>
       )}
 
@@ -175,9 +208,11 @@ export function GuessGame({ building, buildingName, buildings, seed: sharedSeed,
           <div className={styles.field}>
             <span>Mode</span>
             <div className={styles.modes}>
-              <button type="button" className={styles.modeOn} aria-pressed="true"><i>▱</i><b>Silhouette</b><small>Outline and doors</small></button>
-              <button type="button" disabled><i>🔎</i><b>Detective</b><small>Soon</small></button>
-              <button type="button" disabled><i>👁️</i><b>Room view</b><small>Soon</small></button>
+              {MODES.map(m => (
+                <button type="button" key={m.id} className={mode === m.id ? styles.modeOn : ''} aria-pressed={mode === m.id} onClick={() => setMode(m.id)}>
+                  <i>{m.icon}</i><b>{m.name}</b><small>{m.detail}</small>
+                </button>
+              ))}
             </div>
           </div>
           <div className={styles.field}>
@@ -227,8 +262,8 @@ function revealScene(o: RoundOutcome, graph: WalkGraph): SceneDirective {
   return { focus, highlights, links: [{ from: at(o.guess), to: at(o.answer) }] };
 }
 
-function gameUrl(buildingId: string, seed: string, level: Difficulty) {
-  return `/guess?building=${encodeURIComponent(buildingId)}&seed=${encodeURIComponent(seed)}&level=${level}`;
+function gameUrl(buildingId: string, seed: string, level: Difficulty, mode: Mode) {
+  return `/guess?building=${encodeURIComponent(buildingId)}&seed=${encodeURIComponent(seed)}&level=${level}&mode=${mode}`;
 }
 
 function floorShort(level: number) {
