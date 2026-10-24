@@ -1,12 +1,24 @@
 # Lost & Found
 
-Next.js foundation for **Talk to Your Building**, Synera's Industrial Agents Hackathon 2026 challenge.
+Team repo for **Talk to Your Building**, Synera's Industrial Agents Hackathon 2026 challenge.
+
+## Repository layout
+
+| Location | Contents |
+| --- | --- |
+| `website/` | The Next.js app (the product we submit) |
+| `notebooks/` | Development-only challenge data exploration (HTML explorer + Jupyter notebook) |
+| `scripts/` | Notebook generation helpers |
+| `data/` | Challenge dataset (planned) |
+
+The challenge kit itself stays in a separate checkout (see "Python kit and benchmark" below).
 
 ## Run locally
 
 Use Node 24 (see `.nvmrc`) and npm. No credentials are needed for the starter.
 
 ```sh
+cd website
 npm ci
 npm run dev
 ```
@@ -19,7 +31,7 @@ npm run typecheck
 npm run build
 ```
 
-CI runs the same checks on pushes and pull requests. Commit `package-lock.json` and use `npm ci` for reproducible installs.
+CI runs the same checks on `website/` for every push and pull request. Commit `package-lock.json` and use `npm ci` for reproducible installs.
 
 ## What's included
 
@@ -29,6 +41,8 @@ CI runs the same checks on pushes and pull requests. Commit `package-lock.json` 
 - Original synthetic building fixture; nothing copied from the challenge dataset. No API keys, external fonts, database, or paid services required.
 
 ## Where the team works
+
+Paths are relative to `website/`.
 
 | Location | Responsibility |
 | --- | --- |
@@ -76,4 +90,4 @@ Build note: development and production builds use Next.js's supported Webpack op
 
 ## Explore the challenge data
 
-Open `notebooks/data-explorer.html` in a browser for an offline overview and interactive floor plans of a real development factory. For editable analysis, use `notebooks/data-exploration.ipynb` (executed outputs included). See `notebooks/README.md` for setup and data provenance. These are development-only resources outside `src/` and `public/`, with no product imports, routes, or navigation links. `.vercelignore` excludes them from Vercel deployment uploads. This exploration snapshot is separate from the app's original demo fixture.
+Open `notebooks/data-explorer.html` in a browser for an offline overview and interactive floor plans of a real development factory. For editable analysis, use `notebooks/data-exploration.ipynb` (executed outputs included). See `notebooks/README.md` for setup and data provenance. These are development-only resources outside the `website/` app, with no product imports, routes, or navigation links. `.vercelignore` excludes them from Vercel deployment uploads. This exploration snapshot is separate from the app's original demo fixture.
