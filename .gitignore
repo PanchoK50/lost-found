@@ -46,3 +46,6 @@ next-env.d.ts
 /.venv/
 **/__pycache__/
 **/.ipynb_checkpoints/
+
+# Python agent output (kit scratch files)
+/agent_output/
