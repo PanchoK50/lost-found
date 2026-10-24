@@ -7,7 +7,7 @@ export const MAX_POINTS = 5000;
 /** Walking a straight line through walls is cheating: unreachable rooms count 1.5× the 3D distance. */
 const UNREACHABLE_FACTOR = 1.5;
 
-/** Distance at which points drop to 1/e: the 3D diagonal of the building over 8, so small and huge buildings play alike. */
+/** Distance at which points drop to 1/e: the 3D diagonal of the building over 4 (walks run much longer than straight lines), so small and huge buildings play alike. */
 export function scoreScale(building: Building): number {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const s of building.spaces) for (const [x, y] of s.polygon) {
@@ -16,7 +16,7 @@ export function scoreScale(building: Building): number {
   }
   const levels = building.floors.map(f => f.elevation_m);
   const height = levels.length ? Math.max(...levels) - Math.min(...levels) : 0;
-  return Math.max(5, Math.hypot(maxX - minX, maxY - minY, height) / 8);
+  return Math.max(5, Math.hypot(maxX - minX, maxY - minY, height) / 4);
 }
 
 export interface GuessDistance {

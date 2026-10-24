@@ -66,7 +66,7 @@ Jeder Hinweis wird aus den Daten berechnet, nichts ist erfunden. Der erste Hinwe
 ## 4. Punkte
 
 - `d` ist die **Laufdistanz** vom getippten Raum zur Lösung, berechnet mit `new WalkGraph(building).distancesFrom(guessId)`. Eine falsche Etage ist damit automatisch teuer, weil Treppe oder Lift dazukommen.
-- `scale` ist die Diagonale der Bounding Box des Gebäudes geteilt durch 8. Damit funktioniert die Wertung im kleinen Haus genauso wie im TUM-Monster.
+- `scale` ist die Diagonale der Bounding Box des Gebäudes geteilt durch 4 (Laufwege sind deutlich länger als die Luftlinie, mit 8 war die Wertung zu hart). Damit funktioniert die Wertung im kleinen Haus genauso wie im TUM-Monster.
 - `punkte = round(5000 · exp(−d / scale))` minus die gekauften Hinweise, mindestens 0.
 - **Volltreffer** (der richtige Raum): 5.000 Punkte und ein kleines Konfetti.
 - Ist ein Raum nicht erreichbar, zählt die Luftlinie in 3D mal 1,5.
