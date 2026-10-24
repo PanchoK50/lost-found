@@ -9,7 +9,7 @@ The backend returns a `ChatResponse` (`src/lib/chat/contract.ts`): `reply` text,
 - `secondary` (light blue): the reference room the question is about, e.g. the start, the entry, the room being soundproofed.
 - `muted` (faint tint): background candidates, e.g. the runners-up for "largest room".
 
-On a single floor the camera frames the `primary` + `secondary` spaces (never tighter than 45% of the floor or 30 m).
+On a single floor the camera frames the `primary` + `secondary` spaces (never tighter than 30% of the floor or 30 m).
 
 Counts are test questions (145 in total); warm-up kinds are not scored.
 

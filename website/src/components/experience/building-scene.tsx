@@ -429,14 +429,23 @@ function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, dire
     const pts = route.points ?? [], path = route.spacePath ?? [];
     if (pts.length && path.length) { if (!routeEnds.has(path[0])) routeEnds.set(path[0], pts[0]); routeEnds.set(path.at(-1)!, pts.at(-1)!); }
   }
+  // A set of answer rooms (e.g. six neighbours, each labelled with its wall length) is shown by colour alone:
+  // more than three labels on the same tone just pile up, and the numbers are in the reply.
+  const labelled = (tone: string) => (directive.highlights ?? []).filter(h => h.label && h.tone === tone && !routeEnds.has(h.spaceId)).length;
+  const crowded = new Set(['primary', 'secondary', 'muted'].filter(tone => labelled(tone) > 3));
+  let mainAnswer = true;
   for (const h of directive.highlights ?? []) {
     const m = model.spaces.get(h.spaceId);
     const f = m && floorOf.get(m.space.floor_id);
     if (!h.label || !m || !f || !shown(poses, f.floor.id)) continue;
+    if (crowded.has(h.tone) && !routeEnds.has(h.spaceId)) continue;
     const pose = poses.get(f.floor.id)!;
     const end = routeEnds.get(h.spaceId);
     const position: [number, number, number] = end ? worldAt(model, poses, end, ROUTE_HEIGHT) : [m.centre[0], pose.y + blockHeight(f.storey, pose.flat, lift[h.tone]) + 0.4, m.centre[1]];
-    anchors.push({ key: `hl-${h.spaceId}`, position, placement: 'above', priority: h.tone === 'primary' ? 3 : end ? 2.5 : 2, content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
+    // Only the first answer label is guaranteed a spot; further answer labels give way when crowded.
+    const priority = h.tone === 'primary' ? (mainAnswer ? 3 : 2.2) : end ? 2.5 : 2;
+    if (h.tone === 'primary') mainAnswer = false;
+    anchors.push({ key: `hl-${h.spaceId}`, position, placement: 'above', priority, content: <div className={`scene-label scene-label--${h.tone}`}>{h.label}</div> });
   }
   const markers = (directive.markers ?? []).filter(marker => shown(poses, marker.floorId) && marker.tone !== 'muted' && marker.label);
   if (markers.length <= 8) markers.forEach((marker, i) => anchors.push({ key: `mk-${i}`, position: worldAt(model, poses, marker, 2.9), placement: 'above', priority: marker.tone === 'primary' ? 3 : 2, content: <div className={`scene-label ${marker.tone === 'primary' ? 'scene-label--primary' : 'scene-label--marker'}`}>{marker.label}</div> }));

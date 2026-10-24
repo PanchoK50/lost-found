@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Building } from '@/lib/buildings/types';
 import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
+import { ReplyText } from './reply-text';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
 import { detectCategory } from '@/lib/world/mode';
@@ -96,6 +97,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const dock = useRef<HTMLElement>(null);
   const floorList = useRef<HTMLDivElement>(null);
   const latestQuestion = useRef<HTMLParagraphElement>(null);
+  const latestAnswer = useRef<HTMLElement>(null);
   const started = messages.length > 0;
   const floors = [...building.floors].sort((a, b) => a.level - b.level);
   const focusedFloor = directive.focus.mode === 'floor' ? directive.focus.floorId : undefined;
@@ -133,7 +135,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   }, [focusedFloor]);
   // Show the latest question with its answer card at the top, not the end of a long step list.
   useEffect(() => {
-    const target = busy ? transcriptEnd.current : latestQuestion.current ?? transcriptEnd.current;
+    // On phones the sheet shows only the latest answer (no question bubble), so fall back to the answer's top.
+    const target = busy ? transcriptEnd.current : latestQuestion.current ?? latestAnswer.current ?? transcriptEnd.current;
     target?.scrollIntoView({ behavior: 'smooth', block: busy ? 'end' : 'start' });
   }, [messages, busy, expanded]);
 
@@ -251,7 +254,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
             <div className="transcript-scroll">
               {visible.map(message => message.role === 'user'
                 ? <p key={message.id} ref={message.id === messages[lastUser]?.id ? latestQuestion : undefined} className="bubble bubble--user">{message.content}</p>
-                : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
+                : <article key={message.id} ref={message.id === messages.at(-1)?.id ? latestAnswer : undefined} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
                     <AgentAvatar />
                     {message.response?.answer && (
                       <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
@@ -260,7 +263,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
                       </button>
                     )}
-                    <p>{withoutAnswerLine(message.content)}</p>
+                    <ReplyText text={withoutAnswerLine(message.content)} />
                     {message.response?.actions?.length ? (
                       <div className="answer-actions">
                         {message.response.actions.map(action => (

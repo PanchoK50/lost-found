@@ -158,7 +158,7 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
     if (focus.mode === 'floor' && !points.length) {
       // Rooms on one floor: keep enough of the floor around them to read where they are.
       const floor = model.floors.find(f => f.floor.id === focus.floorId)!;
-      minSize = Math.max(floor.box.maxX - floor.box.minX, floor.box.maxZ - floor.box.minZ) * 0.45;
+      minSize = Math.max(floor.box.maxX - floor.box.minX, floor.box.maxZ - floor.box.minZ) * 0.3;
     }
     const half = Math.max(box.max.x - box.min.x, box.max.z - box.min.z, minSize, 30 * (points.length ? 0.8 : 1)) / 2;
     const floorsOnView = model.floors.filter(f => onView(f.floor.id));

@@ -84,13 +84,22 @@ button:disabled { cursor: default; }
 .transcript-scroll { overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
 .sheet-handle { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: transparent; padding: 8px 0 4px; font-size: 12px; color: var(--muted); min-height: 44px; }
 .sheet-handle span { width: 36px; height: 4px; border-radius: 2px; background: #c5ccd8; }
-.bubble { margin: 0; line-height: 1.5; max-width: 92%; animation: rise .35s ease both; }
+.bubble { margin: 0; line-height: 1.5; max-width: 92%; animation: rise .35s ease both; scroll-margin-top: 12px; }
 .bubble--user { align-self: flex-end; background: var(--ink); color: #fff; padding: 9px 13px; border-radius: 16px 16px 4px 16px; font-size: 14px; }
 .bubble--assistant { align-self: stretch; max-width: 100%; display: grid; grid-template-columns: 30px 1fr; column-gap: 10px; }
 .bubble--assistant > .agent-avatar { grid-row: 1 / span 9; margin-top: 2px; }
 .bubble--assistant > :not(.agent-avatar) { grid-column: 2; }
 .bubble--assistant p { margin: 0; color: var(--text); font-size: 14px; }
 .bubble--error p { color: #c0362c; }
+.reply-text { display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; color: var(--text); }
+.reply-text p { margin: 0; }
+.reply-text strong { color: var(--ink); font-weight: 600; }
+.reply-text code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: #eef1f6; }
+.reply-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.reply-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.reply-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 4px 8px 6px 0; border-bottom: 1px solid var(--line); }
+.reply-table td { padding: 5px 8px 5px 0; border-bottom: 1px solid #eef1f6; }
+.reply-table td:last-child, .reply-table th:last-child { text-align: right; padding-right: 0; }
 .answer-card { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; margin-bottom: 8px; padding: 12px 14px; text-align: left; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 16px; }
 .answer-card--negative { border-left-color: #c5ccd8; }
 .answer-card--negative .answer-value { color: var(--text); }
