@@ -186,6 +186,7 @@ class ChatSession:
         self.messages: list[dict] = []
         self.system = system_blocks(CHAT_INSTRUCTIONS, building)
         self.usage: Counter = Counter()
+        self.last_scene: dict = {"focus": {"mode": "building"}}
 
     def ask(self, text: str) -> dict:
         outcome = Outcome(reply="", path="chat")
@@ -194,4 +195,17 @@ class ChatSession:
         self.toolbox.reset_turn()
         reply = self.loop.run(self.system, self.messages, self.toolbox, outcome)
         self.usage.update(outcome.usage)
-        return {"text": reply, **self.toolbox.turn_payload(), "tool_calls": outcome.tool_calls, "cost": round(outcome.cost(), 4)}
+        payload = self.toolbox.turn_payload()
+        ui = payload.pop("ui", None)
+        if ui is None:  # no tool ran (e.g. a clarifying question): keep the camera where it was
+            ui = {"kind": "unknown", "scene": {**self.last_scene, "highlights": [], "routes": []}}
+        else:
+            self.last_scene = {"focus": ui["scene"]["focus"]}
+        ui["scene"].setdefault("closed", sorted(self.building.closed))
+        return {
+            "text": reply,
+            **payload,
+            "ui": ui,
+            "tool_calls": outcome.tool_calls,
+            "cost": round(outcome.cost(), 4),
+        }

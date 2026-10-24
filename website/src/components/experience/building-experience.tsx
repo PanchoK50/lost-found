@@ -36,6 +36,8 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   const [directive, setDirective] = useState<SceneDirective>(overview);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  // Backend conversation id: follow-ups and edits (closed lifts, new doors) stay in one session.
+  const sessionId = useRef<string | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
   // The route step the camera is showing: `${messageId}:${leg}-${step}`.
   const [activeStep, setActiveStep] = useState<string>();
@@ -82,6 +84,7 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
   /** Back to the start screen: whole building, "Ask me anything", suggestions. */
   const startOver = useCallback(() => {
     setMessages([]);
+    sessionId.current = undefined;
     setDirective(overview);
     setDraft('');
     setExpanded(false);
@@ -109,10 +112,11 @@ export function BuildingExperience({ building, buildings, suggestions }: Props) 
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
+      sessionId.current = response.sessionId;
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
       setDirective(response.scene);
       setActiveStep(undefined);

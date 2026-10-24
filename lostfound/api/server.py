@@ -3,6 +3,7 @@
   source .envrc && uv run uvicorn lostfound.api.server:app --reload --port 8000"""
 
 import csv
+import os
 import uuid
 from pathlib import Path
 
@@ -16,8 +17,10 @@ from lostfound.core.building import Building, MapError
 from lostfound.core.resolve import Resolver
 from lostfound.evals.variants import MODELS
 
-DATA = Path("data")
-IMPORTED = Path("buildings")  # buildings created from floor plans (lostfound.ingest)
+REPO = Path(__file__).resolve().parents[2]
+DATA = REPO / "data"
+DEFAULT_CHAT_MODEL = os.environ.get("LOSTFOUND_CHAT_MODEL", "opus")
+IMPORTED = REPO / "buildings"  # buildings created from floor plans (lostfound.ingest)
 
 app = FastAPI(title="Lost & Found building agent", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -143,6 +146,40 @@ def chat(request: ChatRequest) -> dict:
     if session.building.id != request.building_id:
         raise HTTPException(400, "Session belongs to another building.")
     return {"session_id": session_id, **session.ask(request.message)}
+
+
+class UIChatRequest(BaseModel):
+    """The web viewer's ChatRequest (website/src/lib/chat/contract.ts) plus the backend session id."""
+
+    buildingId: str
+    message: str
+    sessionId: str | None = None
+    model: str = DEFAULT_CHAT_MODEL
+    effort: str = "low"
+
+
+@app.post("/ui/chat")
+def ui_chat(request: UIChatRequest) -> dict:
+    """One chat turn in the viewer's ChatResponse shape: kind, reply, answer card, scene."""
+    session_id = request.sessionId or uuid.uuid4().hex
+    if session_id not in SESSIONS:
+        config = AgentConfig(design="chat", model=MODELS.get(request.model, request.model), effort=request.effort)
+        SESSIONS[session_id] = ChatSession(load(request.buildingId), config)
+    session = SESSIONS[session_id]
+    if session.building.id != request.buildingId:
+        raise HTTPException(400, "Session belongs to another building.")
+    turn = session.ask(request.message)
+    ui = turn["ui"]
+    return {
+        "kind": ui["kind"],
+        "reply": turn["text"],
+        **({"answer": ui["answer"]} if ui.get("answer") else {}),
+        "scene": ui["scene"],
+        "sessionId": session_id,
+        "source": "agent",
+        "cost": turn["cost"],
+        "toolCalls": turn["tool_calls"],
+    }
 
 
 class EditRequest(BaseModel):

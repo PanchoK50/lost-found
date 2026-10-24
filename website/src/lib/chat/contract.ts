@@ -20,6 +20,8 @@ export interface ChatRequest {
   buildingId: string;
   message: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Backend conversation id from the previous response; keeps follow-ups and edits in one session. */
+  sessionId?: string;
 }
 
 export interface ChatResponse {
@@ -31,6 +33,10 @@ export interface ChatResponse {
   scene: SceneDirective;
   /** Follow-up buttons under the answer. `send: false` puts the text in the input for the user to finish. */
   actions?: { label: string; message: string; send?: boolean }[];
+  /** Backend conversation id; send it back with the next message. */
+  sessionId?: string;
+  /** Who answered: the Python agent, or the offline demo resolver when the agent is not running. */
+  source?: 'agent' | 'demo';
 }
 
 /** A point on a specific floor, in building metres (Y up). */

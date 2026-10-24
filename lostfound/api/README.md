@@ -53,3 +53,13 @@ In `start`, `destination` and `via` you can pass a space id, a room number (`0.2
 ```
 
 When the agent needs a clarification, for example when two rooms share a name, it asks in `text` and returns no route.
+
+## Web viewer endpoint
+
+`POST /ui/chat` with `{buildingId, message, sessionId?}` returns the viewer's `ChatResponse` (see `website/src/lib/chat/contract.ts`):
+
+- `kind`, `reply` and `answer` (the answer card);
+- `scene`: focus, highlights (primary/secondary/muted), markers, routes as `spacePath` per leg, links, assets, closed;
+- `sessionId`, `source: "agent"`, `cost` and `toolCalls`.
+
+The web app's `/api/chat` calls it and fills in route polylines and turn-by-turn steps from each `spacePath`. Scenes are built in `lostfound/api/scene.py`, one builder per tool.

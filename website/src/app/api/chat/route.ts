@@ -5,7 +5,12 @@ import { turnByTurn } from '@/lib/buildings/turns';
 import type { ChatRequest, ChatResponse } from '@/lib/chat/contract';
 import { resolveDemo } from '@/lib/chat/demo-resolver';
 
-// Chat boundary for the viewer. Swap `resolveDemo` for the real agent; keep the ChatResponse shape.
+/** The Python agent (lostfound.api.server). Start it with `uv run uvicorn lostfound.api.server:app --port 8000`. */
+const AGENT_URL = process.env.LOSTFOUND_API_URL ?? 'http://127.0.0.1:8000';
+const AGENT_TIMEOUT_MS = 120_000;
+
+// Chat boundary for the viewer: the Python agent answers; the demo resolver steps in only when the agent is
+// not running, so the UI can still be worked on without the backend.
 export async function POST(request: Request) {
   let body: Partial<ChatRequest>;
   try { body = await request.json(); } catch { return Response.json({ error: 'Send JSON.' }, { status: 400 }); }
@@ -13,7 +18,25 @@ export async function POST(request: Request) {
   if (!message || message.length > 1000) return Response.json({ error: 'Ask something between 1 and 1000 characters.' }, { status: 400 });
   const entry = getCatalogEntry(body.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
-  const response: ChatResponse = resolveDemo(entry.building, message);
+
+  let agent: Response;
+  try {
+    agent = await fetch(`${AGENT_URL}/ui/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ buildingId: entry.id, message, sessionId: body.sessionId }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
+    });
+  } catch {
+    const demo: ChatResponse = { ...resolveDemo(entry.building, message), source: 'demo' };
+    return Response.json(withRoutePoints(entry.building, demo));
+  }
+  if (!agent.ok) {
+    const detail = await agent.json().catch(() => ({}));
+    return Response.json({ error: typeof detail.detail === 'string' ? detail.detail : 'The building agent could not answer.' }, { status: 502 });
+  }
+  const response = (await agent.json()) as ChatResponse;
   return Response.json(withRoutePoints(entry.building, response));
 }
 

@@ -16,14 +16,25 @@ The challenge kit itself stays in a separate checkout (see "Python kit and bench
 
 ## Run locally
 
-Use Node 24 (see `../.nvmrc`) and npm. No credentials are needed for the starter.
+Use Node 24 (see `../.nvmrc`) and npm for the web app, and uv (Python 3.12+) for the building agent.
+
+**1. The building agent (Python, repo root)**: answers every chat message with Claude and our geometry library.
+
+```sh
+cd ..
+uv sync
+source .envrc   # exports ANTHROPIC_API_KEY (or put it in .env and use `uv run --env-file .env`)
+uv run uvicorn lostfound.api.server:app --port 8000
+```
+
+**2. The web app (this folder)**
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. Search for `printer`, `CNC`, `coffee`, a room name, or a room number. Results select the containing room on the floor plan. Use the space selector to inspect other rooms. Search is a literal, case-insensitive lookup; it does not yet interpret conversational requests.
+Open http://localhost:3000. `/api/chat` forwards each message to the agent at `LOSTFOUND_API_URL` (default `http://127.0.0.1:8000`) and returns its `ChatResponse` (answer card + scene). If the agent is not running, a local demo resolver answers instead (`source: "demo"` in the response), so the UI can be worked on without Python or API keys. The agent's HTTP contract is documented in `../lostfound/api/README.md`.
 
 ```sh
 npm run lint

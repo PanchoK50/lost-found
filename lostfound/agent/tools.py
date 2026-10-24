@@ -15,6 +15,7 @@ import textwrap
 from pathlib import Path
 
 from lostfound.agent.format import answer_line
+from lostfound.api import scene
 from lostfound.core import directions, geometry, skills
 from lostfound.core.building import Building, MapError
 from lostfound.core.resolve import Resolver
@@ -218,7 +219,7 @@ class Toolbox:
         self.reset_turn()
 
     def reset_turn(self) -> None:
-        self.turn = {"highlights": [], "route": None, "edits": []}
+        self.turn = {"highlights": [], "route": None, "edits": [], "ui": None}
 
     def turn_payload(self) -> dict:
         """What the UI needs besides the text: spaces to highlight, the route to draw, edits made this turn."""
@@ -272,8 +273,20 @@ class Toolbox:
 
     # ---------- typed tools ----------
 
+    def _scene(self, build) -> None:
+        """Chat only: record the viewer scene for this tool result (lazily; batch mode never pays for it)."""
+        if not self.chat:
+            return
+        try:
+            self.turn["ui"] = build()
+        except (MapError, KeyError, ValueError) as error:  # a scene problem must never break the answer
+            self.turn["ui_error"] = str(error)
+
     def tool_resolve_place(self, text: str) -> dict:
-        return self.resolver.space(text).as_dict()
+        resolution = self.resolver.space(text)
+        if resolution.candidates and not resolution.ambiguous:
+            self._scene(lambda: scene.show_space(self.building, resolution.best))
+        return resolution.as_dict()
 
     def tool_search(self, query: str) -> dict:
         if query.strip() == "*types*":
@@ -282,65 +295,84 @@ class Toolbox:
         return {"matches": len(results), "results": results[:20]}
 
     def tool_largest_room(self, floor: str, room_type: str) -> dict:
-        return self._answer("largest_room", skills.largest_room(self.building, self._floor(floor), self.resolver.room_type(room_type)))
+        floor_id, kind = self._floor(floor), self.resolver.room_type(room_type)
+        result = skills.largest_room(self.building, floor_id, kind)
+        self._scene(lambda: scene.largest_room(self.building, floor_id, kind, result))
+        return self._answer("largest_room", result)
 
     def tool_total_floor_area(self, floor: str, room_type: str) -> dict:
-        return self._answer(
-            "floor_area_total", skills.floor_area_total(self.building, self._floor(floor), self.resolver.room_type(room_type))
-        )
+        floor_id, kind = self._floor(floor), self.resolver.room_type(room_type)
+        result = skills.floor_area_total(self.building, floor_id, kind)
+        self._scene(lambda: scene.floor_area_total(self.building, floor_id, kind, result))
+        return self._answer("floor_area_total", result)
 
     def tool_errand_distance(self, start, asset_type, target_floor, target_room_type, can_use_stairs) -> dict:
+        start_id = self._space(start)
         result = skills.errand(
             self.building,
-            self._space(start),
+            start_id,
             self.resolver.asset_type(asset_type),
             self._floor(target_floor),
             self.resolver.room_type(target_room_type),
             step_free=not can_use_stairs,
         )
+        self._scene(lambda: scene.errand(self.building, start_id, not can_use_stairs, result))
         return self._answer("errand", result, self._ambiguous(start))
 
     def tool_delivery_reach_count(self, entrance_space, floor, min_width_m) -> dict:
-        result = skills.wide_delivery_count(self.building, self._space(entrance_space), self._floor(floor), min_width_m)
+        start_id, floor_id = self._space(entrance_space), self._floor(floor)
+        result = skills.wide_delivery_count(self.building, start_id, floor_id, min_width_m)
+        self._scene(lambda: scene.wide_delivery(self.building, start_id, floor_id, min_width_m, result))
         return self._answer("wide_delivery_count", result, self._ambiguous(entrance_space))
 
     def tool_step_free_reach_count(self, entrance_space, floor, closed) -> dict:
-        result = skills.step_free_reachable_count(
-            self.building, self._space(entrance_space), self._floor(floor), self._closed(closed)
-        )
+        start_id, floor_id, closed_ids = self._space(entrance_space), self._floor(floor), self._closed(closed)
+        result = skills.step_free_reachable_count(self.building, start_id, floor_id, closed_ids)
+        self._scene(lambda: scene.step_free_reach(self.building, start_id, floor_id, closed_ids, result))
         return self._answer("step_free_reachable_count", result, self._ambiguous(entrance_space))
 
     def tool_room_above_below(self, room, direction) -> dict:
-        return self._answer("room_stacked", skills.room_stacked(self.building, self._space(room), direction), self._ambiguous(room))
+        room_id = self._space(room)
+        result = skills.room_stacked(self.building, room_id, direction)
+        self._scene(lambda: scene.room_stacked(self.building, room_id, direction, result))
+        return self._answer("room_stacked", result, self._ambiguous(room))
 
     def tool_shared_walls(self, room) -> dict:
-        return self._answer("shared_walls_count", skills.shared_walls_count(self.building, self._space(room)), self._ambiguous(room))
+        room_id = self._space(room)
+        result = skills.shared_walls_count(self.building, room_id)
+        self._scene(lambda: scene.shared_walls(self.building, room_id, result))
+        return self._answer("shared_walls_count", result, self._ambiguous(room))
 
     def tool_straight_line_3d(self, first, second) -> dict:
-        result = skills.straight_line_3d(self.building, self._space(first), self._space(second))
+        first_id, second_id = self._space(first), self._space(second)
+        result = skills.straight_line_3d(self.building, first_id, second_id)
+        self._scene(lambda: scene.straight_line(self.building, first_id, second_id, result))
         return self._answer("straight_line_3d", result, self._ambiguous(first, second))
 
     def tool_what_if_door(self, first, second, floor) -> dict:
-        result = skills.what_if_door(self.building, self._space(first), self._space(second), self._floor(floor))
+        first_id, second_id, floor_id = self._space(first), self._space(second), self._floor(floor)
+        result = skills.what_if_door(self.building, first_id, second_id, floor_id)
+        self._scene(lambda: scene.what_if_door(self.building, first_id, second_id, floor_id, result))
         return self._answer("what_if_door", result, self._ambiguous(first, second))
 
     def tool_route(self, start, destination, via, step_free, closed) -> dict:
-        if self.chat:
-            with self.building.temporarily_closed(*self._closed(closed)):
-                details = directions.route_details(
-                    self.building, self._space(start), self._space(destination), step_free, [self._space(v) for v in via]
-                )
-            self.turn["route"] = details
-            self._highlight(*details["highlights"][:1], *details["highlights"][-1:])
-            return {key: details[key] for key in ("length_m", "steps", "step_free")} | {
-                "rooms": [self.building.label(s) for s in details["space_path"] if s in self.building.spaces]
-            }
-        result = skills.route(
-            self.building, self._space(start), self._space(destination), step_free, self._closed(closed), [self._space(v) for v in via]
-        )
+        stops = [self._space(start), *[self._space(v) for v in via], self._space(destination)]
+        closed_ids = self._closed(closed)
+        result = skills.route(self.building, stops[0], stops[-1], step_free, closed_ids, stops[1:-1])
+        self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result))
         if not result["reachable"]:
             self.last_answer_line = "Answer: no route"
             return {**result, "answer_line": "Answer: no route"}
+        if self.chat:
+            # Directions with turns and landmarks for the reply; the viewer draws the route itself.
+            with self.building.temporarily_closed(*closed_ids):
+                details = directions.route_details(self.building, stops[0], stops[-1], step_free, stops[1:-1])
+            self.turn["route"] = details
+            return {
+                "length_m": result["length_m"],
+                "steps": details["steps"],
+                "rooms": [self.building.label(s) for s in details["space_path"] if s in self.building.spaces],
+            }
         result["space_path"] = [self.building.label(s) if s in self.building.spaces else s for s in result["space_path"]]
         return self._answer("route", result)
 
@@ -350,10 +382,14 @@ class Toolbox:
             floor_name = self.building.floor_name(self._floor(floor))
             result["matches"] = [match for match in result["matches"] if match["floor"] == floor_name]
         result["matches"] = result["matches"][:25]
+        self._scene(lambda: scene.locate(self.building, result["matches"]))
         return result
 
     def tool_count_assets(self, asset_type, floor) -> dict:
-        return self._answer("count", skills.count_assets(self.building, self.resolver.asset_type(asset_type), self._floor(floor)))
+        kind, floor_id = self.resolver.asset_type(asset_type), self._floor(floor)
+        result = skills.count_assets(self.building, kind, floor_id)
+        self._scene(lambda: scene.count_assets(self.building, kind, floor_id, result))
+        return self._answer("count", result)
 
     # ---------- edits (chat) ----------
 
@@ -362,6 +398,7 @@ class Toolbox:
         edit = {"action": "close" if closed else "reopen", "element_id": element_id}
         self.edits.append(edit)
         self.turn["edits"].append(edit)
+        self._scene(lambda: scene.edit(self.building, edit))
         return {**edit, "all_closed": sorted(self.building.closed)}
 
     def tool_add_door(self, first: str, second: str, width_m: float, step_free: bool) -> dict:
@@ -387,6 +424,7 @@ class Toolbox:
         edit = {"action": "add_door", "opening": opening}
         self.edits.append(edit)
         self.turn["edits"].append(edit)
+        self._scene(lambda: scene.edit(self.building, edit))
         return edit
 
     def tool_move_asset(self, asset: str, to_room: str) -> dict:
@@ -403,6 +441,7 @@ class Toolbox:
         edit = {"action": "move_asset", "asset_id": asset_id, "to_space_id": room_id}
         self.edits.append(edit)
         self.turn["edits"].append(edit)
+        self._scene(lambda: scene.edit(self.building, edit))
         return edit
 
     # ---------- code ----------
