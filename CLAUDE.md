@@ -15,6 +15,7 @@ Industrial Agents Hackathon 2026, Track 01 "Talk to Your Building", Sat 24 to Su
 | `notebooks/` | Data explorer. |
 | `docs/TECH_MUST_HAVES.md` | Technical must-haves T1–T20: distance models, exact definitions, answer format, API response contract (T20), open questions for the organizers. |
 | `docs/UX_MUST_HAVES.md` | UX must-haves U1–U12, agent tone, 12 interaction test scenarios. |
+| `docs/CONCEPT.md` | UX concept (dollhouse view, lenses, look and feel, demo story), idea pool, team decisions, summary of the team's Notion feature backlog. Read it before UX work. |
 
 Python runs through uv at the repo root (`uv sync`, `uv run ...`).
 
