@@ -23,62 +23,107 @@ class Parsed:
     notes: list[str] = field(default_factory=list)
 
 
-PATTERNS: list[tuple[str, re.Pattern]] = [
+ROOM_AREA_ANSWER = "Finish with a line 'Answer: <room name or number>, <area> m²'."
+ROOM_ANSWER = "Finish with a line 'Answer: <room name or number>'."
+NUMBER_ANSWER = "Finish with a line 'Answer: <number>'."
+
+# Each template is anchored at the start of the question and must end with its own answer instruction, so a
+# reworded question never half-matches a template; anything that is not an exact template goes to Claude.
+TEMPLATES: list[tuple[str, re.Pattern, str]] = [
     (
         "largest_room",
-        re.compile(r"largest (?P<room_type>[\w ]+?) on (?P<floor>the [\w -]+?|[\w -]+? floor)[,?]", re.I),
+        re.compile(r"Which is the largest (?P<room_type>[\w ]+?) on (?P<floor>the [\w -]+?|[\w -]+? floor), and how big is it in m²\?", re.I),
+        ROOM_AREA_ANSWER,
     ),
     (
         "floor_area_total",
-        re.compile(r"floor area of (?:every|all) (?P<room_type>[\w ]+?) on (?P<floor>[\w -]+?) added together", re.I),
+        re.compile(
+            r"Facilities want the total floor area of (?:every|all) (?P<room_type>[\w ]+?) on (?P<floor>[\w -]+?) "
+            r"added together\. How many square metres is that\?",
+            re.I,
+        ),
+        NUMBER_ANSWER,
     ),
     (
         "errand",
         re.compile(
             r"I'm in (?P<start>.+?)\. I need to grab an? (?P<asset_type>[\w ]+?) from the room that has one "
-            r"closest to me, then carry it to the largest (?P<room_type>[\w ]+?) on (?P<floor>[\w -]+?)\.(?P<rest>.*)",
-            re.I | re.S,
+            r"closest to me, then carry it to the largest (?P<room_type>[\w ]+?) on (?P<floor>[\w -]+?)\. "
+            r"(?P<rest>[^.]*)\. How far will I walk in total, in metres\?",
+            re.I,
         ),
+        NUMBER_ANSWER,
     ),
-    ("shared_walls_count", re.compile(r"soundproofing (?P<space>.+?)\. How many other rooms", re.I)),
+    (
+        "shared_walls_count",
+        re.compile(
+            r"We're soundproofing (?P<space>.+?)\. How many other rooms on that floor share a wall with it\? "
+            r"Count every room whose wall runs along it for at least 1 m, with or without a door between them; "
+            r"corridors, stairwells and lifts don't count\.",
+            re.I,
+        ),
+        NUMBER_ANSWER,
+    ),
     (
         "wide_delivery_count",
         re.compile(
-            r"at least (?P<min_width>\d+(?:\.\d+)?) m wide\. It arrives through the entrance into (?P<start>.+?)\. "
-            r"Into how many rooms on (?P<floor>[\w -]+?) can",
+            r"I'm moving an? (?P<load_width>\d+(?:\.\d+)?) m wide [\w ]+?\. It can't go on stairs or steps "
+            r"\(lifts are fine\), and every door it passes through must be at least (?P<min_width>\d+(?:\.\d+)?) m wide\. "
+            r"It arrives through the entrance into (?P<start>.+?)\. Into how many rooms on (?P<floor>[\w -]+?) can it be delivered\?",
             re.I,
         ),
+        NUMBER_ANSWER,
     ),
     (
         "step_free_reachable_count",
         re.compile(
-            r"(?P<closed>[^.]+?) is (?:out of service|closed)[^.]*\. A wheelchair user comes in through the "
-            r"entrance into (?P<start>.+?)\. How many rooms on (?P<floor>[\w -]+?) can",
+            r"(?P<closed>[^.]+?) is out of service\. A wheelchair user comes in through the entrance into (?P<start>.+?)\. "
+            r"How many rooms on (?P<floor>[\w -]+?) can they still reach\?",
             re.I,
         ),
+        NUMBER_ANSWER,
     ),
-    ("room_stacked_above", re.compile(r"ceiling in (?P<space>.+?)\. Which room is directly above", re.I)),
-    ("room_stacked_below", re.compile(r"floor of (?P<space>.+?)\. Which room directly below", re.I)),
+    (
+        "room_stacked_above",
+        re.compile(r"There's water dripping from the ceiling in (?P<space>.+?)\. Which room is directly above it\?", re.I),
+        ROOM_ANSWER,
+    ),
+    (
+        "room_stacked_below",
+        re.compile(
+            r"A washing machine is leaking onto the floor of (?P<space>.+?)\. Which room directly below it will the water reach\?",
+            re.I,
+        ),
+        ROOM_ANSWER,
+    ),
     (
         "straight_line_3d",
-        re.compile(r"between (?P<first>.+?) and (?P<second>.+?)\. What is the straight-line distance", re.I),
+        re.compile(
+            r"We're planning a wireless sensor link between (?P<first>.+?) and (?P<second>.+?)\. What is the straight-line "
+            r"distance in metres between the centres of the two rooms \(each room's floor-plan centroid, at its floor's elevation\)\?",
+            re.I,
+        ),
+        NUMBER_ANSWER,
     ),
     (
         "what_if_door",
         re.compile(
-            r"add a door between (?P<first>.+?) and (?P<second>.+?), in the middle of the wall they share\? "
-            r"How many rooms on (?P<floor>[\w -]+?) would",
+            r"What if we add a door between (?P<first>.+?) and (?P<second>.+?), in the middle of the wall they share\? "
+            r"How many rooms on (?P<floor>[\w -]+?) would then have a shorter walk out of the building, to their "
+            r"nearest entrance, by more than 1 m\?",
             re.I,
         ),
+        NUMBER_ANSWER,
     ),
 ]
 
 
 def parse(building: Building, question: str) -> Parsed | None:
     resolver = Resolver(building)
-    for name, pattern in PATTERNS:
-        match = pattern.search(question)
-        if not match:
+    text = " ".join(question.split())
+    for name, pattern, instruction in TEMPLATES:
+        match = pattern.match(text)
+        if not match or text[match.end():].strip() != instruction:
             continue
         groups = match.groupdict()
         try:
@@ -102,7 +147,7 @@ def _to_inputs(building: Building, resolver: Resolver, name: str, groups: dict) 
                     "asset_type": resolver.asset_type(groups["asset_type"]),
                     "floor_id": floor(),
                     "room_type": resolver.room_type(groups["room_type"]),
-                    "step_free": bool(NOT_STAIRS.search(groups["rest"])),
+                    "step_free": _step_free(groups["rest"]),
                 },
             )
         case "shared_walls_count":
@@ -119,6 +164,15 @@ def _to_inputs(building: Building, resolver: Resolver, name: str, groups: dict) 
         case "what_if_door":
             return Parsed(name, {"first": space("first"), "second": space("second"), "floor_id": floor()})
     raise MapError(name)
+
+
+def _step_free(sentence: str) -> bool:
+    """'I can carry it on the stairs' -> False; anything else must be a clear 'no stairs' statement."""
+    if re.fullmatch(r"I can carry it on the stairs", sentence.strip(), re.I):
+        return False
+    if NOT_STAIRS.search(sentence):
+        return True
+    raise MapError(f"Unrecognised constraint: {sentence}")
 
 
 def solve(building: Building, parsed: Parsed) -> dict:

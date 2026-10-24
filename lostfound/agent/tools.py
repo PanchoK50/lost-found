@@ -15,7 +15,7 @@ import textwrap
 from pathlib import Path
 
 from lostfound.agent.format import answer_line
-from lostfound.core import skills
+from lostfound.core import directions, geometry, skills
 from lostfound.core.building import Building, MapError
 from lostfound.core.resolve import Resolver
 
@@ -139,6 +139,26 @@ TYPED_TOOLS = [
     },
 ]
 
+EDIT_TOOLS = [
+    {
+        "name": "set_closed",
+        "description": "Close or reopen a lift, staircase, door or room (maintenance, blocked aisle). Affects all later answers.",
+        "input_schema": _schema({"element": _string("Name or id, e.g. 'Lift 2', 'east stairs', a door id, a room."), "closed": {"type": "boolean"}}),
+    },
+    {
+        "name": "add_door",
+        "description": "Add a door in the middle of the wall two neighbouring spaces share (edits the building).",
+        "input_schema": _schema(
+            {"first": PLACE, "second": PLACE, "width_m": {"type": "number", "description": "Door width, e.g. 0.9."}, "step_free": {"type": "boolean"}}
+        ),
+    },
+    {
+        "name": "move_asset",
+        "description": "Record that a thing (machine, furniture, equipment) is now in another room (edits the building).",
+        "input_schema": _schema({"asset": _string("Asset name or id, e.g. 'Press 3' or 'Desk 2.03-B'."), "to_room": PLACE}),
+    },
+]
+
 PYTHON_TOOL = {
     "name": "run_python",
     "description": textwrap.dedent(
@@ -184,9 +204,29 @@ class Toolbox:
         self.excluded_kinds = excluded_kinds
         excluded_tools = {KIND_TOOLS[kind] for kind in excluded_kinds}
         typed = [tool for tool in TYPED_TOOLS if tool["name"] not in excluded_tools]
-        self.schemas = {"typed": typed, "code": [TYPED_TOOLS[0], PYTHON_TOOL], "hybrid": [*typed, PYTHON_TOOL]}[design]
+        self.schemas = {
+            "typed": typed,
+            "code": [TYPED_TOOLS[0], PYTHON_TOOL],
+            "hybrid": [*typed, PYTHON_TOOL],
+            "chat": [*typed, *EDIT_TOOLS, PYTHON_TOOL],
+        }[design]
+        self.chat = design == "chat"
         self.last_answer_line: str | None = None
         self.resolutions: list[dict] = []
+        self.edits: list[dict] = []
+        self.reset_turn()
+
+    def reset_turn(self) -> None:
+        self.turn = {"highlights": [], "route": None, "edits": []}
+
+    def turn_payload(self) -> dict:
+        """What the UI needs besides the text: spaces to highlight, the route to draw, edits made this turn."""
+        return {**self.turn, "closed": sorted(self.building.closed)}
+
+    def _highlight(self, *space_ids: str) -> None:
+        for space_id in space_ids:
+            if space_id in self.building.spaces and space_id not in self.turn["highlights"]:
+                self.turn["highlights"].append(space_id)
 
     def definitions(self) -> list[dict]:
         return [{**tool, "strict": True} for tool in self.schemas]
@@ -209,6 +249,7 @@ class Toolbox:
     def _space(self, text: str) -> str:
         resolution = self.resolver.space(text)
         self.resolutions.append(resolution.as_dict(3))
+        self._highlight(resolution.best)
         return resolution.best
 
     def _floor(self, text: str) -> str:
@@ -283,6 +324,16 @@ class Toolbox:
         return self._answer("what_if_door", result, self._ambiguous(first, second))
 
     def tool_route(self, start, destination, via, step_free, closed) -> dict:
+        if self.chat:
+            with self.building.temporarily_closed(*self._closed(closed)):
+                details = directions.route_details(
+                    self.building, self._space(start), self._space(destination), step_free, [self._space(v) for v in via]
+                )
+            self.turn["route"] = details
+            self._highlight(*details["highlights"][:1], *details["highlights"][-1:])
+            return {key: details[key] for key in ("length_m", "steps", "step_free")} | {
+                "rooms": [self.building.label(s) for s in details["space_path"] if s in self.building.spaces]
+            }
         result = skills.route(
             self.building, self._space(start), self._space(destination), step_free, self._closed(closed), [self._space(v) for v in via]
         )
@@ -303,25 +354,77 @@ class Toolbox:
     def tool_count_assets(self, asset_type, floor) -> dict:
         return self._answer("count", skills.count_assets(self.building, self.resolver.asset_type(asset_type), self._floor(floor)))
 
+    # ---------- edits (chat) ----------
+
+    def tool_set_closed(self, element: str, closed: bool) -> dict:
+        element_id = self.building.set_closed(element, closed)
+        edit = {"action": "close" if closed else "reopen", "element_id": element_id}
+        self.edits.append(edit)
+        self.turn["edits"].append(edit)
+        return {**edit, "all_closed": sorted(self.building.closed)}
+
+    def tool_add_door(self, first: str, second: str, width_m: float, step_free: bool) -> dict:
+        first_id, second_id = self._space(first), self._space(second)
+        if self.building.spaces[first_id]["floor_id"] != self.building.spaces[second_id]["floor_id"]:
+            raise MapError("A door can only join two spaces on the same floor.")
+        midpoint = geometry.shared_wall_midpoint(self.building, first_id, second_id)
+        opening = {
+            "id": f"{self.building.spaces[first_id]['floor_id']}-O-new{len(self.edits) + 1}",
+            "floor_id": self.building.spaces[first_id]["floor_id"],
+            "space_ids": [first_id, second_id],
+            "kind": "door",
+            "position": [round(midpoint.x, 3), round(midpoint.y, 3)],
+            "width_m": width_m,
+            "step_free": step_free,
+            "synthetic": True,
+        }
+        self.building.openings[opening["id"]] = opening
+        self.building.data["openings"].append(opening)
+        edit = {"action": "add_door", "opening": opening}
+        self.edits.append(edit)
+        self.turn["edits"].append(edit)
+        return edit
+
+    def tool_move_asset(self, asset: str, to_room: str) -> dict:
+        asset_id = asset if asset in self.building.assets else next(
+            (a["id"] for a in self.building.assets.values() if a["name"].casefold() == asset.casefold()), None
+        )
+        if asset_id is None:
+            matches = [r for r in self.building.search(asset) if r["kind"] == "asset"][:8]
+            raise MapError(f"No asset named '{asset}'. Did you mean: {[m['name'] for m in matches]}?")
+        room_id = self._space(to_room)
+        centre = self.building.polygon(room_id).representative_point()
+        record = self.building.assets[asset_id]
+        record.update({"space_id": room_id, "floor_id": self.building.spaces[room_id]["floor_id"], "position": [round(centre.x, 3), round(centre.y, 3)]})
+        edit = {"action": "move_asset", "asset_id": asset_id, "to_space_id": room_id}
+        self.edits.append(edit)
+        self.turn["edits"].append(edit)
+        return edit
+
     # ---------- code ----------
 
     def tool_run_python(self, code: str) -> dict:
-        prelude = textwrap.dedent(
-            f"""\
-            import json, math, itertools, collections
-            from pathlib import Path
-            from lostfound.core.building import Building
-            from lostfound.core.resolve import Resolver
-            from lostfound.core import skills, geometry, reach
-            b = Building.load(Path({str(Path(self.building.directory).resolve())!r}))
-            R = Resolver(b)
-            for _name in {sorted(self.excluded_kinds)!r}:
-                _function = skills.SKILLS.pop(_name, None)
-                if _function is not None and hasattr(skills, _function.__name__):
-                    delattr(skills, _function.__name__)
-            """
-        )
         with tempfile.TemporaryDirectory() as scratch:
+            source = Path(self.building.directory).resolve()
+            if self.edits:  # chat session with edits: run against the edited building, not the file on disk
+                source = Path(scratch) / "building.json"
+                source.write_text(json.dumps(self.building.data, ensure_ascii=False), encoding="utf-8")
+            prelude = textwrap.dedent(
+                f"""\
+                import json, math, itertools, collections
+                from pathlib import Path
+                from lostfound.core.building import Building
+                from lostfound.core.resolve import Resolver
+                from lostfound.core import skills, geometry, reach
+                b = Building.load(Path({str(source)!r}))
+                b.closed.update({sorted(self.building.closed)!r})
+                R = Resolver(b)
+                for _name in {sorted(self.excluded_kinds)!r}:
+                    _function = skills.SKILLS.pop(_name, None)
+                    if _function is not None and hasattr(skills, _function.__name__):
+                        delattr(skills, _function.__name__)
+                """
+            )
             script = Path(scratch) / "snippet.py"
             script.write_text(prelude + "\n" + code, encoding="utf-8")
             environment = {**os.environ, "PYTHONPATH": str(REPO)}
