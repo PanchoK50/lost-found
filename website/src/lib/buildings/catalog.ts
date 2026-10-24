@@ -3,6 +3,8 @@ import type { Building } from './types';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import n3 from '@/data/buildings/osm-way22744230.json';
 import factory from '@/data/buildings/proc-factory-dev-003.json';
+import terminal2 from '@/data/buildings/osm-way360544293.json';
+import pasing from '@/data/buildings/osm-way52060470.json';
 
 /** A suggestion chip: short label, full question sent when tapped. */
 export interface Suggestion { label: string; question: string }
@@ -16,7 +18,8 @@ const LIST_TTL_MS = 60_000;
 const MAX_CACHED = 40;
 
 /**
- * Hand-written suggestions for the two showcase buildings (also bundled, so the app works without Supabase).
+ * Bundled buildings, so the app works without Supabase: hand-written suggestions for N3 and the factory,
+ * generated ones for the GeoGuessr extras (Terminal 2, Pasing Arcaden).
  * Every other building, including uploaded ones, gets suggestions generated from its rooms and equipment.
  */
 const showcase: CatalogEntry[] = [
@@ -57,6 +60,9 @@ const showcase: CatalogEntry[] = [
       { label: '3D distance', question: 'What is the straight-line distance between Office 0.23 and Kitchen 1.14?' },
     ],
   },
+  // Fun buildings for the GeoGuessr game (docs/GEOGUESSR.md §7). OSM data: ODbL, attribution shown with the model.
+  { id: 'osm-way360544293', name: 'Terminal 2', building: terminal2 as unknown as Building, suggestions: suggestionsFor(terminal2 as unknown as Building) },
+  { id: 'osm-way52060470', name: 'Pasing Arcaden', building: pasing as unknown as Building, suggestions: suggestionsFor(pasing as unknown as Building) },
 ];
 
 export const defaultBuildingId = showcase[0].id;
