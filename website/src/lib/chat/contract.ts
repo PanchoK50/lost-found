@@ -20,6 +20,8 @@ export interface ChatRequest {
   buildingId: string;
   message: string;
   history?: { role: 'user' | 'assistant'; content: string }[];
+  /** Lets the backend read the player's world: closures from reports, later presence and groups. */
+  playerId?: string;
 }
 
 export interface ChatResponse {

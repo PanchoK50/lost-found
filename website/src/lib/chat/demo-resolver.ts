@@ -10,8 +10,8 @@ import type { ChatResponse, FloorPoint } from './contract';
  * it is not benchmark-accurate. Replace `resolveDemo` with a call to the real agent,
  * which should return the same `ChatResponse` shape.
  */
-export function resolveDemo(building: Building, message: string): ChatResponse {
-  const ctx = new Context(building, message);
+export function resolveDemo(building: Building, message: string, options: ResolveOptions = {}): ChatResponse {
+  const ctx = new Context(building, message, options);
   const text = ctx.text;
   const rooms = ctx.mentionedSpaces();
   const loadWidth = text.match(/(\d+(?:\.\d+)?)\s*m(?:etres?|eters?)?\s+wide\b/);
@@ -49,12 +49,20 @@ export function resolveDemo(building: Building, message: string): ChatResponse {
   };
 }
 
+export interface ResolveOptions {
+  /** Opening, connector or space ids closed by reports from people in the building (docs/MULTIPLAYER.md §8). */
+  closed?: string[];
+}
+
 class Context {
   readonly text: string;
   readonly floors: Map<string, Floor>;
-  constructor(readonly building: Building, message: string) {
+  /** Closures from the world, with names for the reply. */
+  readonly worldClosed: { id: string; name: string }[];
+  constructor(readonly building: Building, message: string, options: ResolveOptions = {}) {
     this.text = message.toLowerCase();
     this.floors = new Map(building.floors.map(floor => [floor.id, floor]));
+    this.worldClosed = (options.closed ?? []).map(id => ({ id, name: elementName(building, id) }));
   }
   floorOf(space: Space) { return this.floors.get(space.floor_id)!; }
   spacesOn(floor: Floor) { return this.building.spaces.filter(space => space.floor_id === floor.id); }
@@ -104,6 +112,7 @@ class Context {
     }
     const closedNames = new Set(closed.map(c => c.name.toLowerCase()));
     const stops = this.mentionedSpaces().filter(space => !closedSpaces.has(space.id) && !closedNames.has(space.name.toLowerCase()));
+    for (const c of this.worldClosed) if (!closed.some(x => x.id === c.id)) closed.push(c);
     return { stops, closed };
   }
 
@@ -545,7 +554,8 @@ function wideDelivery(ctx: Context, start: Space, width: number): ChatResponse {
 
 function stepFreeReachable(ctx: Context, start: Space): ChatResponse {
   const floor = ctx.mentionedFloor() ?? ctx.floorOf(start);
-  const closed = /\b(closed|out of service|maintenance|broken)\b/.test(ctx.text) ? ctx.mentionedConnectors() : [];
+  const mentioned = /\b(closed|out of service|maintenance|broken)\b/.test(ctx.text) ? ctx.mentionedConnectors() : [];
+  const closed = [...mentioned, ...ctx.worldClosed.filter(c => !mentioned.some(m => m.id === c.id))];
   const { rooms } = reachableRooms(ctx, start, floor, { stepFree: true, closed: closed.map(c => c.id) });
   const n = rooms.length;
   const closedNames = closed.map(c => c.name).join(' and ');
@@ -600,4 +610,15 @@ function notFound(reply: string, floor?: Floor): ChatResponse {
 
 function escape(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** A readable name for a closed element: the stair or lift, the space, or the door between two spaces. */
+function elementName(building: Building, id: string) {
+  const connector = building.vertical_connectors.find(c => c.id === id);
+  if (connector) return connector.name;
+  const space = building.spaces.find(s => s.id === id);
+  if (space) return space.name;
+  const opening = building.openings.find(o => o.id === id);
+  const sides = opening?.space_ids.map(sid => building.spaces.find(s => s.id === sid)?.name).filter(Boolean) ?? [];
+  return sides.length ? `the ${opening!.kind} to ${sides.join(' / ')}` : id;
 }

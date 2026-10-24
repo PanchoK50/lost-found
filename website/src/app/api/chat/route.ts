@@ -4,6 +4,8 @@ import { WalkGraph } from '@/lib/buildings/walk';
 import { turnByTurn } from '@/lib/buildings/turns';
 import type { ChatRequest, ChatResponse } from '@/lib/chat/contract';
 import { resolveDemo } from '@/lib/chat/demo-resolver';
+import { activeClosures } from '@/lib/world/rules';
+import { worldStore } from '@/lib/world/store';
 
 // Chat boundary for the viewer. Swap `resolveDemo` for the real agent; keep the ChatResponse shape.
 export async function POST(request: Request) {
@@ -13,7 +15,13 @@ export async function POST(request: Request) {
   if (!message || message.length > 1000) return Response.json({ error: 'Ask something between 1 and 1000 characters.' }, { status: 400 });
   const entry = getCatalogEntry(body.buildingId);
   if (!entry) return Response.json({ error: 'Unknown building.' }, { status: 404 });
-  const response: ChatResponse = resolveDemo(entry.building, message);
+  // Reports from people in the building close doors, stairs and lifts for routing (docs/MULTIPLAYER.md §8).
+  const world = await worldStore.get(entry.building, Date.now());
+  const worldClosed = activeClosures(world, typeof body.playerId === 'string' ? body.playerId : undefined);
+  const resolved: ChatResponse = resolveDemo(entry.building, message, { closed: worldClosed });
+  const response = resolved.scene.routes?.length && worldClosed.length
+    ? { ...resolved, scene: { ...resolved.scene, closed: [...new Set([...(resolved.scene.closed ?? []), ...worldClosed])] } }
+    : resolved;
   return Response.json(withRoutePoints(entry.building, response));
 }
 
