@@ -1,6 +1,6 @@
 [project]
 name = "track01-student-kit"
-version = "1.0.0"
+version = "1.1.0"
 description = "Track 01 Google Maps for Every Building: starter agent and scorer"
 requires-python = ">=3.12"
 dependencies = [
@@ -14,5 +14,12 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["starter_agent", "benchmark"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
