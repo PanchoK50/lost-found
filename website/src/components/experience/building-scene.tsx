@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { CameraControls, Line } from '@react-three/drei';
+import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import type { Line2 } from 'three-stdlib';
 import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
@@ -152,6 +153,12 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         <hemisphereLight args={['#fff6ea', '#dfe3ea', 0.95]} />
         <directionalLight position={[80, 130, 55]} intensity={1.6} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
+        {/* Ambient occlusion grounds the furniture and walls: dark seams where things meet. Desktop only, the phone GPU budget skips it. */}
+        {!coarse && (
+          <EffectComposer multisampling={4}>
+            <N8AO halfRes aoRadius={1.5} distanceFalloff={0.5} intensity={2.5} quality="performance" />
+          </EffectComposer>
+        )}
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
