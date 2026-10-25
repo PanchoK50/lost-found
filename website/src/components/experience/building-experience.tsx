@@ -146,6 +146,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     requestAnimationFrame(() => input.current?.focus());
   }, []);
   const contextChip = chatContext ? describeContext(building, chatContext) : null;
+  // One selection at a time: a tapped room replaces an object in the chat, and an object replaces the room.
+  const selectRoom = useCallback((spaceId: string | null) => {
+    setSelectedRoom(spaceId);
+    setChatContext(current => (spaceId ? { kind: 'space', id: spaceId } : current?.kind === 'space' ? null : current));
+  }, []);
   const openIncident = useCallback((incident: Incident) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(incident.spaceId, incident.hazard, 'incident', incident); }, [hazard]);
   // An incident raised on another screen: sound the alarm and show it.
   const { arrived, clearArrived } = incidents;
@@ -441,7 +446,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       </aside>
 
       <section className="shell-main">
-        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={setSelectedRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
       </section>
 

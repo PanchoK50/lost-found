@@ -119,6 +119,9 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
   const picked = selected && selected.directive === directiveKey && !overview ? selected.id : null;
+  // The camera keeps the last tapped room in frame even after the selection moves to an object in it.
+  const [cameraRoom, setCameraRoom] = useState<{ id: string; directive: string } | null>(null);
+  const framedRoom = cameraRoom && cameraRoom.directive === directiveKey && !overview ? cameraRoom.id : null;
   // The answer's rooms keep their colours; a tapped room is tinted light blue instead of being covered by a label.
   const tones = useMemo(() => {
     const map = new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone]));
@@ -137,7 +140,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
     if (el) elements.current.set(key, el); else elements.current.delete(key);
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
-  const select = useCallback((id: string) => setSelected({ id, directive: directiveKey }), [directiveKey]);
+  const select = useCallback((id: string) => { setSelected({ id, directive: directiveKey }); setCameraRoom({ id, directive: directiveKey }); }, [directiveKey]);
   useEffect(() => { onSelectRoom?.(picked); }, [picked, onSelectRoom]);
   // Esc first leaves a zoomed-in room (back to its floor) before the page's own Esc handling.
   useEffect(() => {
@@ -169,17 +172,17 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
 
   return (
     <div className="scene-root">
-      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
+      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); setCameraRoom(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[emergency ? '#05080e' : '#dfe7ee']} />
         <fog attach="fog" args={[emergency ? '#05080e' : '#dfe7ee', Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
         {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
         <ambientLight intensity={emergency ? 0.22 : 0.3} />
         <hemisphereLight args={emergency ? ['#7d8db0', '#0b0f18', 0.55] : ['#fff6ea', '#dfe3ea', 0.95]} />
         <directionalLight position={[80, 130, 55]} intensity={emergency ? 0.7 : 1.6} color={emergency ? '#b8c6ff' : '#ffffff'} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
-        <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
+        <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={framedRoom} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
-            onPickObject={onSelectObject ? (kind, id) => onSelectObject(kind, id) : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
+            onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
         <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency} />
         <Podium model={model} />
