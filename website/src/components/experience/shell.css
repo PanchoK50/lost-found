@@ -468,3 +468,7 @@
   .view-switch { left: 8px; bottom: 8px; }
   .simulate-menu { display: none; }
 }
+.answer-pill { position: absolute; z-index: 3; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: 70%; height: 36px; padding: 0 6px 0 16px; border-radius: 999px; background: rgba(255, 255, 255, .96); box-shadow: 0 4px 18px rgba(0, 0, 0, .12); font-size: 13px; font-weight: 500; color: #0d0d0d; }
+.answer-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.answer-pill button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: #f0f0f0; font-size: 15px; line-height: 1; color: #3d3d3d; }
+.answer-pill button:hover { background: #e4e4e4; }

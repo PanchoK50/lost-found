@@ -147,6 +147,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     requestAnimationFrame(() => input.current?.focus());
   }, []);
   const contextChip = chatContext ? describeContext(building, chatContext) : null;
+  const lastAnswerTitle = messages.findLast(m => m.response?.answer)?.response?.answer?.title;
   // An answer card: show its scene; for a move, fly back to what was moved, in its new place, and select it again.
   const showAnswer = (response: ChatResponse) => {
     const edit = (response.edits ?? []).map(e => e as { action?: string; asset_id?: string; opening_id?: string }).find(e => e.action === 'move_door' || e.action === 'move_asset');
@@ -291,6 +292,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
   // Whole building, keeping the current answer's highlights and route.
   const showOverview = useCallback(() => setDirective(current => ({ ...current, focus: { mode: 'building' } })), []);
+  // Dismiss the answer on the map (route, highlights, markers) and stay where the camera is; the chat stays.
+  const clearAnswer = useCallback(() => setDirective(current => ({ focus: current.focus.mode === 'floor' ? { mode: 'floor', floorId: current.focus.floorId } : current.focus })), []);
   /** Back to the start screen: whole building, "Ask me anything", suggestions. */
   const startOver = useCallback(() => {
     setMessages([]);
@@ -308,6 +311,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
       if (event.key === 'f' && !typing && liveIncident && liveIncident.ticket && !liveIncident.fixedAt) { incidents.update(liveIncident.id, { fixedAt: Date.now() }); return; }
       if (event.key === 'Escape' && hazard.view) { hazard.close(); return; }
+      if (event.key === 'Escape' && (directive.routes?.length || directive.highlights?.length || directive.markers?.length)) { clearAnswer(); return; }
       // Arrow up/down (or Page up/down) step one floor at a time, unless the user is typing.
       const step = { ArrowUp: 1, PageUp: 1, ArrowDown: -1, PageDown: -1 }[event.key];
       if (step && !typing && floors.length) {
@@ -322,7 +326,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents]);
+  }, [showOverview, startOver, directive, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents, clearAnswer]);
 
   async function ask(text: string, skillId?: string) {
     const message = text.trim();
@@ -418,6 +422,12 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
       <section className="shell-main">
         <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        {!hazard.view && (directive.routes?.length || directive.highlights?.length || directive.markers?.length) ? (
+          <div className="answer-pill" role="status">
+            <span>{lastAnswerTitle ?? 'Answer on the map'}</span>
+            <button type="button" onClick={clearAnswer} aria-label="Clear from the map (Esc)">×</button>
+          </div>
+        ) : null}
         {/* Floor picker on the model's edge (as in Google Maps indoors): short labels, live counts as badges. */}
         <nav className="floor-picker" ref={floorList} aria-label="Floors">
           <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }} aria-label="Whole building" title="Whole building">⌂</button>
