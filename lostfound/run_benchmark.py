@@ -116,7 +116,7 @@ def structured(building_dir: Path, result: dict | None) -> dict:
     if result.get("reachable") is False:  # a route, nearest or errand that has no route under the rules
         out.update(no_route)
         return out
-    stops, step_free, closed, min_width, forklift = None, result.get("step_free", False), [], None, False
+    stops, step_free, closed, min_width, forklift, bays = None, result.get("step_free", False), [], None, False, None
     if kind == "route":
         stops, closed = result.get("stops"), result.get("closed") or []
         min_width, forklift = result.get("min_width_m"), bool(result.get("forklift"))
@@ -127,10 +127,11 @@ def structured(building_dir: Path, result: dict | None) -> dict:
         start = result.get("start")
         if start:
             stops = [start, result["pickup"]["space_id"], result["target"]["space_id"]]
+        bays = False  # the errand distance is a kit-model number, so its route is the kit route
     if stops and len(stops) >= 2:
         try:
             with building.temporarily_closed(*closed):
-                details = directions.route_details(building, stops[0], stops[-1], step_free, stops[1:-1], min_width, forklift)
+                details = directions.route_details(building, stops[0], stops[-1], step_free, stops[1:-1], min_width, forklift, bays)
                 nodes = with_connectors(building, details["nodes"], step_free)
             out.update(route=[s for s in details["space_path"] if s in building.spaces], route_nodes=nodes,
                        element_path=[n for n in nodes if n not in building.spaces])

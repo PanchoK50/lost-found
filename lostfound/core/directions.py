@@ -21,10 +21,11 @@ def route_details(
     via: list[str] | None = None,
     min_width: float | None = None,
     forklift: bool = False,
+    bays: bool | None = None,
 ) -> dict:
-    """Raises NoRouteError (a MapError) when a leg has no route under the rules."""
+    """Raises NoRouteError (a MapError) when a leg has no route under the rules. `bays` as in Building.route_graph."""
     stops = [start, *(via or []), destination]
-    length, nodes, graph = building.route_nodes(stops, step_free, min_width, forklift)
+    length, nodes, graph = building.route_nodes(stops, step_free, min_width, forklift, bays)
     return {
         "length_m": round(length, 2),
         "space_path": building.spaces_passed(graph, nodes),

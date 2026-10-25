@@ -88,13 +88,15 @@ class Building(BuildingMap):
         min_width: float | None = None,
         forklift: bool = False,
         source: str | None = None,
+        bays: bool | None = None,
     ) -> nx.MultiGraph | nx.MultiDiGraph:
         """The graph one route leg is searched in: the kit graph plus the organizers' extra route rules.
 
         forklift: openings at least 3 m wide, no steps, stairs or lifts, no pedestrian walkways.
         Production bays (when the bay rule applies): no walking through a bay from door to door, and a bay is only
         left from its own centre when it is the leg's `source`, so bays are reached as destinations but never
-        crossed. That needs direction, so the graph becomes a MultiDiGraph."""
+        crossed. That needs direction, so the graph becomes a MultiDiGraph. `bays` forces the bay rule on or off;
+        None follows lostfound.core.vehicles.bay_rule_applies (forklift routes, or LOSTFOUND_BAY_RULE=always)."""
         if forklift:
             step_free = True
             min_width = max(min_width or 0.0, FORKLIFT_MIN_WIDTH_M)
@@ -106,7 +108,7 @@ class Building(BuildingMap):
                 [(a, b, key) for a, b, key, data in graph.edges(keys=True, data=True) if data.get("space") in walkways]
             )
             graph.remove_nodes_from([space_id for space_id in walkways if space_id in graph])
-        if not bay_rule_applies(forklift):
+        if not (bay_rule_applies(forklift) if bays is None else bays):
             return graph
         bays = {space_id for space_id, space in self.spaces.items() if is_bay(space)}
         if not bays:
@@ -120,18 +122,37 @@ class Building(BuildingMap):
         directed.remove_edges_from(list(directed.out_edges(sinks, keys=True)))
         return directed
 
+    def route_distances(
+        self,
+        source: str,
+        step_free: bool = False,
+        min_width: float | None = None,
+        forklift: bool = False,
+        bays: bool | None = None,
+    ) -> dict[str, float]:
+        """Route-model distance from a space to every node reachable under the same rules as route()."""
+        graph = self.route_graph(step_free, min_width, forklift, source, bays)
+        if source not in graph:
+            return {}
+        return nx.single_source_dijkstra_path_length(graph, source, weight="weight")
+
     def route_nodes(
-        self, stops: list[str], step_free: bool = False, min_width: float | None = None, forklift: bool = False
+        self,
+        stops: list[str],
+        step_free: bool = False,
+        min_width: float | None = None,
+        forklift: bool = False,
+        bays: bool | None = None,
     ) -> tuple[float, list[str], nx.MultiGraph | nx.MultiDiGraph]:
         """Shortest route through the stops in order: (length, nodes walked, a graph holding every edge used).
         Raises NoRouteError when a leg has no route under the rules."""
-        per_leg = bay_rule_applies(forklift)  # each leg may leave its own start bay, so each leg has its own graph
-        shared = None if per_leg else self.route_graph(step_free, min_width, forklift)
+        per_leg = bay_rule_applies(forklift) if bays is None else bays  # each leg may leave its own start bay
+        shared = None if per_leg else self.route_graph(step_free, min_width, forklift, bays=False)
         used = shared
         nodes: list[str] = []
         length = 0.0
         for leg_start, leg_end in itertools.pairwise(stops):
-            graph = shared if shared is not None else self.route_graph(step_free, min_width, forklift, leg_start)
+            graph = shared if shared is not None else self.route_graph(step_free, min_width, forklift, leg_start, True)
             try:
                 leg_length, leg_nodes = nx.single_source_dijkstra(graph, leg_start, leg_end, weight="weight")
             except (nx.NetworkXNoPath, nx.NodeNotFound) as error:

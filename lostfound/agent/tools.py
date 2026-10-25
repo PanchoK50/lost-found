@@ -16,6 +16,7 @@ import re
 import uuid
 from pathlib import Path
 
+from benchmark.score import numbers_in
 from lostfound.agent.format import answer_line
 from lostfound.api import scene
 from lostfound.core import directions, geometry, skills
@@ -24,6 +25,13 @@ from lostfound.core.building import Building, MapError, NoRouteError
 from lostfound.core.resolve import Resolver
 
 REPO = Path(__file__).resolve().parents[2]
+NO_ROUTE = re.compile(r"\bno\b\W*(?:\w+\W+){0,3}?(?:route|path|way)\b|not reachable|unreachable|cannot be reached|can't be reached", re.IGNORECASE)
+MATCH_TOLERANCE = 0.01  # a committed number rounded differently from the tool line still identifies its call
+
+
+def _plain(text: str) -> str:
+    """Answer text without markdown, a final full stop and case: '**84.16 m**.' -> '84.16 m'."""
+    return re.sub(r"[*`_]", "", text).strip().rstrip(".").strip().casefold()
 PYTHON_TIMEOUT_S = 60
 MAX_TOOL_OUTPUT_CHARS = 6000
 
@@ -319,14 +327,28 @@ class Toolbox:
         self.answered.append((line or "", record))
 
     def result_for(self, committed: str | None) -> dict | None:
-        """The structured result behind the answer the reply committed to: the latest call whose answer line says the
-        same, else the latest answering call. The agent may explore a fallback after the answer it gives."""
-        if committed is not None:
-            wanted = committed.strip().casefold()
-            for line, record in reversed(self.answered):
-                if line.removeprefix("Answer:").strip().casefold() == wanted:
-                    return record
-        return self.last_result
+        """The structured result behind the answer the reply committed to (the agent may explore a fallback after the
+        answer it gives): the latest call whose answer line says the same, ignoring markdown, units and a final full
+        stop; else the call whose numbers match within 1% (closest, then latest); for a "no route" answer the latest
+        call without a route; else the latest answering call."""
+        if committed is None:
+            return self.last_result
+        wanted = _plain(committed)
+        records = [(_plain(line.removeprefix("Answer:")), record) for line, record in self.answered if line]
+        for line, record in reversed(records):
+            if line == wanted:
+                return record
+        values = numbers_in(wanted)
+        if not values and NO_ROUTE.search(wanted):
+            return next((record for _, record in reversed(records) if record.get("reachable") is False), self.last_result)
+        best, best_gap = None, MATCH_TOLERANCE
+        for line, record in reversed(records):
+            found = numbers_in(line)
+            if values and len(found) == len(values):
+                gap = max(abs(a - b) / max(abs(b), 1.0) for a, b in zip(values, found))
+                if gap < best_gap or (best is None and gap <= best_gap):
+                    best, best_gap = record, gap
+        return best if best is not None else self.last_result
 
     def _answer(self, kind: str, result: dict, ambiguous: list[str] | None = None, record: dict | None = None) -> dict:
         line = answer_line(self.building, kind, result)
@@ -473,7 +495,8 @@ class Toolbox:
         start_id = self._space(start)
         closed_ids = self._closed(closed or [])
         with self.building.temporarily_closed(*closed_ids):
-            distances = self.building.distances_from(start_id, step_free)
+            # The same rules as the route computed below, so the nearest target is one that route can reach.
+            distances = self.building.route_distances(start_id, step_free)
         targets: dict[str, str] = {}  # space id -> what was found there
         try:
             room_type = self.resolver.room_type(what)

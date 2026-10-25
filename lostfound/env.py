@@ -13,15 +13,16 @@ LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$")
 def load_env(path: Path = ROOT_ENV) -> None:
     if not path.is_file():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8-sig").splitlines():  # utf-8-sig: a BOM must not hide the first key
         match = LINE.match(line)
         if not match or line.lstrip().startswith("#"):
             continue
         key, value = match.groups()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
-        elif " #" in value:
-            value = value.split(" #", 1)[0].rstrip()
+        if value[:1] in ("\"", "'"):
+            closing = value.find(value[0], 1)
+            value = value[1:closing] if closing > 0 else value[1:]  # anything after the closing quote is a comment
+        elif " #" in value or "\t#" in value:
+            value = re.split(r"\s#", value, maxsplit=1)[0].rstrip()
         if value:
             os.environ.setdefault(key, value)
 

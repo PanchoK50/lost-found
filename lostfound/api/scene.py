@@ -91,13 +91,19 @@ def floor_area_total(b: Building, floor_id: str, room_type: str, result: dict) -
 
 
 def _route_legs(
-    b: Building, stops: list[str], step_free: bool, closed: list[str], min_width: float | None = None, forklift: bool = False
+    b: Building,
+    stops: list[str],
+    step_free: bool,
+    closed: list[str],
+    min_width: float | None = None,
+    forklift: bool = False,
+    bays: bool | None = None,
 ) -> list[dict]:
     legs = []
     with b.temporarily_closed(*closed):
         for start, end in zip(stops, stops[1:]):
             try:
-                details = directions.route_details(b, start, end, step_free, None, min_width, forklift)
+                details = directions.route_details(b, start, end, step_free, None, min_width, forklift, bays)
             except MapError:
                 continue
             legs.append(details)
@@ -161,7 +167,7 @@ def route(
 
 def errand(b: Building, start: str, step_free: bool, result: dict) -> dict:
     pickup, target = result["pickup"]["space_id"], result["target"]["space_id"]
-    legs = _route_legs(b, [start, pickup, target], step_free, [])
+    legs = _route_legs(b, [start, pickup, target], step_free, [], bays=False)  # the errand number is kit-model
     floor_ids = [_floor(b, s) for s in (start, pickup, target)]
     return {
         "kind": "errand",
