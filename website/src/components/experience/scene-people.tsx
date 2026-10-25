@@ -12,13 +12,25 @@ export interface Evacuee { id: string; path: FloorPoint[]; startMin: number; out
 const MAX_FIGURES = 320;
 const PER_ROOM = 4;
 const QUEUE_MIN = 0.06;  // figures from one room leave a few seconds apart
+// Waiting for the exit: one behind the other on their own way out, the first this far before the door.
+const QUEUE_FRONT_M = 0.6;
+const QUEUE_GAP_M = 0.5;
+// Walking: a small step to the side of the route, so a room's people don't walk in single file but stay off the walls.
+const WALK_SIDE_M = 0.2;
 // A little larger than life, so people read at building scale.
 const BODY = new THREE.CapsuleGeometry(0.36, 1.5, 4, 10);
 BODY.translate(0, 1.11, 0); // stand on y = 0
 // Few states, quiet colours: grey waiting, navy moving (walking or queuing), green safe, red only when trapped.
 const COLORS = { waiting: new THREE.Color('#9aa3b2'), walking: new THREE.Color('#002478'), queue: new THREE.Color('#002478'), safe: new THREE.Color('#2f8f5b'), trapped: new THREE.Color('#e5484d') };
 
-interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 }
+interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; queueAt: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 }
+
+/** The polyline segment [k - 1, k] holding the point `distance` metres along it. */
+function segmentAt(lengths: number[], distance: number) {
+  let k = 1;
+  while (k < lengths.length - 1 && lengths[k] < distance) k++;
+  return k;
+}
 
 /** Seeded jitter so figures stay put between renders. */
 function jitter(seed: number) {
@@ -67,6 +79,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
         const seed = roomIndex * 31 + i * 7 + 1;
         out.push({
           path: points, floors: evacuee.path.map(p => p.floorId), lengths, total: lengths.at(-1)!, start: evacuee.startMin + i * QUEUE_MIN,
+          queueAt: Math.max(0, lengths.at(-1)! - QUEUE_FRONT_M - i * QUEUE_GAP_M),
           // Through the exit door once the queue lets them (spread over the room's share of the wait).
           out: evacuee.outMin !== undefined ? Math.max(evacuee.startMin, evacuee.outMin - (n - 1 - i) * QUEUE_MIN) : Infinity,
           offset: new THREE.Vector2((jitter(seed) - 0.5) * 1.6, (jitter(seed + 3) - 0.5) * 1.6), cutOff: !!evacuee.cutOff,
@@ -95,39 +108,44 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
       let heading = 0;
       if (figure.cutOff) {
         position.copy(figure.path[0]);
+        position.x += figure.offset.x * 0.5; position.z += figure.offset.y * 0.5; // spread round the room
         color = COLORS.trapped;
         s = t >= figure.start ? 1 + 0.15 * Math.sin(clock.elapsedTime * 8 + i) : 1;
       } else {
         const walked = Math.max(0, t - figure.start) * speed;
+        // Until the exit lets them through they only get as far as their place in the queue.
+        const stop = t < figure.out ? figure.queueAt : figure.total;
         if (walked <= 0) {
           position.copy(figure.path[0]);
           position.y += Math.abs(Math.sin(clock.elapsedTime * 1.5 + i)) * 0.05; // idle bob
-        } else if (walked >= figure.total && t < figure.out) {
-          // Queuing at the exit door.
-          position.copy(figure.path.at(-1)!);
-          floorId = figure.floors.at(-1)!;
-          color = COLORS.queue;
-        } else if (walked >= figure.total) {
+          position.x += figure.offset.x * 0.5; position.z += figure.offset.y * 0.5; // spread round the room
+        } else if (walked >= figure.total && t >= figure.out) {
           position.copy(figure.exitOut);
           floorId = figure.floors.at(-1)!;
           color = COLORS.safe;
+        } else if (figure.path.length < 2) {
+          position.copy(figure.path[0]);
+          color = COLORS.queue;
         } else {
-          let k = 1;
-          while (k < figure.lengths.length - 1 && figure.lengths[k] < walked) k++;
+          // Walking, or queuing for the exit at their place on the way to it.
+          const queuing = walked >= stop;
+          const along = queuing ? stop : walked;
+          const k = segmentAt(figure.lengths, along);
           const a = figure.path[k - 1], b = figure.path[k];
           const span = figure.lengths[k] - figure.lengths[k - 1] || 1;
-          position.lerpVectors(a, b, (walked - figure.lengths[k - 1]) / span);
-          floorId = figure.floors[(walked - figure.lengths[k - 1]) / span < 0.5 ? k - 1 : k];
+          position.lerpVectors(a, b, (along - figure.lengths[k - 1]) / span);
+          floorId = figure.floors[(along - figure.lengths[k - 1]) / span < 0.5 ? k - 1 : k];
           // On the stairs between two floors: only drawn when both floors are on view (lifted-away floors would make them fly).
           const other = figure.floors[k - 1] === floorId ? figure.floors[k] : figure.floors[k - 1];
           if ((poses.get(other)?.opacity ?? 0) <= 0.5) floorId = other;
           heading = Math.atan2(b.x - a.x, b.z - a.z);
-          position.y += Math.abs(Math.sin(clock.elapsedTime * 10 + i)) * 0.08; // walking bob
-          color = COLORS.walking;
+          // Sideways only: the route keeps off the walls, a step across it stays inside the room.
+          const side = figure.offset.x / 0.8 * WALK_SIDE_M;
+          position.x += Math.cos(heading) * side; position.z -= Math.sin(heading) * side;
+          if (!queuing) position.y += Math.abs(Math.sin(clock.elapsedTime * 10 + i)) * 0.08; // walking bob
+          color = queuing ? COLORS.queue : COLORS.walking;
         }
       }
-      // Spread a room's people around its route so they don't stack on one line.
-      if (color !== COLORS.safe) { position.x += figure.offset.x * 0.5; position.z += figure.offset.y * 0.5; }
       const shown = (poses.get(floorId)?.opacity ?? 0) > 0.5;
       scale.setScalar(shown ? s : 0);
       matrix.compose(position, turn.setFromAxisAngle(up, heading), scale);
