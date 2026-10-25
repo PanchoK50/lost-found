@@ -35,7 +35,7 @@ import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
 import { HazardPanel, HazardPlayback } from '@/components/hazards/hazard-panel';
 import { VoiceAgent, type VoiceActions } from '@/components/voice/voice-agent';
-import { AlarmCard, BrigadePanel, BrigadeTimeline, FactsStrip, brigadeChips, brigadeDirective, useBrigade } from '@/components/brigade/brigade';
+import { BrigadePanel, BrigadeTimeline, FactsStrip, brigadeChips, brigadeDirective, useBrigade } from '@/components/brigade/brigade';
 import { ReportDamage } from '@/components/hazards/report-damage';
 import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
@@ -235,7 +235,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     if (building.spaces.some(sp => sp.id === 'proc-campus-test-005-F3-S025')) return 'proc-campus-test-005-F3-S025';
     return scenariosFor(building).find(sc => sc.hazard === 'fire')?.spaceId ?? null;
   }, [brigade, params, building]);
-  const [alarmOpen, setAlarmOpen] = useState(() => params.get('open') === '1');
   const [rescueTarget, setRescueTarget] = useState<string | null>(params.get('crew1'));
   const [brigadeTab, setBrigadeTab] = useState<'situation' | 'people' | 'routes' | 'ask'>(params.get('crew1') || params.get('routes') ? 'routes' : 'situation');
   const brigadeStarted = useRef(false);
@@ -704,10 +703,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       }} />}
       {sheet === 'location' && profile && <LocationSheet building={building} room={myRoom} sharing={settings?.share !== 'off'} onChange={setLocation} onSettings={() => setSheet('settings')} onClose={closeSheet} />}
       {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
-      {brigade && !alarmOpen && !broll && (
-        <AlarmCard building={building} origin={brigadeData.briefing?.origin ?? (brigadeOrigin ? { space_id: brigadeOrigin, name: building.spaces.find(sp => sp.id === brigadeOrigin)?.name ?? '', floor: building.floors.find(f => f.id === building.spaces.find(sp => sp.id === brigadeOrigin)?.floor_id)?.name ?? '', floor_id: '' } : null)}
-          tNow={tNow} eta={eta} onOpen={() => setAlarmOpen(true)} onPick={() => { setAlarmOpen(true); setSheet('buildings'); }} />
-      )}
     </main>
   );
 }
