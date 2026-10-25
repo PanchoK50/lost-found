@@ -56,9 +56,10 @@ export function useIncidents(buildingId: string) {
   }, []);
   const raise = useCallback((incident: Incident) => save([...read(), incident], { type: 'raised', incident }), []);
   const setStatus = useCallback((id: string, status: Incident['status']) => save(read().map(i => (i.id === id ? { ...i, status } : i)), { type: 'changed' }), []);
+  const update = useCallback((id: string, patch: Partial<Incident>) => save(read().map(i => (i.id === id ? { ...i, ...patch } : i)), { type: 'changed' }), []);
   const clearArrived = useCallback(() => setArrived(null), []);
   const active = useMemo(() => all.filter(i => i.buildingId === buildingId && i.status !== 'resolved'), [all, buildingId]);
-  return { active, raise, setStatus, arrived, clearArrived };
+  return { all, active, raise, setStatus, update, arrived, clearArrived };
 }
 
 /** A short two-tone alarm (Web Audio), played when an incident arrives. */

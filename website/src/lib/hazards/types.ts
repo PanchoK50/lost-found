@@ -52,6 +52,9 @@ export interface Readiness { building_id: string; score: number; findings: Readi
 export interface Incident {
   id: string; buildingId: string; hazard: HazardKind; spaceId: string; severity: 1 | 2 | 3; source: 'photo' | 'report' | 'sensor';
   title: string; description: string; photo?: string; reporter?: string; createdAt: number; status: 'active' | 'contained' | 'resolved';
+  /** The responder dispatched with one tap (technician, plumber, fire brigade): Reported → On the way → Fixed. */
+  ticket?: { name: string; role: string; phone: string; etaMin: number | null; at: number };
+  fixedAt?: number;
 }
 
 /** Level of one reached space at minute t (same ramp as lostfound/hazards/spread.py level_at). */

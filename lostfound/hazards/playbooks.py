@@ -10,7 +10,7 @@ DEFAULT_CONTACTS = [
     {"id": "facility", "role": "facility", "name": "Facility manager on duty", "phone": "+49 89 1234 5600", "eta_min": 5},
     {"id": "security", "role": "security", "name": "Site security", "phone": "+49 89 1234 5601", "eta_min": 3},
     {"id": "plumber", "role": "plumber", "name": "Sanitär-Notdienst Huber GmbH", "phone": "+49 89 5550 1200", "eta_min": 35},
-    {"id": "electrician", "role": "electrician", "name": "Elektro-Notdienst Maier", "phone": "+49 89 5550 3400", "eta_min": 40},
+    {"id": "electrician", "role": "electrician", "name": "Elektro-Notdienst Maier", "phone": "+49 89 5550 3400", "eta_min": 15},
     {"id": "it", "role": "it", "name": "IT on call", "phone": "+49 89 1234 5699", "eta_min": 15},
     {"id": "insurer", "role": "insurer", "name": "Building insurance claims line", "phone": "+49 800 555 0100", "eta_min": None},
 ]

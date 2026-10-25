@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type Ref } from 'react';
 import type { Building } from '@/lib/buildings/types';
-import { hazardMeta, type ImpactRoom, type PlaybookAction, type Relation, type SimulateResponse } from '@/lib/hazards/types';
+import { hazardMeta, type Contact, type ImpactRoom, type Incident, type PlaybookAction, type Relation, type SimulateResponse } from '@/lib/hazards/types';
 import { evacuationProgress, keyRoom, type HazardView } from './use-hazard';
 
 const RELATION_LABEL: Record<Relation, string> = {
@@ -12,9 +12,15 @@ type Tab = 'overview' | 'affected' | 'response';
 const TITLE: Record<string, string> = { fire: 'Fire', water: 'Water leak', electrical: 'Power fault' };
 
 /** Side panel for a simulation or a live incident: timeline, what is hit, evacuation and the response. */
-export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom, onShowFloor, onClose, onResolve }: {
+export function HazardPanel({ building, view, incident, panelRef, onStartResponse, onRoom, onShowFloor, onClose, onResolve, onDispatch, onFixed }: {
   building: Building;
   view: HazardView;
+  /** The live incident as stored (ticket, fixed); the view only holds the snapshot it was opened with. */
+  incident?: Incident;
+  /** One tap: dispatch the main responder for this hazard (technician, plumber, fire brigade). */
+  onDispatch?(contact: Contact): void;
+  /** The responder reports it fixed. */
+  onFixed?(): void;
   panelRef?: Ref<HTMLElement>;
   onStartResponse(): void;
   /** Back to the whole-building view of the hazard. */
@@ -65,7 +71,7 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
 
         <div className="hazard-body">
           {tab === 'overview' && (
-            <Overview view={view} data={data} reached={reached} progress={progress} onShowFloor={onShowFloor} onRoom={onRoom} onDetails={() => setTab('response')} />
+            <Overview view={view} data={data} reached={reached} progress={progress} incident={incident} onShowFloor={onShowFloor} onRoom={onRoom} onDetails={() => setTab('response')} />
           )}
           {tab === 'affected' && <Rooms rooms={reached} onRoom={onRoom} />}
           {tab === 'affected' && assets.length > 0 && <h3 className="hazard-subhead">Critical assets</h3>}
@@ -100,8 +106,14 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
 
       {data && (
         <footer className="hazard-foot">
-          {!view.responseStartedAt && <button type="button" className="hazard-run" onClick={onStartResponse}>{view.mode === 'incident' ? 'Start response' : 'Run response drill'}</button>}
-          {view.mode === 'incident' && onResolve && <button type="button" className="hazard-secondary" onClick={onResolve}>Mark as resolved</button>}
+          {view.mode === 'incident' && incident ? (
+            incident.fixedAt ? <button type="button" className="hazard-secondary" onClick={onResolve ?? onClose}>Close incident</button>
+            : incident.ticket ? <button type="button" className="hazard-run" onClick={onFixed}>Mark as fixed</button>
+            : <>
+                {primaryContact(data.playbook) && <button type="button" className="hazard-run" onClick={() => onDispatch?.(primaryContact(data.playbook)!)}>Call {roleLabel(primaryContact(data.playbook)!.role)}</button>}
+                {!view.responseStartedAt && <button type="button" className="hazard-secondary" onClick={onStartResponse}>Notify everyone</button>}
+              </>
+          ) : !view.responseStartedAt && <button type="button" className="hazard-run" onClick={onStartResponse}>Run response drill</button>}
         </footer>
       )}
     </aside>
@@ -138,8 +150,8 @@ const TAB_LABEL: Record<Tab, string> = { overview: 'Overview', affected: 'Affect
  * Overview: facts first, each saying what it counts and why, then the response, then clearing the rooms.
  * Water (or fire) and the power cut it causes are counted separately, so the numbers add up.
  */
-function Overview({ view, data, reached, progress, onShowFloor, onRoom, onDetails }: {
-  view: HazardView; data: SimulateResponse; reached: ImpactRoom[]; progress?: ReturnType<typeof evacuationProgress>;
+function Overview({ view, data, reached, progress, incident, onShowFloor, onRoom, onDetails }: {
+  view: HazardView; data: SimulateResponse; reached: ImpactRoom[]; progress?: ReturnType<typeof evacuationProgress>; incident?: Incident;
   onShowFloor(floorId: string): void; onRoom(spaceId: string): void; onDetails(): void;
 }) {
   const now = useNow(view.responseStartedAt);
@@ -160,18 +172,41 @@ function Overview({ view, data, reached, progress, onShowFloor, onRoom, onDetail
   const noun = main === 'fire' ? 'Fire and smoke' : main === 'water' ? 'Water' : 'Power off';
   const peopleInHit = hit.reduce((sum, r) => sum + r.people, 0);
   const peopleDark = darkOnly.reduce((sum, r) => sum + r.people, 0);
+  // Power: what a tripped circuit takes with it. Lifts on it stop; server rooms on it run on their UPS.
+  const powerRooms = main === 'electrical' ? hit : dark;
+  const liftsOff = powerRooms.filter(r => r.type === 'lift').length;
+  const ups = powerRooms.find(r => r.room_type === 'server_room') ?? powerRooms.find(r => r.room_type === 'technical_room');
+  const outageStart = main === 'electrical' ? 0 : cascade?.at_min;
+  const fixed = Boolean(incident?.fixedAt);
+  const upsLeft = ups && outageStart !== undefined
+    ? Math.max(0, UPS_MIN * 60 - (view.mode === 'incident' && incident ? (now - incident.createdAt) / 1000 : (view.t - outageStart) * 60))
+    : undefined;
+  const circuit = main === 'electrical' ? circuitLabel(data, view.spaceId) : undefined;
   return (
     <div className="hz-overview">
+      {fixed && <p className="hz-fixed">Status: fixed · {incident?.ticket?.name ?? 'responder'} closed the job</p>}
       <section className="hz-section">
         <header><h3>Situation</h3><span>{live ? 'predicted' : 'simulated'} · at +{fmt(view.t)}</span></header>
         <dl className="hz-facts">
           <div>
             <dt><i className={`hazard-dot hazard-dot--${main}`} />{noun}</dt>
             <dd>
-              {hit.length} {hit.length === 1 ? 'space' : 'spaces'}
-              {floors.length > 0 && <span className="hz-floors">{floors.map(f => <button type="button" key={f.id} onClick={() => onShowFloor(f.id)}>{f.name} ({f.rooms})</button>)}</span>}
+              {fixed ? 'Restored' : `${hit.length} ${hit.length === 1 ? 'space' : 'spaces'}`}{circuit && !fixed && <small>Circuit {circuit} tripped</small>}
+              {floors.length > 0 && !fixed && <span className="hz-floors">{floors.map(f => <button type="button" key={f.id} onClick={() => onShowFloor(f.id)}>{f.name} ({f.rooms})</button>)}</span>}
             </dd>
           </div>
+          {main === 'electrical' && (
+            <div>
+              <dt>Lifts</dt>
+              <dd>{fixed ? 'Running' : liftsOff ? `${liftsOff} offline` : 'Running'}<small>{liftsOff && !fixed ? 'On the tripped circuit; use the stairs' : 'Not on the tripped circuit'}</small></dd>
+            </div>
+          )}
+          {ups && upsLeft !== undefined && !fixed && (
+            <div>
+              <dt>Backup</dt>
+              <dd className={upsLeft < 600 ? 'is-urgent' : ''}>{fmtClock(upsLeft)} left<small>{ups.name} on UPS ({UPS_MIN} min autonomy assumed)</small></dd>
+            </div>
+          )}
           {main !== 'electrical' && (
             <div>
               <dt><i className="hazard-dot hazard-dot--electrical" />Power</dt>
@@ -180,14 +215,14 @@ function Overview({ view, data, reached, progress, onShowFloor, onRoom, onDetail
           )}
           <div>
             <dt>People</dt>
-            <dd>{main === 'electrical' ? `${peopleInHit} without power` : `${peopleInHit} in affected rooms`}{main !== 'electrical' && peopleDark > 0 && <small>{peopleDark} more only without power</small>}</dd>
+            <dd>{fixed ? `Back to normal for ${peopleInHit + peopleDark}` : main === 'electrical' ? `${peopleInHit} without power` : `${peopleInHit} in affected rooms`}{main !== 'electrical' && peopleDark > 0 && <small>{peopleDark} more only without power</small>}</dd>
           </div>
-          <div>
+          {!fixed && <div>
             <dt>Equipment</dt>
             <dd>{equipment.length ? <>{equipment.length} at risk<small>{[...new Set(equipment.map(a => `${a.type.replaceAll('_', ' ')} (${a.room})`))].slice(0, 2).join(' · ')}</small></> : 'None hit yet'}</dd>
-          </div>
+          </div>}
         </dl>
-        {key && (
+        {key && !fixed && (
           <button type="button" className="hz-key" onClick={() => { if (keyFloor) onShowFloor(keyFloor); onRoom(key.space_id); }}>
             <span>{key.arrival_min <= view.t ? 'Reached' : `Next, at +${Math.round(key.arrival_min)} min`}</span>
             <strong>{key.name}</strong>
@@ -195,6 +230,17 @@ function Overview({ view, data, reached, progress, onShowFloor, onRoom, onDetail
           </button>
         )}
       </section>
+
+      {incident?.ticket && (
+        <section className="hz-section">
+          <header><h3>Ticket</h3><span>{incident.ticket.name}</span></header>
+          <ol className="hz-tracker">
+            <li className="is-done">Reported</li>
+            <li className={fixed ? 'is-done' : 'is-active'}>On the way{incident.ticket.etaMin && !fixed ? ` · ETA ${incident.ticket.etaMin} min` : ''}</li>
+            <li className={fixed ? 'is-done' : ''}>Fixed</li>
+          </ol>
+        </section>
+      )}
 
       <section className="hz-section">
         <header><h3>Response</h3><span>{view.responseStartedAt ? `${confirmed} of ${unique.length} confirmed` : live ? 'not started' : 'calls simulated'}</span></header>
@@ -217,6 +263,31 @@ function Overview({ view, data, reached, progress, onShowFloor, onRoom, onDetail
       )}
     </div>
   );
+}
+
+const UPS_MIN = 40;
+
+function fmtClock(seconds: number) {
+  const m = Math.floor(seconds / 60), s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** A short name for the circuit: the panel's name, or "zone N" where the plans have no panels. */
+function circuitLabel(data: SimulateResponse, spaceId: string) {
+  const entry = data.simulation.spaces.find(e => e.space_id === spaceId && e.kind === 'electrical') as (SimulateResponse['simulation']['spaces'][number] & { circuit?: string }) | undefined;
+  const circuit = entry?.circuit;
+  if (!circuit) return undefined;
+  const [kind, ...rest] = circuit.split(':');
+  return kind === 'zone' ? `${rest[0].split('-F').pop()}-${String.fromCharCode(65 + Number(rest[1]))}` : rest.join(':').split('-').pop();
+}
+
+/** The responder one tap dispatches: the first call in the playbook (electrician, plumber, fire brigade). */
+function primaryContact(actions: PlaybookAction[]) {
+  return actions.find(a => a.kind === 'call' && a.contact)?.contact ?? undefined;
+}
+
+function roleLabel(role: string) {
+  return ({ electrician: 'technician', plumber: 'plumber', fire_brigade: 'fire brigade', facility: 'facility manager', it: 'IT' } as Record<string, string>)[role] ?? role.replaceAll('_', ' ');
 }
 
 function statusOf(action: PlaybookAction, elapsed: number, live: boolean) {

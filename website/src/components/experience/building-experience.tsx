@@ -105,22 +105,28 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   useEffect(() => {
     if (!arrived || arrived.buildingId !== building.building.id) return;
     playAlarm();
-    openIncident(arrived);
+    setToast(arrived);
     clearArrived();
-  }, [arrived, building.building.id, openIncident, clearArrived]);
+  }, [arrived, building.building.id, clearArrived]);
   // Deep link for demos and the video: ?simulate=water:<space id> (or fire:, electrical:) opens that simulation.
   const openSimulation = hazard.open;
+  const simulateHandled = useRef(false);
   useEffect(() => {
+    if (simulateHandled.current) return;
+    simulateHandled.current = true;
     const [kind, spaceId] = (new URLSearchParams(window.location.search).get('simulate') ?? '').split(':');
     if ((kind === 'fire' || kind === 'water' || kind === 'electrical') && building.spaces.some(s => s.id === spaceId)) void openSimulation(spaceId, kind);
   }, [building, openSimulation]);
   // Start-screen entry points for the emergency side: a water leak on an upper floor, a fire in a busy room.
   const demoScenarios = useMemo(() => scenariosFor(building), [building]);
+  // The open incident as stored now (ticket, fixed), and the map fading back to normal once it is fixed.
+  const liveIncident = hazard.view?.incident ? incidents.all.find(i => i.id === hazard.view!.incident!.id) : undefined;
+  const fade = useFade(liveIncident?.fixedAt);
   // While a scenario plays, each floor in the sidebar shows how many of its spaces are hit right now (a building section).
   const hazardByFloor = useMemo(() => {
     const out = new Map<string, { kind: 'fire' | 'water' | 'electrical'; count: number }>();
     const view = hazard.view;
-    if (!view?.data) return out;
+    if (!view?.data || liveIncident?.fixedAt) return out;
     const floorOf = new Map(building.spaces.map(s => [s.id, s.floor_id]));
     for (const entry of view.data.simulation.spaces) {
       if (entry.kind !== view.hazard || levelAt(entry, view.t, view.data.simulation.ramp_min) < 0.15) continue;
@@ -129,8 +135,29 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       out.set(floorId, { kind: view.hazard, count: (out.get(floorId)?.count ?? 0) + 1 });
     }
     return out;
-  }, [hazard.view, building]);
-  const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive]);
+  }, [hazard.view, building, liveIncident?.fixedAt]);
+  const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor, fade) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive, fade]);
+  // A pushed alert (another screen raised it, or ?notify= for the video): tap to open.
+  const [toast, setToast] = useState<Incident | null>(null);
+  // Deep links for demos and the video: ?incident=<kind>:<space id> raises and opens a live incident;
+  // ?notify=<kind>:<space id> raises it and shows the alert only. Press "f" to mark the open incident fixed.
+  const raiseIncident = incidents.raise;
+  const linkHandled = useRef(false);
+  useEffect(() => {
+    if (linkHandled.current) return;
+    linkHandled.current = true;
+    const params = new URLSearchParams(window.location.search);
+    for (const key of ['incident', 'notify'] as const) {
+      const [kind, spaceId] = (params.get(key) ?? '').split(':');
+      const space = building.spaces.find(s => s.id === spaceId);
+      if (!space || !(kind === 'fire' || kind === 'water' || kind === 'electrical')) continue;
+      const incident: Incident = { id: crypto.randomUUID(), buildingId: building.building.id, hazard: kind, spaceId, severity: 2, source: 'sensor',
+        title: kind === 'electrical' ? 'Power loss' : kind === 'water' ? 'Water detected' : 'Smoke detected', description: `${kind === 'electrical' ? 'Power monitor' : kind === 'water' ? 'Leak sensor' : 'Smoke detector'} in ${space.name}`, createdAt: Date.now(), status: 'active' };
+      raiseIncident(incident);
+      if (key === 'incident') openIncident(incident);
+      else window.setTimeout(() => { playAlarm(); setToast(incident); }, 1500);
+    }
+  }, [building, raiseIncident, openIncident]);
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
   const conversationId = useRef<string | undefined>(undefined);
@@ -192,10 +219,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   useEffect(() => {
     // Esc: first back to the whole building, then (pressed again) back to the start screen.
     const onKey = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
+      if (event.key === 'f' && !typing && liveIncident && liveIncident.ticket && !liveIncident.fixedAt) { incidents.update(liveIncident.id, { fixedAt: Date.now() }); return; }
       if (event.key === 'Escape' && hazard.view) { hazard.close(); return; }
       // Arrow up/down (or Page up/down) step one floor at a time, unless the user is typing.
       const step = { ArrowUp: 1, PageUp: 1, ArrowDown: -1, PageDown: -1 }[event.key];
-      const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
       if (step && !typing && floors.length) {
         event.preventDefault();
         const current = floors.findIndex(f => f.id === focusedFloor);
@@ -208,7 +236,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor, hazard]);
+  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents]);
 
   async function ask(text: string, skillId?: string) {
     const message = text.trim();
@@ -275,7 +303,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         <span className="shell-spacer" />
         <div className="shell-lamps" aria-label="Active incidents">
           {(['fire', 'water', 'electrical'] as const).map(kind => {
-            const active = incidents.active.filter(i => i.hazard === kind);
+            const active = incidents.active.filter(i => i.hazard === kind && !i.fixedAt);
             return (
               <button type="button" key={kind} className={`shell-lamp shell-lamp--${kind}${active.length ? ' is-lit' : ''}`} disabled={!active.length} onClick={() => active[0] && openIncident(active.at(-1)!)} aria-label={`${hazardMeta[kind].label}: ${active.length} active`}>
                 <i />{kind === 'fire' ? 'Fire' : kind === 'water' ? 'Water' : 'Power'}<b>{active.length}</b>
@@ -349,7 +377,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         {hazard.view && (
           <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onStartResponse={hazard.startResponse}
             onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onShowFloor={floorId => { setHazardRoom(null); setHazardFloor(floorId); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
-            onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
+            incident={liveIncident}
+          onDispatch={contact => liveIncident && incidents.update(liveIncident.id, { ticket: { name: contact.name, role: contact.role, phone: contact.phone, etaMin: contact.eta_min, at: Date.now() } })}
+          onFixed={() => liveIncident && incidents.update(liveIncident.id, { fixedAt: Date.now() })}
+          onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
         )}
         <section ref={transcript} className={`shell-chat${hazard.view ? ' shell-chat--compact' : ''}`} hidden={Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
           {!started && !hazard.view && (
@@ -449,6 +480,13 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
       {sheet === 'buildings' && <BuildingsSheet buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
+      {toast && (
+        <button type="button" className="incident-toast" onClick={() => { openIncident(toast); setToast(null); }}>
+          <i className={`hazard-dot hazard-dot--${toast.hazard}`} />
+          <span><strong>{toast.title} · {building.building.name}</strong><em>{building.spaces.find(s => s.id === toast.spaceId)?.name} · {building.floors.find(f => f.id === building.spaces.find(s => s.id === toast.spaceId)?.floor_id)?.name}</em></span>
+          <time>now</time>
+        </button>
+      )}
       {sheet === 'damage' && <ReportDamage building={building} myRoom={selectedRoom ?? myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
         incidents.raise(incident);
         closeSheet();
@@ -555,6 +593,19 @@ function scenariosFor(building: Building): { hazard: 'water' | 'fire'; spaceId: 
 
 function initials(name: string) {
   return name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+/** 1 → 0 over a second after `since` (a fixed incident clearing from the map); 1 when unset. */
+function useFade(since?: number) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!since) return;
+    let frame = 0;
+    const tick = () => { setNow(Date.now()); if (Date.now() - since < 1200) frame = requestAnimationFrame(tick); };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [since]);
+  return since ? Math.max(0, 1 - (now - since) / 1000) : 1;
 }
 
 /** "2 min ago", refreshed every 20 s. */

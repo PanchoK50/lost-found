@@ -30,8 +30,8 @@ export function useHazard(building: Building) {
 
   const open = useCallback(async (spaceId: string, hazard: HazardKind, mode: HazardView['mode'] = 'simulation', incident?: Incident) => {
     const id = ++request.current;
-    const live = mode === 'incident';
-    setView({ hazard, spaceId, mode, incident, t: live ? 0 : 0, playing: true, responseStartedAt: live ? Date.now() : undefined });
+        // Nothing is called until someone taps Call … or Notify everyone (also for live incidents).
+    setView({ hazard, spaceId, mode, incident, t: 0, playing: true, responseStartedAt: undefined });
     try {
       const res = await fetch('/api/hazards/simulate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -80,11 +80,15 @@ export function useHazard(building: Building) {
 }
 
 /** The map for a hazard at minute t: tinted spaces, the origin pin, evacuation routes (fire) and a camera on the floors hit. */
-export function hazardDirective(building: Building, view: HazardView, focusRoom?: string | null, focusFloor?: string | null): SceneDirective {
+export function hazardDirective(building: Building, view: HazardView, focusRoom?: string | null, focusFloor?: string | null, fade = 1): SceneDirective {
   const origin = building.spaces.find(s => s.id === view.spaceId);
   const data = view.data;
   const floorOf = new Map(building.spaces.map(s => [s.id, s.floor_id]));
-  const hazards = data ? data.simulation.spaces.map(e => ({ spaceId: e.space_id, kind: e.kind, level: levelAt(e, view.t, data.simulation.ramp_min) })).filter(h => h.level > 0.02) : [];
+  // `fade` < 1 while a fixed incident clears from the map.
+  const hazards = data ? data.simulation.spaces.map(e => ({ spaceId: e.space_id, kind: e.kind, level: levelAt(e, view.t, data.simulation.ramp_min) * fade })).filter(h => h.level > 0.02) : [];
+  // Lifts whose shaft is without power stop (drawn as closed); fire switches all lifts off (below).
+  const darkSpaces = new Set(hazards.filter(h => h.kind === 'electrical' && h.level > 0.3).map(h => h.spaceId));
+  const liftsDark = building.vertical_connectors.filter(c => c.kind === 'lift' && c.space_ids.some(id => darkSpaces.has(id))).map(c => c.id);
   const key = data ? keyRoom(data) : undefined;
   const target = key && building.spaces.find(s => s.id === key.space_id);
   const originFloor = origin?.floor_id ?? building.floors[0].id;
@@ -103,7 +107,7 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     ...(target && target.id !== origin?.id && target.floor_id === shownFloor && !hasLink ? [{ floorId: target.floor_id, position: centroid(target.polygon), label: target.name, tone: 'secondary' as const }] : []),
   ];
   // The one consequence that matters most, as an arrow with a label: "Kitchen 3.14 → Server room 2.14".
-  const links: SceneDirective['links'] = hasLink && origin && target
+  const links: SceneDirective['links'] = hasLink && fade > 0.5 && origin && target
     ? [{ from: { floorId: origin.floor_id, position: centroid(origin.polygon) }, to: { floorId: target.floor_id, position: centroid(target.polygon) }, label: `${origin.name} → ${target.name}` }]
     : undefined;
   const routes: SceneDirective['routes'] = view.hazard === 'fire' && data?.evacuation && view.t >= 1
@@ -124,7 +128,7 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     links,
     routes,
     highlights: [...(target && target.id !== origin?.id ? [{ spaceId: target.id, tone: 'secondary' as const }] : []), ...(focusRoom ? [{ spaceId: focusRoom, tone: 'secondary' as const }] : [])],
-    closed: view.hazard === 'fire' && data?.evacuation ? data.evacuation.lifts_off : undefined,
+    closed: fade < 1 ? undefined : [...new Set([...(view.hazard === 'fire' && data?.evacuation ? data.evacuation.lifts_off : []), ...liftsDark])],
   };
 }
 
