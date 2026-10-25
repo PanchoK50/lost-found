@@ -19,7 +19,7 @@ from pathlib import Path
 from benchmark.score import numbers_in
 from lostfound.agent.format import answer_line
 from lostfound.api import scene
-from lostfound.core import directions, geometry, skills
+from lostfound.core import campus, directions, geometry, skills
 from lostfound.core.edits import apply_edits
 from lostfound.core.building import Building, MapError, NoRouteError
 from lostfound.core.resolve import Resolver
@@ -207,6 +207,52 @@ EDIT_TOOLS = [
         "description": "Record that a thing (machine, furniture, equipment) is now in another room (edits the building).",
         "input_schema": _schema({"asset": _string("Asset name or id, e.g. 'Press 3' or 'Desk 2.03-B'."), "to_room": PLACE}),
     },
+    {
+        "name": "move_door",
+        "description": "Slide an existing door or opening along its wall by a distance (it stays in the same wall, never past its "
+        "ends). direction: 'left' | 'right' | 'up' | 'down' as seen on the person's screen (use these when they say left/right), "
+        "or 'north' | 'south' | 'east' | 'west' on the plan. Saved for everyone; routes use the new position.",
+        "input_schema": _schema({"door": _string("Door/opening id (e.g. from the selection)."), "distance_m": {"type": "number", "description": "Metres, e.g. 3."},
+                                 "direction": _string("left, right, up, down, north, south, east or west.")}),
+    },
+    {
+        "name": "move_object",
+        "description": "Shift a thing (furniture, machine, equipment) by a distance in a direction, within the building "
+        "(it changes room if it ends up in another one). direction as for move_door. Saved for everyone.",
+        "input_schema": _schema({"asset": _string("Asset id or name."), "distance_m": {"type": "number", "description": "Metres, e.g. 2."},
+                                 "direction": _string("left, right, up, down, north, south, east or west.")}),
+    },
+]
+
+CROSS_TOOLS = [
+    {
+        "name": "cross_route",
+        "description": "Route from a place in THIS building to a place in ANOTHER building — use it whenever the person names a "
+        "destination outside this building (a building name, 'the other building', a campus). Routes out of the best exit here, "
+        "across between the buildings, and through the other building to the destination. The distance between the buildings "
+        "comes from real positions or a saved layout when known; when the tool reports need_distance, ask the person one short "
+        "question (how far, roughly), remember the answer with set_building_placement, then call cross_route again.",
+        "input_schema": _schema(
+            {
+                "start": PLACE,
+                "destination": _string("The destination, as the person wrote it (room in the other building)."),
+                "building": _string("The other building, as the person named it, e.g. 'N8', 'Fertigung Ost 27', or its id."),
+                "step_free": {"type": "boolean"},
+            }
+        ),
+    },
+    {
+        "name": "set_building_placement",
+        "description": "Remember for this conversation where another building is, from what the person just said "
+        "(after cross_route reported need_distance). Distance from this building, roughly; which way, if they said.",
+        "input_schema": _schema(
+            {
+                "building": _string("The other building, as in cross_route."),
+                "distance_m": {"type": "number", "description": "Distance between the buildings in metres, as the person said."},
+                "bearing": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "Which way the other building lies; default 'east'."},
+            }
+        ),
+    },
 ]
 
 PYTHON_TOOL = {
@@ -255,7 +301,13 @@ def infer_room_types() -> list[str]:
 class Toolbox:
     """Executes tool calls for one building. `last_answer_line` holds the most recent formatted answer."""
 
-    def __init__(self, building: Building, design: str, excluded_kinds: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        building: Building,
+        design: str,
+        excluded_kinds: frozenset[str] = frozenset(),
+        catalog: campus.Catalog | None = None,
+    ) -> None:
         self.building = building
         self.resolver = Resolver(building)
         self.excluded_kinds = excluded_kinds
@@ -268,6 +320,11 @@ class Toolbox:
             "chat": [*typed, *EDIT_TOOLS, PYTHON_TOOL],
         }[design]
         self.chat = design == "chat"
+        # Cross-building routing: the catalog knows every building, and placements learned in conversation.
+        self.catalog = catalog
+        if self.chat and catalog is not None:
+            self.schemas = [*self.schemas, *CROSS_TOOLS]
+        self.placements: dict[str, dict] = {}
         self.last_answer_line: str | None = None
         self.last_result: dict | None = None  # structured result of the last answering tool (for answers.json)
         self.answered: list[tuple[str, dict]] = []  # (answer line, structured result) of every answering call, in order
@@ -536,6 +593,112 @@ class Toolbox:
         self._scene(lambda: scene.count_assets(self.building, kind, floor_id, result))
         return self._answer("count", result)
 
+    # ---------- other buildings (chat) ----------
+
+    def _placement_for(self, other_id: str) -> dict | None:
+        """Where the other building is, relative to this one: curated campus, learned in chat, or measured.
+        Every pair routes — far buildings too (with their real distance); nothing is cut off."""
+        curated = campus.curated_placement(self.building.id, other_id)
+        if curated is not None:
+            return curated
+        learned = self.placements.get(other_id)
+        if learned is not None:
+            return learned
+        return campus.geo_placement(self.building.id, other_id)
+
+    def tool_cross_route(self, start: str, destination: str, building: str, step_free: bool = False) -> dict:
+        if self.catalog is None:
+            raise MapError("No other buildings are known here.")
+        matches = [match for match in self.catalog.search(building) if match["id"] != self.building.id]
+        if not matches:
+            raise MapError(f"No building called '{building}'. Ask which building they mean.")
+        other = matches[0]
+        if len({match["name"] for match in matches}) > 1:
+            # 'Fertigung Ost' matches several buildings: never guess silently — the agent asks which one.
+            return {
+                "need_clarify_building": building,
+                "candidates": matches[:4],
+                "what_to_ask": f"'{building}' matches several buildings: {', '.join(m['name'] for m in matches[:4])}. Ask which one they mean, then call cross_route with the full name.",
+            }
+        other_building = self.catalog.load(other["id"])
+        other_resolver = Resolver(other_building)
+        destination_id = self._resolve_elsewhere(other_building, other_resolver, destination)
+        if destination_id is None:
+            return {
+                "need_clarify": destination,
+                "what_to_ask": f"Ask which room in {other['name']} they mean (a room number or name); the tools cannot resolve '{destination}' there.",
+            }
+        placement = self._placement_for(other["id"])
+        if placement is None:
+            return {
+                "need_distance": True,
+                "building": other,
+                "what_to_ask": (
+                    f"Ask one short question: roughly how far is {other['name']} from "
+                    f"{self.building.data['building']['name']} (metres), and which way? Then remember it with "
+                    "set_building_placement and call cross_route again."
+                ),
+            }
+        start_id = self._space(start)
+        site = campus.Campus(
+            [campus.CampusMember(self.building, (0, 0), "here"), campus.CampusMember(other_building, tuple(placement["offset"]), placement["source"])],
+            placement.get("walkways", []),
+        )
+        result = site.cross_route((self.building.id, start_id), (other["id"], destination_id), step_free)
+        self._highlight(start_id)
+        self._scene(lambda: scene.cross_route(site, result))
+        self.last_result = {"kind": "cross_route", **{k: result[k] for k in ("length_m", "minutes", "steps", "distance_source")}}
+        return {
+            "length_m": result["length_m"],
+            "minutes": result["minutes"],
+            "steps": result["steps"],
+            "from": result["from"],
+            "to": result["to"],
+            "distance_source": result["distance_source"],
+        }
+
+    def _resolve_elsewhere(self, other_building: Building, resolver: Resolver, text: str) -> str | None:
+        """Resolve a place in another building: by name, or by superlative ('the largest generic room')."""
+        try:
+            resolution = resolver.space(text)
+            if resolution.candidates and not resolution.ambiguous:
+                return resolution.best
+        except MapError:
+            pass
+        text = re.sub(r"\s+in\s+\S+\s*$", "", text.strip(), flags=re.IGNORECASE)  # '… room in N8'
+        superlative = re.search(r"\b(largest|biggest)\s+(.+?)(?:\s+on\s+(.+))?$", text, re.IGNORECASE)
+        if not superlative:
+            return None
+        try:
+            kind = resolver.room_type(superlative.group(2))
+        except MapError:
+            return None
+        floor_ids = [resolver.floor(superlative.group(3))] if superlative.group(3) else list(other_building.floors)
+        best: tuple[float, str] | None = None
+        for floor_id in floor_ids:
+            for space in other_building.rooms_on_floor(floor_id, kind):
+                area = other_building.polygon(space["id"]).area
+                if best is None or area > best[0]:
+                    best = (area, space["id"])
+        return best[1] if best else None
+
+    def tool_set_building_placement(self, building: str, distance_m: float, bearing: str = "east") -> dict:
+        if self.catalog is None:
+            raise MapError("No other buildings are known here.")
+        matches = [match for match in self.catalog.search(building) if match["id"] != self.building.id]
+        if not matches:
+            raise MapError(f"No building called '{building}'.")
+        if not 3 <= distance_m <= 100_000:
+            raise MapError("The distance should be between 3 m and 100 km — check what the person said.")
+        direction = {"north": (0, 1), "east": (1, 0), "south": (0, -1), "west": (-1, 0)}[bearing]
+        other = matches[0]
+        self.placements[other["id"]] = {
+            "offset": [round(direction[0] * distance_m, 1), round(direction[1] * distance_m, 1)],
+            "distance_m": round(distance_m, 1),
+            "source": "assumed",
+        }
+        return {"building": other, "distance_m": round(distance_m, 1), "bearing": bearing, "remembered": True}
+
     # ---------- edits (chat) ----------
 
     def tool_set_closed(self, element: str, closed: bool) -> dict:
@@ -588,6 +751,125 @@ class Toolbox:
         self.turn["edits"].append(edit)
         self._scene(lambda: scene.edit(self.building, edit))
         return edit
+
+    # ---------- moving doors and objects ----------
+
+    def _direction(self, direction: str) -> tuple[float, float]:
+        """Unit vector on the plan (x east, y north). Screen directions use the viewer's camera, sent with the selection."""
+        d = direction.strip().lower()
+        compass = {"north": (0.0, 1.0), "south": (0.0, -1.0), "east": (1.0, 0.0), "west": (-1.0, 0.0)}
+        if d in compass:
+            return compass[d]
+        right = getattr(self, "view_right", None) or (1.0, 0.0)
+        rx, ry = right
+        screen = {"right": (rx, ry), "left": (-rx, -ry), "up": (-ry, rx), "down": (ry, -rx)}
+        if d not in screen:
+            raise MapError("direction must be left, right, up, down, north, south, east or west.")
+        return screen[d]
+
+    def tool_move_door(self, door: str, distance_m: float, direction: str) -> dict:
+        from shapely.geometry import LineString, Point
+        if door not in self.building.openings:
+            raise MapError(f"No door with id '{door}'. Select the door on the map or name the two rooms it joins.")
+        if distance_m <= 0:
+            raise MapError("Give a distance in metres (more than 0).")
+        distance_m = min(distance_m, 500.0)  # "as far as possible": the door stops at the end of its wall
+        opening = self.building.openings[door]
+        inside = [s for s in opening["space_ids"] if s in self.building.spaces]
+        here = Point(opening["position"])
+        # The wall the door sits in: the shared stretch of the two spaces' outlines (or the one outline for an entrance).
+        ring = self.building.polygon(inside[0]).exterior
+        wall = ring.intersection(self.building.polygon(inside[1]).exterior.buffer(0.35)) if len(inside) == 2 else ring
+        lines = [g for g in getattr(wall, "geoms", [wall]) if isinstance(g, LineString)] or [ring]
+        line = min(lines, key=lambda g: g.distance(here))
+        # The straight segment of that line the door is on, so the door slides along one wall and doesn't turn corners.
+        coords = list(line.coords)
+        segment = min((LineString([a, b]) for a, b in zip(coords, coords[1:])), key=lambda seg: seg.distance(here))
+        (x0, y0), (x1, y1) = segment.coords
+        length = segment.length
+        ux, uy = (x1 - x0) / length, (y1 - y0) / length
+        dx, dy = self._direction(direction)
+        along = dx * ux + dy * uy
+        if abs(along) < 0.2:
+            raise MapError(f"That direction is across the wall, not along it. The wall runs {'east–west' if abs(ux) > abs(uy) else 'north–south'}; say left/right along it.")
+        current = segment.project(here)
+        t = current + distance_m * (1 if along > 0 else -1)
+        lo, hi = self._door_span(segment, door, inside)
+        half = opening["width_m"] / 2
+        if hi - lo < 2 * half:
+            raise MapError("There is no room to move this door along its wall.")
+        t_clamped = min(max(t, lo + half), hi - half)
+        point = segment.interpolate(t_clamped)
+        position = [round(point.x, 3), round(point.y, 3)]
+        self.building.walks = dict(self.building.walks)
+        for space_id in inside:
+            self.building.walks.pop(space_id, None)
+        opening["position"] = position
+        for record in self.building.data["openings"]:
+            if record["id"] == door:
+                record["position"] = position
+        moved = round(abs(t_clamped - segment.project(here)), 2)
+        edit = {"action": "move_door", "opening_id": door, "position": position}
+        self._record(edit)
+        return {**edit, "moved_m": moved, "note": "stopped at the end of the wall" if moved + 1e-6 < distance_m else ""}
+
+    WALL_CLEARANCE_M = 0.25  # a door keeps this much solid wall at either end (wall thickness plus a frame)
+
+    def _door_span(self, segment, door_id: str, inside: list[str]) -> tuple[float, float]:
+        """The stretch of `segment` the door may slide in, around where it is now: not past the wall's ends, not
+        across a point where another room's wall joins this one, and not over another door."""
+        from shapely.geometry import Point
+        length = segment.length
+        current = segment.project(Point(self.building.openings[door_id]["position"]))
+        blocked: list[tuple[float, float]] = []
+        near = segment.buffer(0.2)
+        floor_id = self.building.openings[door_id]["floor_id"]
+        for other in self.building.spaces_by_floor[floor_id]:
+            if other["id"] in inside:
+                continue
+            touch = self.building.polygon(other["id"]).exterior.intersection(near)
+            if touch.is_empty:
+                continue
+            # Where its outline meets this wall: project the touching part onto the wall line.
+            points = [Point(c) for g in getattr(touch, "geoms", [touch]) for c in getattr(g, "coords", [])] or [touch.centroid]
+            ts = [segment.project(pt) for pt in points]
+            a, b = min(ts), max(ts)
+            # A room alongside (sharing much of the wall) is not a junction; its corners are.
+            if b - a > 0.6:
+                blocked += [(a - 0.05, a + 0.05), (b - 0.05, b + 0.05)]
+            else:
+                blocked.append((a, b))
+        for oid, o in self.building.openings.items():
+            # Doors in this wall, and doors in a wall meeting it at a corner (their leaves would clash).
+            if oid == door_id or o["floor_id"] != floor_id or segment.distance(Point(o["position"])) > o["width_m"] / 2 + 0.3:
+                continue
+            t = segment.project(Point(o["position"]))
+            blocked.append((t - o["width_m"] / 2 - 0.1, t + o["width_m"] / 2 + 0.1))
+        lo, hi = 0.0, length
+        for a, b in blocked:
+            if b <= current:
+                lo = max(lo, b)
+            elif a >= current:
+                hi = min(hi, a)
+        return lo + self.WALL_CLEARANCE_M, hi - self.WALL_CLEARANCE_M
+
+    def tool_move_object(self, asset: str, distance_m: float, direction: str) -> dict:
+        from shapely.geometry import Point
+        asset_id = asset if asset in self.building.assets else next((a["id"] for a in self.building.assets.values() if a["name"].casefold() == asset.casefold()), None)
+        if asset_id is None:
+            raise MapError(f"No object '{asset}'. Select it on the map.")
+        if not 0 < distance_m <= 100:
+            raise MapError("Move an object by more than 0 and at most 100 m.")
+        record = self.building.assets[asset_id]
+        dx, dy = self._direction(direction)
+        x, y = record["position"][0] + dx * distance_m, record["position"][1] + dy * distance_m
+        target = next((s["id"] for s in self.building.spaces_by_floor[record["floor_id"]] if self.building.polygon(s["id"]).contains(Point(x, y))), None)
+        if target is None:
+            raise MapError("That would put it outside the building on this floor. Try a shorter distance.")
+        record.update({"space_id": target, "position": [round(x, 3), round(y, 3)]})
+        edit = {"action": "move_asset", "asset_id": asset_id, "to_space_id": target, "position": record["position"]}
+        self._record(edit)
+        return {**edit, "room": self.building.label(target)}
 
     def _record(self, edit: dict) -> dict:
         self.edits.append(edit)

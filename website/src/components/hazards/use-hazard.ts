@@ -21,6 +21,9 @@ export interface HazardView {
 }
 
 const PLAY_SECONDS = 30;
+/** Local B-roll only: ?speed=0.25 plays the whole scenario four times slower (people walk out on camera). */
+const SPEED = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  ? Math.min(4, Math.max(0.05, Number(new URLSearchParams(window.location.search).get('speed')) || 1)) : 1;
 const SLOW_MIN = 6;
 const SLOW_SECONDS = 20;
 
@@ -67,7 +70,7 @@ export function useHazard(building: Building) {
         if (!current || !current.playing) return current;
         // The first minutes (alarm, people walking out) play slowly; the rest of the spread faster.
         const rate = current.t < SLOW_MIN ? SLOW_MIN / SLOW_SECONDS : (minutes - SLOW_MIN) / Math.max(1, PLAY_SECONDS - SLOW_SECONDS);
-        const t = Math.min(minutes, current.t + dt * rate);
+        const t = Math.min(minutes, current.t + dt * rate * SPEED);
         return { ...current, t, playing: t < minutes };
       });
       frame = requestAnimationFrame(tick);
@@ -95,11 +98,12 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
   const focus: SceneDirective['focus'] = focusRoom && floorOf.get(focusRoom)
     ? { mode: 'floor', floorId: floorOf.get(focusRoom)! }
     : focusFloor === '__all__' ? { mode: 'building' }
+    : focusFloor === '__xray__' ? { mode: 'xray', floorIds: [...new Set([originFloor, ...(target ? [target.floor_id] : [])])] }
     : focusFloor ? { mode: 'floor', floorId: focusFloor }
     : { mode: 'floor', floorId: originFloor };
   // One floor at a time (as in ArcGIS Indoors or Desigo CC): an arrow only when both rooms are on the floor shown.
-  const shownFloor = focusRoom ? floorOf.get(focusRoom) : focusFloor && focusFloor !== '__all__' ? focusFloor : originFloor;
-  const hasLink = Boolean(origin && target && target.id !== origin.id && origin.floor_id === shownFloor && target.floor_id === shownFloor);
+  const shownFloor = focusRoom ? floorOf.get(focusRoom) : focusFloor && !focusFloor.startsWith('__') ? focusFloor : originFloor;
+  const hasLink = Boolean(origin && target && target.id !== origin.id && (focusFloor === '__xray__' || (origin.floor_id === shownFloor && target.floor_id === shownFloor)));
   // The arrow's label already names the origin; then the pin needs no label of its own.
   const markers: SceneDirective['markers'] = [
     ...(origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: hasLink ? '' : `${origin.name} · origin`, tone: 'primary' as const }] : []),
@@ -127,7 +131,7 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     markers,
     links,
     routes,
-    highlights: [...(target && target.id !== origin?.id ? [{ spaceId: target.id, tone: 'secondary' as const }] : []), ...(focusRoom ? [{ spaceId: focusRoom, tone: 'secondary' as const }] : [])],
+    highlights: fade < 1 ? [] : [...(target && target.id !== origin?.id ? [{ spaceId: target.id, tone: 'secondary' as const }] : []), ...(focusRoom ? [{ spaceId: focusRoom, tone: 'secondary' as const }] : [])],
     closed: fade < 1 ? undefined : [...new Set([...(view.hazard === 'fire' && data?.evacuation ? data.evacuation.lifts_off : []), ...liftsDark])],
   };
 }

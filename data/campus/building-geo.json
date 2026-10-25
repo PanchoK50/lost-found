@@ -1,0 +1,23 @@
+{
+ "note": "Real-world centroids (WGS84) of the OSM indoor buildings, measured once from the OSM API (way geometry node averages). They give honest distances between buildings for cross-building routing and the 'too far to walk' answers. Buildings from other sources (procedural, swiss_dwellings, resplan, uploads) have no real-world position and are placed by asking the user instead.",
+ "projection": "distances computed as x = (lon2-lon1)*111320*cos(lat), y = (lat2-lat1)*111320; orientation of each building's local plan frame is not preserved by the indoor extraction, so bearings are approximate; distances are not.",
+ "buildings": {
+  "osm-way22744230": { "lat": 48.15112, "lon": 11.56774, "name": "N3" },
+  "osm-way43035346": { "lat": 48.15065, "lon": 11.56955, "name": "N8" },
+  "osm-way58216509": { "lat": 48.15008, "lon": 11.56827, "name": "U-Trakt" },
+  "osm-way10053349": { "lat": 48.14886, "lon": 11.56800, "name": "Hauptgebäude" },
+  "osm-way19183732": { "lat": 48.14732, "lon": 11.56717, "name": "Mensa Arcisstraße" },
+  "osm-way50299584": { "lat": 48.14808, "lon": 11.56753, "name": "Bestelmeyer Süd" },
+  "osm-way50300147": { "lat": 48.14808, "lon": 11.56755, "name": "Bestelmeyer Süd (east wing)" },
+  "osm-way50299720": { "lat": 48.14913, "lon": 11.56630, "name": "Landwirtschaftsbau" },
+  "osm-way61408163": { "lat": 48.14859, "lon": 11.56610, "name": "Thierschbau" },
+  "osm-way27326387": { "lat": 48.39572, "lon": 11.72671, "name": "TUM 4107 Institutsgebäude 3" },
+  "osm-way27917482": { "lat": 48.26255, "lon": 11.66798, "name": "TUM CIT" },
+  "osm-way476929995": { "lat": 48.26684, "lon": 11.67014, "name": "StudiTUM" },
+  "osm-way360544293": { "lat": 48.35420, "lon": 11.79130, "name": "Terminal 2" },
+  "osm-way363805324": { "lat": 48.13793, "lon": 11.55294, "name": "EineWeltHaus" },
+  "osm-way13507441": { "lat": 48.06498, "lon": 11.66547, "name": "Wolf-Ferrari-Haus" },
+  "osm-way37850565": { "lat": 48.07705, "lon": 11.66246, "name": "Haus der Weiterbildung" },
+  "osm-way52060470": { "lat": 48.14786, "lon": 11.46379, "name": "Pasing Arcaden" }
+ }
+}

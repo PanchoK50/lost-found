@@ -165,6 +165,77 @@ def route(
     }
 
 
+def cross_route(site, result: dict) -> dict:
+    """A journey across buildings: indoor legs (space paths; the viewer fills the line per building), the
+    outdoor leg with its own points and steps, and a campus focus placing both buildings."""
+    start, destination = result["from"], result["to"]
+    routes: list[dict] = []
+    markers: list[dict] = []
+    for leg in result["legs"]:
+        if leg["kind"] == "indoor":
+            routes.append({"spacePath": [s for s in leg["route"]["space_path"] if s in site.by_building[leg["building_id"]].building.spaces], "label": leg["building_name"]})
+        else:
+            building_a = site.by_building[leg["from"]["building_id"]].building
+            building_b = site.by_building[leg["to"]["building_id"]].building
+            exit_opening = building_a.openings[leg["from"]["opening_id"]]
+            entry_opening = building_b.openings[leg["to"]["opening_id"]]
+            leave = _entrance_text(building_a, leg["from"]["opening_id"])
+            enter = _entrance_text(building_b, leg["to"]["opening_id"])
+            routes.append({
+                "spacePath": [
+                    next(s for s in exit_opening["space_ids"] if s in building_a.spaces),
+                    next(s for s in entry_opening["space_ids"] if s in building_b.spaces),
+                ],
+                "points": [{"floorId": None, "position": point} for point in leg["path"]],
+                "steps": [
+                    {
+                        "action": "outside",
+                        "text": f"Leave {building_a.data['building']['name']} through the entrance at {leave}.",
+                        "distance": leg["length_m"],
+                        "at": {"floorId": exit_opening["floor_id"], "position": exit_opening["position"]},
+                    },
+                    {
+                        "action": "inside",
+                        "text": f"Enter {building_b.data['building']['name']} through the entrance at {enter}.",
+                        "distance": 0,
+                        "at": {"floorId": entry_opening["floor_id"], "position": entry_opening["position"]},
+                    },
+                ],
+                "label": f"{leg['length_m']:.0f} m across",
+                "outdoor": True,
+            })
+            markers.append({"floorId": exit_opening["floor_id"], "position": exit_opening["position"], "label": f"Exit · {building_a.data['building']['name']}", "tone": "muted"})
+            markers.append({"floorId": entry_opening["floor_id"], "position": entry_opening["position"], "label": f"Entrance · {building_b.data['building']['name']}", "tone": "muted"})
+    source_note = {"assumed": " · distance as you said", "measured": " · real distance (OSM)"}.get(result["distance_source"], "")
+    metres = result["length_m"]
+    distance = f"{metres / 1000:.1f} km" if metres >= 1000 else f"{metres:.0f} m"
+    minutes = result["minutes"]
+    time = f"about {minutes // 60} h {minutes % 60} min" if minutes >= 90 else f"about {minutes} min"
+    return {
+        "kind": "route",
+        "answer": {
+            "title": f"{start['name']} → {destination['name']}",
+            "value": distance,
+            "detail": f"{start['building_name']} → {destination['building_name']} · {time}{source_note}",
+        },
+        "scene": {
+            "focus": {"mode": "campus", "members": site.placement()},
+            "highlights": [
+                _highlight(start["space_id"], "secondary", f"Start · {start['name']}"),
+                _highlight(destination["space_id"], "primary", destination["name"]),
+            ],
+            "routes": routes,
+            "markers": markers,
+        },
+    }
+
+
+def _entrance_text(building: Building, opening_id: str) -> str:
+    from lostfound.core.campus import _entrance_label
+
+    return _entrance_label(building, opening_id)
+
+
 def errand(b: Building, start: str, step_free: bool, result: dict) -> dict:
     pickup, target = result["pickup"]["space_id"], result["target"]["space_id"]
     legs = _route_legs(b, [start, pickup, target], step_free, [], bays=False)  # the errand number is kit-model

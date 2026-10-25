@@ -20,9 +20,10 @@ import anthropic
 from benchmark.score import committed_answer
 from lostfound.agent import rules
 from lostfound.agent.format import answer_line
-from lostfound.agent.prompts import BATCH_INSTRUCTIONS, CHAT_INSTRUCTIONS, building_summary
+from lostfound.agent.prompts import BATCH_INSTRUCTIONS, CHAT_INSTRUCTIONS, building_summary, other_buildings_block
 from lostfound.agent.tools import Toolbox
 from lostfound.core.building import Building, MapError
+from lostfound.core.campus import Catalog
 from lostfound.core.resolve import Resolver
 from lostfound.evals.variants import Outcome
 
@@ -192,15 +193,50 @@ def import_checks(building: Building) -> list[dict]:
     )}]
 
 
-class ChatSession:
-    """Chat mode: one conversation about one building, with edits that persist for the session."""
+def selection_note(building, selection: dict | None) -> str:
+    """What the person selected on the model (shown as a chip in the chat), so "this", "it" and "that door" resolve."""
+    if not isinstance(selection, dict):
+        return ""
+    kind, item = selection.get("kind"), str(selection.get("id") or "")
+    if kind == "asset" and item in building.assets:
+        asset = building.assets[item]
+        return (f"[Selected on the map: {asset['name']} ({asset['type'].replace('_', ' ')}, asset id {item}) in "
+                f"{building.label(asset['space_id'])}. 'This', 'it' and 'that {asset['type'].replace('_', ' ')}' mean this object; "
+                "use its asset id with the tools (move_object to shift it by metres, left/right as on the person's screen; move_asset to another room).]\n")
+    if kind == "opening" and item in building.openings:
+        opening = building.openings[item]
+        sides = " and ".join(building.label(s) if s in building.spaces else "outside" for s in opening["space_ids"])
+        state = "closed" if item in building.closed else "open"
+        return (f"[Selected on the map: the {opening['kind']} {item} between {sides}, {opening['width_m']:.2f} m wide, "
+                f"{'step-free' if opening['step_free'] else 'with a step'}, currently {state}. 'This door' and 'it' mean this "
+                f"opening; use its id {item} with set_closed, set_door_width or move_door (left/right are as the person sees the screen; for 'as far as possible' pass a large distance, e.g. 100 — the door stops at the end of its wall). Don't ask where the person is.]\n")
+    if kind == "space" and item in building.spaces:
+        return f"[Selected on the map: {building.label(item)} (space id {item}). 'This room' and 'here' mean this space.]\n"
+    return ""
 
-    def __init__(self, building: Building, config: AgentConfig | None = None, client: anthropic.Anthropic | None = None) -> None:
+
+class ChatSession:
+    """Chat mode: one conversation about one building, with edits that persist for the session.
+
+    With a building catalogue, the session can also route to other buildings (cross_route): the session's
+    building stays the anchor; others are loaded on demand and placed from real positions, curated campus
+    files, or what the person says in the conversation."""
+
+    def __init__(
+        self,
+        building: Building,
+        config: AgentConfig | None = None,
+        client: anthropic.Anthropic | None = None,
+        catalog: Catalog | None = None,
+    ) -> None:
         self.config = config or AgentConfig(design="hybrid", effort="low")
         self.loop = ClaudeLoop(self.config, client)
-        self.toolbox = Toolbox(building, "chat")
+        self.toolbox = Toolbox(building, "chat", catalog=catalog)
+        self.catalog = catalog
         self.messages: list[dict] = []
         self.system = system_blocks(CHAT_INSTRUCTIONS, building) + import_checks(building)
+        if catalog is not None:
+            self.system += other_buildings_block(building, catalog)
         self.usage: Counter = Counter()
         self.last_scene: dict = {"focus": {"mode": "building"}}
         self.world_closed: set[str] = set()  # closures reported by people in the building (web world layer)
@@ -230,7 +266,7 @@ class ChatSession:
         self.world_closed = valid
         b.closed = agent_closed | valid
 
-    def ask(self, text: str, location: str | None = None) -> dict:
+    def ask(self, text: str, location: str | None = None, selection: dict | None = None) -> dict:
         outcome = Outcome(reply="", path="chat")
         hints = mention_hints(self.building, text)
         where = (
@@ -240,7 +276,9 @@ class ChatSession:
             else "[The person has not set their location. If you need a start, ask for their room, or tell them to tap a room "
             "on the map and choose \"I'm here\".]\n"
         )
-        self.messages.append({"role": "user", "content": where + text + (f"\n\n{hints}" if hints else "")})
+        view = selection.get("view_right") if isinstance(selection, dict) else None
+        self.toolbox.view_right = tuple(view) if isinstance(view, (list, tuple)) and len(view) == 2 else None
+        self.messages.append({"role": "user", "content": where + selection_note(self.building, selection) + text + (f"\n\n{hints}" if hints else "")})
         self.toolbox.reset_turn()
         reply = self.loop.run(self.system, self.messages, self.toolbox, outcome)
         self.usage.update(outcome.usage)

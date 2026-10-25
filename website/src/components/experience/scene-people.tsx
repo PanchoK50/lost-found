@@ -18,12 +18,19 @@ const QUEUE_GAP_M = 0.5;
 // Walking: a small step to the side of the route, so a room's people don't walk in single file but stay off the walls.
 const WALK_SIDE_M = 0.2;
 // A little larger than life, so people read at building scale.
-const BODY = new THREE.CapsuleGeometry(0.36, 1.5, 4, 10);
-BODY.translate(0, 1.11, 0); // stand on y = 0
+// Mii-style figures: a round head on a small rounded body (no arms), a little larger than life to read at
+// building scale. Both stand on y = 0.
+const FIGURE_SCALE = 1.35;
+const BODY = new THREE.CapsuleGeometry(0.25, 0.5, 6, 14);
+BODY.translate(0, 0.52, 0);
+const HEAD = new THREE.SphereGeometry(0.29, 20, 16);
+HEAD.translate(0, 1.32, 0);
+const SHIRTS = ['#2f6fdf', '#e5484d', '#2f9e62', '#f5a623', '#8a4fd8', '#f26a1b', '#1aa3b8', '#d6409f'].map(c => new THREE.Color(c));
+const SKIN = ['#f6d7c3', '#e8b796', '#c98e6b', '#8d5a3b', '#f1c8a2'].map(c => new THREE.Color(c));
+const TRAPPED = new THREE.Color('#ff2d3d');
 // Few states, quiet colours: grey waiting, navy moving (walking or queuing), green safe, red only when trapped.
-const COLORS = { waiting: new THREE.Color('#9aa3b2'), walking: new THREE.Color('#002478'), queue: new THREE.Color('#002478'), safe: new THREE.Color('#2f8f5b'), trapped: new THREE.Color('#e5484d') };
 
-interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; queueAt: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 }
+interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; queueAt: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 ; shirt: THREE.Color; skin: THREE.Color }
 
 /** The polyline segment [k - 1, k] holding the point `distance` metres along it. */
 function segmentAt(lengths: number[], distance: number) {
@@ -51,7 +58,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
   /** Walking speed, metres per minute. */
   speed: number;
   /** Height of the walkable surface of a floor (block top or slab), relative to its pose. */
-  floorBase(floorId: string): number;
+  floorBase(floorId: string | null): number;
 }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const now = useRef(minute);
@@ -65,7 +72,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
       const n = Math.max(1, Math.round(Math.min(evacuee.count, PER_ROOM) * share));
       const points = evacuee.path.map(p => {
         const [x, z] = model.toWorld(p.position);
-        return new THREE.Vector3(x, (poses.get(p.floorId)?.y ?? 0) + floorBase(p.floorId), z);
+        return new THREE.Vector3(x, (p.floorId === null ? 0 : poses.get(p.floorId)?.y ?? 0) + floorBase(p.floorId), z);
       });
       if (!points.length) return;
       const lengths = [0];
@@ -78,19 +85,22 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
       for (let i = 0; i < n; i++) {
         const seed = roomIndex * 31 + i * 7 + 1;
         out.push({
-          path: points, floors: evacuee.path.map(p => p.floorId), lengths, total: lengths.at(-1)!, start: evacuee.startMin + i * QUEUE_MIN,
+          path: points, floors: evacuee.path.map(p => p.floorId ?? ''), lengths, total: lengths.at(-1)!, start: evacuee.startMin + i * QUEUE_MIN,
           queueAt: Math.max(0, lengths.at(-1)! - QUEUE_FRONT_M - i * QUEUE_GAP_M),
           // Through the exit door once the queue lets them (spread over the room's share of the wait).
           out: evacuee.outMin !== undefined ? Math.max(evacuee.startMin, evacuee.outMin - (n - 1 - i) * QUEUE_MIN) : Infinity,
           offset: new THREE.Vector2((jitter(seed) - 0.5) * 1.6, (jitter(seed + 3) - 0.5) * 1.6), cutOff: !!evacuee.cutOff,
           exitOut: last.clone().add(out3).add(new THREE.Vector3((jitter(seed + 5) - 0.5) * 3, 0, (jitter(seed + 9) - 0.5) * 3)),
+          shirt: SHIRTS[Math.floor(jitter(seed + 11) * SHIRTS.length)], skin: SKIN[Math.floor(jitter(seed + 13) * SKIN.length)],
         });
       }
     });
     return out.slice(0, MAX_FIGURES);
   }, [evacuees, model, poses, floorBase]);
 
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.5 }), []);
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.45 }), []);
+  const headMaterial = useMemo(() => new THREE.MeshStandardMaterial({ roughness: 0.6 }), []);
+  const heads = useRef<THREE.InstancedMesh>(null);
   const matrix = useMemo(() => new THREE.Matrix4(), []);
   const position = useMemo(() => new THREE.Vector3(), []);
   const scale = useMemo(() => new THREE.Vector3(), []);
@@ -98,18 +108,18 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
 
   useFrame(({ clock }) => {
-    const instance = mesh.current;
-    if (!instance) return;
+    const instance = mesh.current, headInstance = heads.current;
+    if (!instance || !headInstance) return;
     const t = now.current;
     figures.forEach((figure, i) => {
       let floorId = figure.floors[0];
-      let color = COLORS.waiting;
+      let color: 'waiting' | 'walking' | 'queue' | 'safe' | 'trapped' = 'waiting';
       let s = 1;
       let heading = 0;
       if (figure.cutOff) {
         position.copy(figure.path[0]);
         position.x += figure.offset.x * 0.5; position.z += figure.offset.y * 0.5; // spread round the room
-        color = COLORS.trapped;
+        color = 'trapped';
         s = t >= figure.start ? 1 + 0.15 * Math.sin(clock.elapsedTime * 8 + i) : 1;
       } else {
         const walked = Math.max(0, t - figure.start) * speed;
@@ -122,10 +132,10 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
         } else if (walked >= figure.total && t >= figure.out) {
           position.copy(figure.exitOut);
           floorId = figure.floors.at(-1)!;
-          color = COLORS.safe;
+          color = 'safe';
         } else if (figure.path.length < 2) {
           position.copy(figure.path[0]);
-          color = COLORS.queue;
+          color = 'queue';
         } else {
           // Walking, or queuing for the exit at their place on the way to it.
           const queuing = walked >= stop;
@@ -143,19 +153,27 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
           const side = figure.offset.x / 0.8 * WALK_SIDE_M;
           position.x += Math.cos(heading) * side; position.z -= Math.sin(heading) * side;
           if (!queuing) position.y += Math.abs(Math.sin(clock.elapsedTime * 10 + i)) * 0.08; // walking bob
-          color = queuing ? COLORS.queue : COLORS.walking;
+          color = queuing ? 'queue' : 'walking';
         }
       }
       const shown = (poses.get(floorId)?.opacity ?? 0) > 0.5;
-      scale.setScalar(shown ? s : 0);
+      scale.setScalar(shown ? s * FIGURE_SCALE : 0);
       matrix.compose(position, turn.setFromAxisAngle(up, heading), scale);
       instance.setMatrixAt(i, matrix);
-      instance.setColorAt(i, color);
+      // Shirts keep their colour; trapped people flash red.
+      instance.setColorAt(i, color === 'trapped' && Math.sin(clock.elapsedTime * 8 + i) > 0 ? TRAPPED : figure.shirt);
+      headInstance.setMatrixAt(i, matrix);
+      headInstance.setColorAt(i, figure.skin);
     });
-    instance.instanceMatrix.needsUpdate = true;
-    if (instance.instanceColor) instance.instanceColor.needsUpdate = true;
+    for (const m of [instance, headInstance]) {
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
   });
 
   if (!figures.length) return null;
-  return <instancedMesh key={figures.length} ref={mesh} args={[BODY, material, figures.length]} castShadow raycast={() => null} frustumCulled={false} />;
+  return <>
+    <instancedMesh key={`b${figures.length}`} ref={mesh} args={[BODY, material, figures.length]} castShadow raycast={() => null} frustumCulled={false} />
+    <instancedMesh key={`h${figures.length}`} ref={heads} args={[HEAD, headMaterial, figures.length]} castShadow raycast={() => null} frustumCulled={false} />
+  </>;
 }

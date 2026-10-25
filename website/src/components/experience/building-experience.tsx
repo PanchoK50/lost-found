@@ -49,6 +49,10 @@ type Message = { id: number; role: 'user' | 'assistant'; content: string; respon
 
 interface Props {
   building: Building;
+  /** ?campus=<id>: the campus to open (members with their offsets); cross-building answers extend this at runtime. */
+  campus?: { id: string; members: { buildingId: string; offset: [number, number] }[] };
+  /** ?ask=<question>: asked automatically once the page is ready (the fixed cross-building chip navigates here). */
+  autoAsk?: string;
   buildings: BuildingRow[];
   suggestions: { label: string; question: string }[];
   /** Just created from plans: offer to go through what the importer was unsure about. */
@@ -56,6 +60,8 @@ interface Props {
 }
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
+/** The fixed cross-building example: always offered as the fourth chip, on every building. */
+const CAMPUS_TRIP = { label: 'To another building', question: 'How do I get from N2301 in N3 to N0839 in N8?' };
 /** Matches the desktop breakpoint in globals.css. Phone layout is the default. */
 const wideQuery = '(min-width: 900px)';
 
@@ -67,12 +73,44 @@ function useWide() {
   );
 }
 
-export function BuildingExperience({ building, buildings, suggestions, importIntro }: Props) {
+export function BuildingExperience({ building, buildings, suggestions, importIntro, campus, autoAsk }: Props) {
   const router = useRouter();
   // Wake the Python agent while people read the start screen (cold starts on Vercel).
   useEffect(() => { void fetch('/api/health').catch(() => undefined); }, []);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [directive, setDirective] = useState<SceneDirective>(overview);
+  const [directive, setDirective] = useState<SceneDirective>(() => campus
+    ? { focus: { mode: 'campus', members: campus.members.map(m => ({ buildingId: m.buildingId, offset: m.offset })) } }
+    : overview);
+  // The other campus buildings (cross-building routes): loaded lazily, remembered for the session.
+  const [site, setSite] = useState<Map<string, { building: Building; offset: [number, number] }>>(() => new Map());
+  const ensureSite = useCallback(async (members: { buildingId: string; offset: [number, number] }[]) => {
+    for (const member of members) {
+      if (member.buildingId === building.building.id) continue;
+      setSite(current => {
+        if (current.has(member.buildingId)) {
+          if (current.get(member.buildingId)!.offset[0] === member.offset[0] && current.get(member.buildingId)!.offset[1] === member.offset[1]) return current;
+          const next = new Map(current); next.set(member.buildingId, { ...current.get(member.buildingId)!, offset: member.offset }); return next;
+        }
+        return current;
+      });
+      if (!site.has(member.buildingId)) {
+        try {
+          const res = await fetch(`/api/buildings/${encodeURIComponent(member.buildingId)}`);
+          if (!res.ok) continue;
+          const other = await res.json() as Building;
+          setSite(current => current.has(member.buildingId) ? current : new Map(current).set(member.buildingId, { building: other, offset: member.offset }));
+        } catch { /* the campus answer still works for the primary building */ }
+      }
+    }
+  }, [building.building.id, site]);
+  useEffect(() => { if (campus) void ensureSite(campus.members); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoAsked = useRef(false);
+  useEffect(() => {
+    if (!autoAsk || autoAsked.current) return;
+    autoAsked.current = true;
+    void ask(autoAsk);
+  }, [autoAsk]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (directive.focus.mode === 'campus') void ensureSite(directive.focus.members.map(m => ({ buildingId: m.buildingId, offset: m.offset }))); }, [directive.focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   // Backend conversation id: follow-ups and edits (closed lifts, new doors) stay in one session.
@@ -97,8 +135,32 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const [hazardFloor, setHazardFloor] = useState<string | null>(null);
   const hazardPanel = useRef<HTMLElement>(null);
   const [mapStyle, setMapStyle] = useMapStyle();
+  const simulateMenu = useRef<HTMLDetailsElement>(null);
+  // Emergency mode: while a live incident is open and not yet fixed, the whole platform turns dark and vivid.
+  const emergency = incidents.active.some(i => !i.fixedAt);
   // The room selected on the model: a report starts there.
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  // An object or door picked on the model, attached to the chat as a chip (like a file in an editor's chat).
+  const [chatContext, setChatContext] = useState<{ kind: 'asset' | 'opening' | 'space'; id: string } | null>(null);
+  const selectObject = useCallback((kind: 'asset' | 'opening', id: string) => {
+    setChatContext({ kind, id });
+    requestAnimationFrame(() => input.current?.focus());
+  }, []);
+  const contextChip = chatContext ? describeContext(building, chatContext) : null;
+  const lastAnswerTitle = messages.findLast(m => m.response?.answer)?.response?.answer?.title;
+  // An answer card: show its scene; for a move, fly back to what was moved, in its new place, and select it again.
+  const showAnswer = (response: ChatResponse) => {
+    const edit = (response.edits ?? []).map(e => e as { action?: string; asset_id?: string; opening_id?: string }).find(e => e.action === 'move_door' || e.action === 'move_asset');
+    const target = edit?.action === 'move_door' ? { kind: 'opening' as const, id: edit.opening_id! } : edit?.action === 'move_asset' ? { kind: 'asset' as const, id: edit.asset_id! } : null;
+    if (target) setChatContext(target);
+    const context = target ?? chatContext;
+    setDirective(context ? keepSelectionInView(response, building, context) : response.scene);
+  };
+  // One selection at a time: a tapped room replaces an object in the chat, and an object replaces the room.
+  const selectRoom = useCallback((spaceId: string | null) => {
+    setSelectedRoom(spaceId);
+    setChatContext(current => (spaceId ? { kind: 'space', id: spaceId } : current?.kind === 'space' ? null : current));
+  }, []);
   const openIncident = useCallback((incident: Incident) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(incident.spaceId, incident.hazard, 'incident', incident); }, [hazard]);
   // An incident raised on another screen: sound the alarm and show it.
   const { arrived, clearArrived } = incidents;
@@ -110,6 +172,18 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [arrived, building.building.id, clearArrived]);
   // Deep link for demos and the video: ?simulate=water:<space id> (or fire:, electrical:) opens that simulation.
   const openSimulation = hazard.open;
+  // B-roll (?broll=1): only the model. ?view=building | xray | <floor id> picks the hazard view.
+  // B-roll is local only (recording the submission video), never on the hosted app.
+  const broll = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get('broll') === '1' && ['localhost', '127.0.0.1'].includes(window.location.hostname), () => false);
+  const viewHandled = useRef(false);
+  useEffect(() => {
+    if (viewHandled.current || !hazard.view) return;
+    viewHandled.current = true;
+    const view = new URLSearchParams(window.location.search).get('view');
+    if (view === 'building') setHazardFloor(ALL_FLOORS);
+    else if (view === 'xray') setHazardFloor('__xray__');
+    else if (view && building.floors.some(f => f.id === view)) setHazardFloor(view);
+  }, [hazard.view, building]);
   const simulateHandled = useRef(false);
   useEffect(() => {
     if (simulateHandled.current) return;
@@ -136,7 +210,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     }
     return out;
   }, [hazard.view, building, liveIncident?.fixedAt]);
-  const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor, fade) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive, fade]);
+  const baseDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor, fade) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive, fade]);
+  // The chat's selected object lights up on the model, whatever the answer shows.
+  const shownDirective = useMemo(() => (chatContext?.kind === 'asset' ? { ...baseDirective, assets: [...new Set([...(baseDirective.assets ?? []), chatContext.id])] } : baseDirective), [baseDirective, chatContext]);
   // A pushed alert (another screen raised it, or ?notify= for the video): tap to open.
   const [toast, setToast] = useState<Incident | null>(null);
   // Deep links for demos and the video: ?incident=<kind>:<space id> raises and opens a live incident;
@@ -216,6 +292,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
   // Whole building, keeping the current answer's highlights and route.
   const showOverview = useCallback(() => setDirective(current => ({ ...current, focus: { mode: 'building' } })), []);
+  // Dismiss the answer on the map (route, highlights, markers) and stay where the camera is; the chat stays.
+  const clearAnswer = useCallback(() => setDirective(current => ({ focus: current.focus.mode === 'floor' ? { mode: 'floor', floorId: current.focus.floorId } : current.focus })), []);
   /** Back to the start screen: whole building, "Ask me anything", suggestions. */
   const startOver = useCallback(() => {
     setMessages([]);
@@ -233,6 +311,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
       if (event.key === 'f' && !typing && liveIncident && liveIncident.ticket && !liveIncident.fixedAt) { incidents.update(liveIncident.id, { fixedAt: Date.now() }); return; }
       if (event.key === 'Escape' && hazard.view) { hazard.close(); return; }
+      if (event.key === 'Escape' && (directive.routes?.length || directive.highlights?.length || directive.markers?.length)) { clearAnswer(); return; }
       // Arrow up/down (or Page up/down) step one floor at a time, unless the user is typing.
       const step = { ArrowUp: 1, PageUp: 1, ArrowDown: -1, PageDown: -1 }[event.key];
       if (step && !typing && floors.length) {
@@ -247,7 +326,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents]);
+  }, [showOverview, startOver, directive, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents, clearAnswer]);
 
   async function ask(text: string, skillId?: string) {
     const message = text.trim();
@@ -260,7 +339,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId, location: profile?.rooms[building.building.id] }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId, location: profile?.rooms[building.building.id], selection: chatContext ? { ...chatContext, view_right: (window as unknown as { __lfViewRight?: [number, number] }).__lfViewRight } : undefined }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
@@ -269,7 +348,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       if (response.edits?.length) router.refresh();
       conversationId.current = response.conversationId ?? conversationId.current;
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
-      setDirective(response.scene);
+      setDirective(chatContext ? keepSelectionInView(response, building, chatContext) : response.scene);
       setActiveStep(undefined);
     } catch (error) {
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: error instanceof Error ? error.message : 'Something went wrong.', error: true }]);
@@ -305,7 +384,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}`}>
+    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency ? ' shell--emergency' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
@@ -322,6 +401,17 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             );
           })}
         </div>
+        <details className="simulate-menu" ref={simulateMenu}>
+          <summary className="shell-button">Simulate</summary>
+          <div className="simulate-list" role="menu">
+            {demoScenarios.map(scenario => (
+              <button type="button" role="menuitem" key={scenario.hazard} onClick={() => { simulateMenu.current?.removeAttribute('open'); setHazardRoom(null); setHazardFloor(null); void hazard.open(scenario.spaceId, scenario.hazard); }}>
+                <i className={`hazard-dot hazard-dot--${scenario.hazard}`} /><span><strong>{scenario.hazard === 'fire' ? 'Fire' : 'Water leak'}</strong><em>{building.spaces.find(sp => sp.id === scenario.spaceId)?.name}</em></span>
+              </button>
+            ))}
+            <p>Or select any room on the model and pick Fire, Water or Power.</p>
+          </div>
+        </details>
         <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>
         <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>
         <button type="button" className="shell-account" onClick={() => setSheet('account')} aria-label={profile ? `Signed in as ${profile.name}. Switch account` : 'Sign in'}>{profile ? initials(profile.name) : 'Sign in'}</button>
@@ -329,58 +419,26 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />}
       </header>
 
-      <aside className="shell-side" aria-label="Building navigation">
-        <section>
-          <h2>Floors</h2>
-          <nav className="shell-floors" ref={floorList} aria-label="Floors">
-            <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }}>Whole building</button>
-            {[...floors].reverse().map(floor => (
-              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} hazard={hazardByFloor.get(floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
-            ))}
-          </nav>
-        </section>
-        <section>
-          <h2>View</h2>
-          <div className="shell-segmented" role="group" aria-label="Map style">
-            {(['blocks', 'detailed'] as const).map(option => <button type="button" key={option} aria-pressed={mapStyle === option} onClick={() => setMapStyle(option)}>{option === 'blocks' ? 'Blocks' : 'Detailed'}</button>)}
-          </div>
-        </section>
-        <section>
-          <h2>Incidents</h2>
-          {incidents.active.length ? (
-            <ul className="shell-list">
-              {incidents.active.map(incident => {
-                const space = building.spaces.find(s => s.id === incident.spaceId);
-                return (
-                  <li key={incident.id}>
-                    <button type="button" className={hazard.view?.incident?.id === incident.id ? 'active' : ''} onClick={() => openIncident(incident)}>
-                      <i className={`hazard-dot hazard-dot--${incident.hazard}`} /><span><strong>{hazardMeta[incident.hazard].label}</strong><em>{space?.name} · <Ago at={incident.createdAt} /></em></span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <p className="shell-empty">No active incidents.</p>}
-        </section>
-        <section>
-          <h2>Simulate</h2>
-          <ul className="shell-list">
-            {demoScenarios.map(scenario => (
-              <li key={scenario.hazard}>
-                <button type="button" className={hazard.view?.mode === 'simulation' && hazard.view.spaceId === scenario.spaceId ? 'active' : ''} onClick={() => { setHazardRoom(null); setHazardFloor(null); void hazard.open(scenario.spaceId, scenario.hazard); }}>
-                  <i className={`hazard-dot hazard-dot--${scenario.hazard}`} /><span><strong>{scenario.hazard === 'fire' ? 'Fire' : 'Water leak'}</strong><em>{building.spaces.find(s => s.id === scenario.spaceId)?.name}</em></span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="shell-hint">Or select any room on the model.</p>
-        </section>
-        {/* Credit where the licence asks for it (CC BY, ODbL); public-domain (CC0) plans need none. */}
-        {building.building.license !== 'CC0-1.0' && <footer className="shell-credit">{building.building.attribution} · {building.building.license}</footer>}
-      </aside>
 
       <section className="shell-main">
-        <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} mapStyle={mapStyle} onSelectRoom={setSelectedRoom} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        {!hazard.view && (directive.routes?.length || directive.highlights?.length || directive.markers?.length) ? (
+          <div className="answer-pill" role="status">
+            <span>{lastAnswerTitle ?? 'Answer on the map'}</span>
+            <button type="button" onClick={clearAnswer} aria-label="Clear from the map (Esc)">×</button>
+          </div>
+        ) : null}
+        {/* Floor picker on the model's edge (as in Google Maps indoors): short labels, live counts as badges. */}
+        <nav className="floor-picker" ref={floorList} aria-label="Floors">
+          <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }} aria-label="Whole building" title="Whole building">⌂</button>
+          {[...floors].reverse().map(floor => (
+            <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} hazard={hazardByFloor.get(floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
+          ))}
+        </nav>
+        <div className="view-switch" role="group" aria-label="Map style">
+          {(['blocks', 'detailed'] as const).map(option => <button type="button" key={option} aria-pressed={mapStyle === option} onClick={() => setMapStyle(option)}>{option === 'blocks' ? 'Blocks' : 'Detailed'}</button>)}
+        </div>
+        {building.building.license !== 'CC0-1.0' && <footer className="model-credit">{building.building.attribution} · {building.building.license}</footer>}
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
       </section>
 
@@ -413,6 +471,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
               )}
               <div className="shell-examples">
                 {suggestions.slice(0, 3).map(s => <button type="button" key={s.label} onClick={() => void ask(s.question)}>{s.question.replace(/ Finish with.*$/, '')}</button>)}
+                {/* One fixed cross-building example on every building: from N3 it just asks, from anywhere else it opens the campus and asks there. */}
+                <button type="button" className="shell-example--campus" onClick={() => {
+                  if (building.building.id === 'osm-way22744230') void ask(CAMPUS_TRIP.question);
+                  else router.push(`/?campus=stammgelaende&ask=${encodeURIComponent(CAMPUS_TRIP.question)}`);
+                }}>{CAMPUS_TRIP.question}</button>
               </div>
             </div>
           )}
@@ -423,7 +486,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                 : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
                     <AgentAvatar />
                     {message.response?.answer && (
-                      <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
+                      <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { showAnswer(message.response!); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
                         <span className="answer-title">{message.response.answer.title}</span>
                         {message.response.answer.value && <span className="answer-value">{message.response.answer.value}</span>}
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
@@ -450,7 +513,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                         active={activeStep?.startsWith(`${message.id}:`) ? activeStep.slice(`${message.id}:`.length) : undefined}
                         onStep={(step, key) => {
                           // Fly to the maneuver on its floor, keeping the route and labels of this answer.
-                          setDirective({ ...message.response!.scene, focus: { mode: 'floor', floorId: step.at.floorId, around: step.at.position } });
+                          setDirective({ ...message.response!.scene, ...(step.at.floorId ? { focus: { mode: 'floor' as const, floorId: step.at.floorId, around: step.at.position } } : {}) });
                           setActiveStep(`${message.id}:${key}`);
                         }}
                         onOverview={() => { setDirective(message.response!.scene); setActiveStep(undefined); }}
@@ -475,9 +538,28 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           {SHOW_MULTIPLAYER && (world && profile && mentionQuery(draft) !== undefined
             ? <MentionPicker players={world.players.filter(p => p.id !== profile.id)} draft={draft} onPick={text => { setDraft(text); input.current?.focus(); }} />
             : world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />)}
-          <form className="ask" onSubmit={submit}>
+          {contextChip && (
+            <div className="ask-actions" aria-label="Suggestions for the selection">
+              {contextChip.actions.map(action => (
+                <button type="button" key={action.label} onClick={() => {
+                  if (action.send) { void ask(action.message); return; }
+                  setDraft(action.message);
+                  requestAnimationFrame(() => { const el = input.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+                }}>{action.label}</button>
+              ))}
+            </div>
+          )}
+          <form className={`ask${contextChip ? ' ask--context' : ''}`} onSubmit={submit}>
+            {contextChip && (
+              <div className="ask-context">
+                <span className={`ask-chip ask-chip--${chatContext!.kind}`} title={contextChip.detail}>
+                  <i aria-hidden />{contextChip.label}<em>{contextChip.where}</em>
+                  <button type="button" onClick={() => setChatContext(null)} aria-label={`Remove ${contextChip.label} from the chat`}>×</button>
+                </span>
+              </div>
+            )}
             {SHOW_MULTIPLAYER && <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>}
-            <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={hazard.view ? 'Ask or coordinate…' : started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
+            <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={contextChip ? `Ask about this ${chatContext!.kind === 'opening' ? 'door' : chatContext!.kind === 'space' ? 'room' : 'object'}…` : hazard.view ? 'Ask or coordinate…' : started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
             <MicButton onTranscript={addTranscript} onError={setVoiceError} />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
           </form>
@@ -585,6 +667,7 @@ function withoutAnswerLine(reply: string) {
 
 /** Sentinel for the hazard view's floor: the whole building instead of one floor. */
 const ALL_FLOORS = '__all__';
+const noSubscribe = () => () => {};
 const ZERO_INSETS: SceneInsets = { top: 0, left: 0, bottom: 0, right: 0 };
 const STYLE_KEY = 'lf-scene-style';
 const styleListeners = new Set<() => void>();
@@ -597,6 +680,66 @@ function useMapStyle(): [SceneStyle, (style: SceneStyle) => void] {
   );
   const set = useCallback((next: SceneStyle) => { localStorage.setItem(STYLE_KEY, next); styleListeners.forEach(l => l()); }, []);
   return [style as SceneStyle, set];
+}
+
+/**
+ * While something is selected (a chip in the chat), answers about it keep the camera on it: a clarifying question or
+ * an edit doesn't jump back to the whole building, and after a move the camera follows it to where it went.
+ * Answers that show something else on purpose (a route, another room on another floor) keep their own view.
+ */
+function keepSelectionInView(response: ChatResponse, building: Building, context: { kind: 'asset' | 'opening' | 'space'; id: string }): SceneDirective {
+  const scene = response.scene;
+  const moved = (response.edits ?? []).map(e => e as { action?: string; asset_id?: string; opening_id?: string; position?: [number, number] })
+    .find(e => (e.action === 'move_door' && e.opening_id === context.id) || (e.action === 'move_asset' && e.asset_id === context.id));
+  let floorId: string | undefined, position: [number, number] | undefined;
+  if (context.kind === 'asset') {
+    const asset = building.assets.find(a => a.id === context.id);
+    floorId = asset?.floor_id; position = moved?.position ?? asset?.position;
+  } else if (context.kind === 'opening') {
+    const opening = building.openings.find(o => o.id === context.id);
+    floorId = opening?.floor_id; position = moved?.position ?? opening?.position;
+  } else {
+    const space = building.spaces.find(sp => sp.id === context.id);
+    floorId = space?.floor_id;
+    if (space) position = [space.polygon.reduce((a, p) => a + p[0], 0) / space.polygon.length, space.polygon.reduce((a, p) => a + p[1], 0) / space.polygon.length];
+  }
+  if (!floorId || !position) return scene;
+  const ownView = Boolean(scene.routes?.length) || (scene.focus.mode === 'floor' && scene.focus.floorId !== floorId && !response.edits?.length);
+  if (ownView) return scene;
+  return { ...scene, focus: { mode: 'floor', floorId, around: position } };
+}
+
+/** The chat chip for a selection: what it is, where, and the edits that make sense for it. */
+function describeContext(building: Building, context: { kind: 'asset' | 'opening' | 'space'; id: string }) {
+  const spaceName = (id: string) => building.spaces.find(s => s.id === id)?.name ?? (id === 'outside' ? 'outside' : id);
+  if (context.kind === 'asset') {
+    const asset = building.assets.find(a => a.id === context.id);
+    if (!asset) return null;
+    return {
+      label: asset.name, where: spaceName(asset.space_id), detail: `${asset.type.replaceAll('_', ' ')} · ${asset.category}`,
+      actions: [
+        { label: 'Move it to…', message: 'Move this to ', send: false },
+        { label: 'What is it used for?', message: 'What is this and which room is it in?', send: true },
+        { label: 'Nearest exit from here', message: 'What is the nearest way out from where this is?', send: true },
+      ],
+    };
+  }
+  if (context.kind === 'opening') {
+    const opening = building.openings.find(o => o.id === context.id);
+    if (!opening) return null;
+    const [a, b] = opening.space_ids.map(spaceName);
+    return {
+      label: opening.kind === 'entrance' ? 'Entrance' : opening.kind === 'opening' ? 'Opening' : 'Door', where: `${a} ↔ ${b}`,
+      detail: `${opening.width_m.toFixed(2)} m wide · ${opening.step_free ? 'step-free' : 'with a step'}`,
+      actions: [
+        { label: 'Close this door', message: 'Close this door.', send: true },
+        { label: 'Reopen it', message: 'Reopen this door.', send: true },
+        { label: 'Set width…', message: 'Make this door ', send: false },
+      ],
+    };
+  }
+  const space = building.spaces.find(s => s.id === context.id);
+  return space ? { label: space.name, where: building.floors.find(f => f.id === space.floor_id)?.name ?? '', detail: space.room_type, actions: [] } : null;
 }
 
 /** Two ready-made simulations for the start screen, picked from the building's own rooms (works on any building). */
@@ -628,14 +771,6 @@ function useFade(since?: number) {
     return () => cancelAnimationFrame(frame);
   }, [since]);
   return since ? Math.max(0, 1 - (now - since) / 1000) : 1;
-}
-
-/** "2 min ago", refreshed every 20 s. */
-function Ago({ at }: { at: number }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 20_000); return () => clearInterval(timer); }, []);
-  const minutes = Math.max(0, Math.round((now - at) / 60_000));
-  return <>{minutes < 1 ? 'just now' : `${minutes} min ago`}</>;
 }
 
 /** Live incidents count as alerts on the floor rail. */

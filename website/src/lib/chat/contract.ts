@@ -33,6 +33,8 @@ export interface ChatRequest {
   skillId?: string;
   /** The room the player picked as "I'm here" (no GPS indoors). */
   location?: string;
+  /** What is selected on the model and shown as a chip in the chat: "this", "it", "this door" refer to it. */
+  selection?: { kind: 'asset' | 'opening' | 'space'; id: string; view_right?: [number, number] };
 }
 
 /** A world change the agent suggests. Shown as a preview card; nothing is written until the user taps Confirm (U8). */
@@ -67,8 +69,11 @@ export interface ChatResponse {
   proposals?: Proposal[];
 }
 
-/** A point on a specific floor, in building metres (Y up). */
-export interface FloorPoint { floorId: string; position: Point }
+/**
+ * A point on a specific floor, in building metres (Y up). `floorId` null means a point on the campus
+ * ground between buildings, in campus-frame metres (cross-building routes).
+ */
+export interface FloorPoint { floorId: string | null; position: Point }
 
 /** One maneuver in turn-by-turn directions, Google Maps style. */
 export interface RouteStep {
@@ -96,7 +101,9 @@ export type SceneFocus =
    */
   | { mode: 'stack'; floorIds: string[]; spacing?: 'spread' | 'true' }
   /** The whole building as glass at real heights, with `floorIds` drawn solid and opened up (emergency views). */
-  | { mode: 'xray'; floorIds: string[] };
+  | { mode: 'xray'; floorIds: string[] }
+  /** Several buildings placed on one campus frame (cross-building routes); members carry their offsets in metres. */
+  | { mode: 'campus'; members: { buildingId: string; name?: string; offset: [number, number]; source?: string }[] };
 
 export type Tone = 'primary' | 'secondary' | 'muted';
 
@@ -115,7 +122,7 @@ export interface SceneDirective {
    * scores) and drives the step list. `points` is the drawn polyline; if omitted, the API fills it in from
    * `spacePath` with the walking model (lib/buildings/walk.ts). Points on different floors draw a vertical hop.
    */
-  routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string }[];
+  routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string; outdoor?: boolean }[];
   /** Straight 3D lines, e.g. sensor links between room centroids. `breakdown` also draws the across and up legs (dashed). */
   links?: { from: FloorPoint; to: FloorPoint; label?: string; breakdown?: boolean }[];
   /** Asset ids to light up (their footprint boxes turn orange). */

@@ -4,6 +4,7 @@
 
 import base64
 import csv
+import functools
 import json
 import os
 import re
@@ -23,6 +24,7 @@ from lostfound.ingest.verify import summary as issue_summary
 from lostfound.ingest.verify import verify
 from lostfound.core import directions
 from lostfound.core.building import Building, MapError
+from lostfound.core.campus import Catalog
 from lostfound.core.resolve import Resolver
 from lostfound.evals.variants import MODELS
 
@@ -46,6 +48,12 @@ def building_directories() -> dict[str, Path]:
 def building_directory(building_id: str) -> Path | None:
     """Dataset buildings ship with the agent; uploaded ones are fetched from Supabase Storage on first use."""
     return building_directories().get(building_id) or storage.cached_directory(building_id)
+
+
+@functools.lru_cache(maxsize=1)
+def catalog() -> Catalog:
+    """Every servable building, for cross-building questions (chat only; nothing else changes)."""
+    return Catalog(building_directories())
 
 
 def load(building_id: str) -> Building:
@@ -165,7 +173,7 @@ def chat(request: ChatRequest) -> dict:
     session_id = request.session_id or uuid.uuid4().hex
     if session_id not in SESSIONS:
         config = AgentConfig(design="chat", model=MODELS.get(request.model, request.model), effort=request.effort)
-        SESSIONS[session_id] = ChatSession(load(request.building_id), config)
+        SESSIONS[session_id] = ChatSession(load(request.building_id), config, catalog=catalog())
     session = SESSIONS[session_id]
     if session.building.id != request.building_id:
         raise HTTPException(400, "Session belongs to another building.")
@@ -183,6 +191,8 @@ class UIChatRequest(BaseModel):
     # from this (the reply text is kept; edits made in a lost session are not replayed).
     history: list[dict] = []
     location: str | None = None  # the room the person picked as "I'm here"
+    # What the person selected on the model (a chip in the chat): {"kind": "asset" | "opening" | "space", "id": "..."}.
+    selection: dict | None = None
     model: str = DEFAULT_CHAT_MODEL
     effort: str = "low"
 
@@ -193,13 +203,13 @@ def ui_chat(request: UIChatRequest) -> dict:
     session_id = request.sessionId or uuid.uuid4().hex
     if session_id not in SESSIONS:
         config = AgentConfig(design="chat", model=MODELS.get(request.model, request.model), effort=request.effort)
-        SESSIONS[session_id] = ChatSession(load(request.buildingId), config)
+        SESSIONS[session_id] = ChatSession(load(request.buildingId), config, catalog=catalog())
         SESSIONS[session_id].seed_history(request.history)
     session = SESSIONS[session_id]
     if session.building.id != request.buildingId:
         raise HTTPException(400, "Session belongs to another building.")
     session.set_world_closures(request.closed)
-    turn = session.ask(request.message, request.location)
+    turn = session.ask(request.message, request.location, request.selection)
     ui = turn["ui"]
     return {
         "kind": ui["kind"],
@@ -232,7 +242,7 @@ def edit(request: EditRequest) -> dict:
     """Direct edits from UI controls (no LLM); they apply to the chat session's copy of the building."""
     if request.session_id not in SESSIONS:
         config = AgentConfig(design="chat")
-        SESSIONS[request.session_id] = ChatSession(load(request.building_id), config)
+        SESSIONS[request.session_id] = ChatSession(load(request.building_id), config, catalog=catalog())
     toolbox = SESSIONS[request.session_id].toolbox
     try:
         match request.action:

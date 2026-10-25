@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import type { ThreeEvent } from '@react-three/fiber';
 import type { Asset, Opening, Point, Space } from '@/lib/buildings/types';
 import type { BuildingModel, FloorModel } from './scene-model';
 
@@ -217,7 +218,15 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
 }
 
 /** Door thresholds: a coloured strip across the wall, green for entrances, amber where there is a step. */
-export function Doors({ doors }: { doors: DoorMarker[] }) {
+/** Pick handler for objects on the model: an asset or an opening (door) by id. */
+export type PickObject = (kind: 'asset' | 'opening', id: string, event: ThreeEvent<MouseEvent>) => void;
+const selectedColor = new THREE.Color('#f26a1b');
+const pointer = (on: boolean) => () => { document.body.style.cursor = on ? 'pointer' : ''; };
+// Explicit functions: switching a mesh's raycast back from "off" needs the real method, not undefined.
+const instancedRaycast = THREE.InstancedMesh.prototype.raycast;
+const noRaycast = () => null;
+
+export function Doors({ doors, selected, onPick }: { doors: DoorMarker[]; selected?: string | null; onPick?: PickObject }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -226,16 +235,20 @@ export function Doors({ doors }: { doors: DoorMarker[] }) {
     doors.forEach((door, i) => {
       matrix.compose(new THREE.Vector3(door.x, 0.02, door.z), rotation.setFromAxisAngle(up, door.angle), new THREE.Vector3(Math.max(door.width, 0.6), 1, 1));
       mesh.setMatrixAt(i, matrix);
-      mesh.setColorAt(i, color.set(door.color));
+      mesh.setColorAt(i, door.id === selected ? selectedColor : color.set(door.color));
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [doors]);
+  }, [doors, selected]);
   if (!doors.length) return null;
   return (
-    <instancedMesh key={doors.length} ref={ref} args={[undefined, undefined, doors.length]} raycast={() => null} renderOrder={3}>
-      <boxGeometry args={[1, 0.03, 0.3]} />
+    <instancedMesh key={doors.length} ref={ref} args={[undefined, undefined, doors.length]} renderOrder={3}
+      raycast={onPick ? instancedRaycast : noRaycast}
+      onClick={onPick ? event => { if (event.instanceId == null) return; event.stopPropagation(); onPick('opening', doors[event.instanceId].id, event); } : undefined}
+      onPointerOver={onPick ? pointer(true) : undefined} onPointerOut={onPick ? pointer(false) : undefined}>
+      {/* A little taller than it looks, so a door is easy to click. */}
+      <boxGeometry args={[1, 0.12, 0.45]} />
       <meshBasicMaterial toneMapped={false} transparent opacity={0.45} depthWrite={false} />
     </instancedMesh>
   );
@@ -369,7 +382,7 @@ function modelMatrix(asset: Asset, storey: number, toWorld: BuildingModel['toWor
 const boxGrey = new THREE.Color('#c9d0db'), lit = new THREE.Color('#f26a1b');
 
 /** A floor's furniture as 3D models where one exists, boxes otherwise; the answer's items turn orange. */
-export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: FloorModel; toWorld: BuildingModel['toWorld']; models: Map<string, AssetModel>; litAssets: Set<string> }) {
+export function DetailedAssets({ floor, toWorld, models, litAssets, onPick }: { floor: FloorModel; toWorld: BuildingModel['toWorld']; models: Map<string, AssetModel>; litAssets: Set<string>; onPick?: PickObject }) {
   const byType = useMemo(() => {
     const groups = new Map<string, Asset[]>();
     for (const asset of floor.assets) if (models.has(asset.type)) groups.set(asset.type, [...(groups.get(asset.type) ?? []), asset]);
@@ -378,7 +391,7 @@ export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: F
   const boxes = useMemo(() => floor.assets.filter(asset => !models.has(asset.type)), [floor.assets, models]);
   return <>
     {boxes.length > 0 && (
-      <Instances assets={boxes} litAssets={litAssets} base={boxGrey} matrixFor={(asset, m) => boxMatrix(asset, floor.storey, toWorld, m)}>
+      <Instances assets={boxes} litAssets={litAssets} onPick={onPick} base={boxGrey} matrixFor={(asset, m) => boxMatrix(asset, floor.storey, toWorld, m)}>
         <boxGeometry />
         <meshStandardMaterial roughness={0.8} />
       </Instances>
@@ -386,15 +399,16 @@ export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: F
     {[...byType].flatMap(([type, items]) => {
       const model = models.get(type)!;
       return model.parts.map((part, i) => (
-        <Instances key={`${type}-${i}`} assets={items} litAssets={litAssets} base={modelTint(type)} geometry={part.geometry} material={part.material} matrixFor={(asset, m) => modelMatrix(asset, floor.storey, toWorld, model.size, m)} />
+        <Instances key={`${type}-${i}`} assets={items} litAssets={litAssets} onPick={onPick} base={modelTint(type)} geometry={part.geometry} material={part.material} matrixFor={(asset, m) => modelMatrix(asset, floor.storey, toWorld, model.size, m)} />
       ));
     })}
   </>;
 }
 
-function Instances({ assets, litAssets, base, matrixFor, geometry, material, children }: {
+function Instances({ assets, litAssets, onPick, base, matrixFor, geometry, material, children }: {
   assets: Asset[];
   litAssets: Set<string>;
+  onPick?: PickObject;
   base: THREE.Color;
   matrixFor: (asset: Asset, matrix: THREE.Matrix4) => THREE.Matrix4;
   geometry?: THREE.BufferGeometry;
@@ -415,7 +429,10 @@ function Instances({ assets, litAssets, base, matrixFor, geometry, material, chi
     mesh.computeBoundingSphere();
   });
   return (
-    <instancedMesh key={assets.length} ref={ref} args={[geometry, material, assets.length]} castShadow receiveShadow raycast={() => null}>
+    <instancedMesh key={assets.length} ref={ref} args={[geometry, material, assets.length]} castShadow receiveShadow
+      raycast={onPick ? instancedRaycast : noRaycast}
+      onClick={onPick ? event => { if (event.instanceId == null) return; event.stopPropagation(); onPick('asset', assets[event.instanceId].id, event); } : undefined}
+      onPointerOver={onPick ? pointer(true) : undefined} onPointerOut={onPick ? pointer(false) : undefined}>
       {children}
     </instancedMesh>
   );

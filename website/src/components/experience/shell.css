@@ -68,6 +68,8 @@
 .shell-examples { display: flex; flex-direction: column; gap: 6px; }
 .shell-examples button { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-align: left; font-size: 13px; color: var(--ink); line-height: 1.35; }
 .shell-examples button:hover { border-color: var(--ink); }
+/* The fixed cross-building example (fourth chip): a hint of the petrol primary marks it as the campus trip. */
+.shell-examples button.shell-example--campus { border-style: dashed; border-color: var(--ink); }
 .shell-ask { padding: 12px; border-top: 1px solid var(--line); }
 .shell .ask { box-shadow: none; }
 .shell-ask .voice-error { margin: 6px 4px 0; }
@@ -276,3 +278,197 @@
   .incident-toast { top: 56px; }
   .shell .room-card { left: 8px !important; right: 8px; top: 8px !important; width: auto; }
 }
+
+/* B-roll for the pitch video: the model alone, full frame. */
+.shell.shell--broll { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "main"; }
+.shell--broll .shell-top, .shell--broll .shell-side, .shell--broll .shell-panel, .shell--broll .hazard-playback, .shell--broll .incident-toast, .shell--broll .sheet, .shell--broll .sheet-backdrop { display: none !important; }
+
+/* Selection as chat context: a chip in the question bar, quick actions above it */
+.ask.ask--context { flex-wrap: wrap; row-gap: 4px; padding-top: 6px; }
+.ask-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 26px; padding: 0 4px 0 8px; border: 1px solid var(--primary); border-radius: var(--radius); background: var(--primary-soft); font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.ask-chip i { width: 8px; height: 8px; border-radius: 1px; background: #f26a1b; flex: none; }
+.ask-chip--opening i { background: var(--primary); }
+.ask-chip em { font-style: normal; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.ask .ask-chip button { width: 20px; height: 20px; border-radius: 2px; background: transparent; color: var(--muted); font-size: 14px; line-height: 1; }
+.ask .ask-chip button:hover { background: rgba(0, 20, 40, .08); color: var(--ink); }
+.ask-context { flex: 0 0 100%; display: flex; }
+.ask-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ask-actions button { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; font-size: 12px; font-weight: 500; color: var(--primary); }
+.ask-actions button:hover { border-color: var(--primary); }
+
+/* ==========================================================================
+   Emergency mode: a live incident is open. Dark surfaces, vivid accents, a red signal line under the header,
+   so the switch from "all normal" to "something is happening" registers at a glance.
+   ========================================================================== */
+.shell--emergency {
+  --ink: #f2f5f9; --text: #dfe6ee; --muted: #8e9aab; --line: #263142; --paper: #0b1018; --surface-2: #1b2433;
+  --primary: #22d3ee; --primary-hover: #67e8f9; --primary-soft: rgba(34, 211, 238, .14);
+  --alarm: #ff3b4e; --warning: #ffc21a; --success: #3ddc84; --shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  background: var(--paper); color: var(--text);
+}
+.shell--emergency .shell-top { background: #0f1520; box-shadow: 0 1px 0 var(--line), 0 2px 0 var(--alarm); }
+.shell--emergency .shell-top .brand::before { background-color: var(--alarm); }
+.shell--emergency .shell-side, .shell--emergency .shell-panel { background: #0f1520; border-color: var(--line); }
+.shell--emergency .shell-building, .shell--emergency .shell-segmented, .shell--emergency .shell-lamp, .shell--emergency .shell-examples button,
+.shell--emergency .hz-floors button, .shell--emergency .ask-actions button, .shell--emergency .hazard-secondary, .shell--emergency .shell-account {
+  background: #141c2a; border-color: var(--line); color: var(--ink);
+}
+.shell--emergency .shell-button { background: transparent; border-color: var(--primary); color: var(--primary); }
+.shell--emergency .shell-button--primary { background: var(--alarm); border-color: var(--alarm); color: #fff; }
+.shell--emergency .shell-floors button.active, .shell--emergency .shell-list button.active { background: rgba(255, 59, 78, .14); border-left-color: var(--alarm); color: var(--ink); }
+.shell--emergency .shell-floors button:hover, .shell--emergency .shell-list button:hover { background: #141c2a; }
+.shell--emergency .shell-segmented button[aria-pressed="true"] { background: var(--primary); color: #04131a; }
+.shell--emergency .hazard-panel, .shell--emergency .hazard-head, .shell--emergency .hz-section, .shell--emergency .hazard-tabs { background: #0f1520; border-color: var(--line); }
+.shell--emergency .hz-key { background: #141c2a; border-color: var(--line); border-left-color: var(--primary); }
+.shell--emergency .hz-facts > div { border-top-color: #1a2330; }
+.shell--emergency .hz-fixed { background: rgba(61, 220, 132, .14); color: var(--success); }
+.shell--emergency .hazard-run { background: var(--alarm); color: #fff; }
+.shell--emergency .hazard-run:hover { background: #ff5c6c; }
+.shell--emergency .hazard-close { background: transparent; border-color: var(--line); color: var(--muted); }
+.shell--emergency .shell-main .hazard-playback { background: #0f1520; border-top-color: var(--line); }
+.shell--emergency .hazard-playback .hazard-play { background: var(--alarm); }
+.shell--emergency .hazard-timeline input { accent-color: var(--alarm); }
+.shell--emergency .ask { background: #141c2a; border-color: var(--line); }
+.shell--emergency .ask input { color: var(--ink); }
+.shell--emergency .ask-chip { background: rgba(34, 211, 238, .12); border-color: var(--primary); color: var(--ink); }
+.shell--emergency .bubble--user { background: #1b2433; color: var(--ink); }
+.shell--emergency .answer-card { background: #141c2a; border-color: var(--line); }
+.shell--emergency .reply, .shell--emergency .bubble--assistant p { color: var(--text); }
+.shell--emergency .reply strong { color: var(--ink); }
+.shell--emergency .room-card, .shell--emergency .scene-tip { background: #141c2a; border-color: var(--line); color: var(--text); }
+.shell--emergency .room-card strong, .shell--emergency .scene-tip strong { color: var(--ink); }
+.shell--emergency .room-card-actions .room-card-secondary { background: transparent; color: var(--ink); border-color: var(--line); }
+.shell--emergency .incident-toast { background: #141c2a; border-color: var(--line); border-left-color: var(--alarm); }
+.shell--emergency .incident-toast strong { color: var(--ink); }
+.shell--emergency .shell-lamp.is-lit { box-shadow: 0 0 14px currentColor; animation: alarm-pulse 1.2s infinite; }
+.shell--emergency .shell-lamp--fire.is-lit { color: #fff; background: var(--alarm); box-shadow: 0 0 16px rgba(255, 59, 78, .7); }
+.shell--emergency .shell-lamp--water.is-lit { color: #fff; background: #2f8bff; box-shadow: 0 0 16px rgba(47, 139, 255, .7); }
+.shell--emergency .shell-lamp--electrical.is-lit { color: #1a1200; background: var(--warning); box-shadow: 0 0 16px rgba(255, 194, 26, .7); }
+.shell--emergency .floor-hazard--fire { background: var(--alarm); }
+.shell--emergency .floor-hazard--water { background: #2f8bff; }
+.shell--emergency .shell-credit { color: var(--muted); }
+
+/* ==========================================================================
+   Design language after ChatGPT: soft neutral surfaces without hard borders, a grey sidebar with rounded rows,
+   plain assistant text and soft user bubbles, a large rounded composer, black pill buttons, generous spacing.
+   (Emergency mode further down the cascade keeps its dark palette.)
+   ========================================================================== */
+.shell:not(.shell--emergency) {
+  --ink: #0d0d0d; --text: #1f1f1f; --muted: #6b6b6b; --line: #ececec; --paper: #ffffff; --surface-2: #f4f4f4;
+  --primary: #0d0d0d; --primary-hover: #2f2f2f; --primary-soft: #f0f0f0; --radius: 12px;
+  font-family: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #ffffff;
+}
+.shell:not(.shell--emergency) .shell-top { background: #ffffff; box-shadow: none; border-bottom: 1px solid #f0f0f0; padding-right: 14px; }
+.shell:not(.shell--emergency) .shell-top .brand { border-right: 0; padding-right: 6px; }
+.shell:not(.shell--emergency) .shell-top .brand::before { width: 34px; height: 34px; margin: 0 10px 0 14px; border-radius: 10px; background-color: #0d0d0d; background-size: 18px; }
+.shell:not(.shell--emergency) .shell-top .brand span { font-weight: 600; font-size: 15px; }
+.shell:not(.shell--emergency) .shell-top .brand span::after { display: none; }
+.shell:not(.shell--emergency) .shell-building { border: 0; border-radius: 10px; font-weight: 600; font-size: 15px; }
+.shell:not(.shell--emergency) .shell-building:hover { background: #f4f4f4; }
+.shell:not(.shell--emergency) .shell-button { height: 36px; padding: 0 16px; border: 1px solid #e5e5e5; border-radius: 999px; background: #fff; color: #0d0d0d; font-weight: 500; }
+.shell:not(.shell--emergency) .shell-button:hover { background: #f4f4f4; border-color: #e5e5e5; }
+.shell:not(.shell--emergency) .shell-button--primary { background: #0d0d0d; border-color: #0d0d0d; color: #fff; }
+.shell:not(.shell--emergency) .shell-button--primary:hover { background: #2f2f2f; }
+.shell:not(.shell--emergency) .shell-lamp { height: 32px; border: 0; border-radius: 999px; background: #f4f4f4; font-weight: 500; }
+.shell:not(.shell--emergency) .shell-lamp i { border-radius: 50%; }
+.shell:not(.shell--emergency) .shell-account { width: 34px; height: 34px; background: #e8e3fb; color: #5b45c7; font-weight: 600; }
+
+.shell:not(.shell--emergency) .shell-side { background: #f9f9f9; border-right: 0; padding: 14px 10px; gap: 22px; }
+.shell:not(.shell--emergency) .shell-side h2 { margin: 0 10px 6px; font-size: 13px; font-weight: 500; color: #8f8f8f; }
+.shell:not(.shell--emergency) .shell-floors button, .shell:not(.shell--emergency) .shell-list button { border-left: 0; border-radius: 10px; padding-left: 10px; min-height: 38px; font-size: 14px; }
+.shell:not(.shell--emergency) .shell-floors button:hover, .shell:not(.shell--emergency) .shell-list button:hover { background: #ececec; }
+.shell:not(.shell--emergency) .shell-floors button.active, .shell:not(.shell--emergency) .shell-list button.active { background: #e8e8e8; color: #0d0d0d; font-weight: 500; }
+.shell:not(.shell--emergency) .shell-segmented { margin: 0 6px; border: 0; border-radius: 999px; background: #ececec; padding: 3px; }
+.shell:not(.shell--emergency) .shell-segmented button { border-radius: 999px; height: 30px; font-weight: 500; color: #6b6b6b; }
+.shell:not(.shell--emergency) .shell-segmented button[aria-pressed="true"] { background: #fff; color: #0d0d0d; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.shell:not(.shell--emergency) .shell-empty, .shell:not(.shell--emergency) .shell-hint { margin: 0 10px; color: #8f8f8f; }
+
+.shell:not(.shell--emergency) .shell-panel { border-left: 1px solid #f0f0f0; }
+.shell:not(.shell--emergency) .shell-chat { padding: 20px 20px 12px; }
+.shell:not(.shell--emergency) .shell-intro h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.shell:not(.shell--emergency) .shell-examples { gap: 8px; }
+.shell:not(.shell--emergency) .shell-examples button { border: 1px solid #ececec; border-radius: 16px; padding: 12px 14px; color: #1f1f1f; font-size: 14px; }
+.shell:not(.shell--emergency) .shell-examples button:hover { background: #f9f9f9; border-color: #e0e0e0; color: #0d0d0d; }
+.shell:not(.shell--emergency) .bubble--user { margin-left: auto; padding: 10px 16px; border-radius: 22px; background: #f4f4f4; color: #0d0d0d; font-size: 15px; }
+.shell:not(.shell--emergency) .reply, .shell:not(.shell--emergency) .bubble--assistant p { font-size: 15px; line-height: 1.65; color: #0d0d0d; }
+.shell:not(.shell--emergency) .answer-card { border: 1px solid #ececec; border-left: 1px solid #ececec; border-radius: 16px; background: #fff; }
+.shell:not(.shell--emergency) .answer-card::before { content: ""; display: block; width: 6px; height: 6px; margin-bottom: 6px; border-radius: 50%; background: #f26a1b; }
+.shell:not(.shell--emergency) .answer-actions button, .shell:not(.shell--emergency) .directions-overview { border-radius: 999px; }
+
+.shell:not(.shell--emergency) .shell-ask { padding: 10px 14px 16px; border-top: 0; }
+.shell:not(.shell--emergency) .ask { min-height: 56px; padding: 8px 8px 8px 18px; border: 1px solid #e5e5e5; border-radius: 26px; background: #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, .06); }
+.shell:not(.shell--emergency) .ask input { font-size: 15px; }
+.shell:not(.shell--emergency) .ask button[type="submit"] { width: 36px; height: 36px; border-radius: 50%; background: #0d0d0d; }
+.shell:not(.shell--emergency) .ask button[type="submit"]:disabled { background: #d7d7d7; }
+.shell:not(.shell--emergency) .ask .mic-button { border-radius: 50%; }
+.shell:not(.shell--emergency) .ask-chip { border: 0; border-radius: 999px; background: #f0f0f0; padding: 0 6px 0 10px; }
+.shell:not(.shell--emergency) .ask-actions button { border: 1px solid #ececec; border-radius: 999px; color: #0d0d0d; }
+.shell:not(.shell--emergency) .ask-actions button:hover { background: #f4f4f4; }
+
+.shell:not(.shell--emergency) .hazard-head { border-bottom: 0; padding: 18px 20px 6px; }
+.shell:not(.shell--emergency) .hazard-head h2 { font-size: 19px; font-weight: 600; }
+.shell:not(.shell--emergency) .hazard-close { border: 0; border-radius: 50%; background: #f4f4f4; }
+.shell:not(.shell--emergency) .hazard-tabs { border-bottom: 0; gap: 4px; padding: 6px 16px 4px; }
+.shell:not(.shell--emergency) .hazard-tabs button { flex: none; padding: 6px 12px; border: 0; border-radius: 999px; }
+.shell:not(.shell--emergency) .hazard-tabs button[aria-selected="true"] { background: #f0f0f0; color: #0d0d0d; }
+.shell:not(.shell--emergency) .hz-section { margin: 8px 16px; padding: 14px 16px; border: 1px solid #f0f0f0; border-radius: 16px; }
+.shell:not(.shell--emergency) .hz-key { border: 0; border-radius: 12px; background: #f6f6f6; }
+.shell:not(.shell--emergency) .hazard-foot { border-top: 0; padding: 12px 16px 14px; }
+.shell:not(.shell--emergency) .hazard-run { border-radius: 999px; background: #0d0d0d; }
+.shell:not(.shell--emergency) .hazard-secondary { border-radius: 999px; border-color: #e5e5e5; color: #0d0d0d; }
+.shell:not(.shell--emergency) .hz-floors button { border-radius: 999px; color: #0d0d0d; }
+.shell:not(.shell--emergency) .shell-main .hazard-playback { border-top: 1px solid #f0f0f0; }
+.shell:not(.shell--emergency) .hazard-playback .hazard-play { border-radius: 50%; background: #0d0d0d; }
+.shell:not(.shell--emergency) .room-card { border: 0; border-radius: 16px; box-shadow: 0 8px 28px rgba(0, 0, 0, .12); }
+.shell:not(.shell--emergency) .room-card-actions button { border-radius: 999px; }
+.shell:not(.shell--emergency) .scene-label { border-radius: 999px; }
+.shell:not(.shell--emergency) .incident-toast { border-radius: 16px; border-left-width: 1px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14); }
+.sheet { border-radius: 20px 20px 0 0; }
+@media (min-width: 900px) { .sheet { border-radius: 20px; } }
+
+/* ==========================================================================
+   No fixed left column: floors as a slim picker on the model's edge (Google Maps indoors), the map style as a
+   small switch in its corner, scenarios in a header menu. The model gets the full width.
+   ========================================================================== */
+.shell { grid-template-columns: minmax(0, 1fr) 400px; grid-template-areas: "top top" "main panel"; }
+.shell-side { display: none; }
+.floor-picker { position: absolute; z-index: 3; right: 14px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 2px; padding: 4px; max-height: calc(100% - 120px); overflow-y: auto; scrollbar-width: none; border-radius: 16px; background: rgba(255, 255, 255, .94); box-shadow: 0 4px 18px rgba(0, 0, 0, .12); }
+.floor-picker button { position: relative; min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 12px; background: none; font-size: 13px; font-weight: 600; color: #3d3d3d; }
+.floor-picker button:hover { background: #f1f1f1; }
+.floor-picker button.active { background: #0d0d0d; color: #fff; }
+.floor-picker .floor-button-name { display: none; }
+.floor-picker .floor-button-short { display: inline; }
+.floor-picker .floor-hazard, .floor-picker .floor-badge { position: absolute; top: 2px; right: -4px; min-width: 16px; height: 16px; margin: 0; padding: 0 4px; border-radius: 999px; font-size: 10px; line-height: 16px; box-shadow: 0 0 0 2px #fff; }
+.view-switch { position: absolute; z-index: 3; left: 14px; bottom: 14px; display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, .94); box-shadow: 0 4px 18px rgba(0, 0, 0, .12); }
+.experience--hazard .view-switch { bottom: 84px; }
+.view-switch button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; font-size: 13px; font-weight: 500; color: #6b6b6b; }
+.view-switch button[aria-pressed="true"] { background: #0d0d0d; color: #fff; }
+.model-credit { position: absolute; z-index: 2; right: 14px; bottom: 8px; max-width: 50%; font-size: 10px; color: #6b6b6b; text-align: right; }
+.experience--hazard .model-credit { bottom: 78px; }
+.simulate-menu { position: relative; }
+.simulate-menu summary { list-style: none; display: inline-flex; align-items: center; cursor: pointer; }
+.simulate-menu summary::-webkit-details-marker { display: none; }
+.simulate-menu summary::after { content: "▾"; margin-left: 6px; font-size: 10px; color: #8f8f8f; }
+.simulate-list { position: absolute; right: 0; top: 42px; z-index: 30; width: 270px; padding: 6px; border-radius: 16px; background: #fff; box-shadow: 0 12px 32px rgba(0, 0, 0, .16); }
+.simulate-list button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px; background: none; text-align: left; }
+.simulate-list button:hover { background: #f4f4f4; }
+.simulate-list .hazard-dot { flex: none; width: 8px; height: 8px; margin-top: 6px; }
+.simulate-list span { display: flex; flex-direction: column; }
+.simulate-list strong { font-size: 14px; font-weight: 600; color: #0d0d0d; }
+.simulate-list em { font-style: normal; font-size: 12px; color: #6b6b6b; }
+.simulate-list p { margin: 4px 10px 6px; font-size: 12px; color: #8f8f8f; }
+.shell--emergency .floor-picker, .shell--emergency .view-switch, .shell--emergency .simulate-list { background: rgba(15, 21, 32, .94); }
+.shell--emergency .floor-picker button { color: #dfe6ee; }
+.shell--emergency .floor-picker button.active, .shell--emergency .view-switch button[aria-pressed="true"] { background: #ff3b4e; color: #fff; }
+.shell--emergency .simulate-list strong { color: #f2f5f9; }
+@media (max-width: 899px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) auto; grid-template-areas: "top" "main" "panel"; }
+  .floor-picker { right: 8px; top: 8px; transform: none; max-height: calc(100% - 70px); }
+  .view-switch { left: 8px; bottom: 8px; }
+  .simulate-menu { display: none; }
+}
+.answer-pill { position: absolute; z-index: 3; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: 70%; height: 36px; padding: 0 6px 0 16px; border-radius: 999px; background: rgba(255, 255, 255, .96); box-shadow: 0 4px 18px rgba(0, 0, 0, .12); font-size: 13px; font-weight: 500; color: #0d0d0d; }
+.answer-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.answer-pill button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: #f0f0f0; font-size: 15px; line-height: 1; color: #3d3d3d; }
+.answer-pill button:hover { background: #e4e4e4; }

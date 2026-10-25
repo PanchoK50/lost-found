@@ -1,0 +1,10 @@
+{
+ "id": "stammgelaende",
+ "name": "TUM Stammgelände",
+ "note": "N3 and N8 are real neighbours on the TUM main campus (Arcisstraße, Munich); the offset is the real displacement between their OSM centroids (≈134 m east, 52 m south, 144 m apart). Local plan frames may not preserve north, so the bearing is approximate — the distance is not.",
+ "members": [
+  { "building_id": "osm-way22744230", "offset": [0, 0], "geo": { "lat": 48.15112, "lon": 11.56774 } },
+  { "building_id": "osm-way43035346", "offset": [134, -52], "geo": { "lat": 48.15065, "lon": 11.56955 } }
+ ],
+ "walkways": []
+}
