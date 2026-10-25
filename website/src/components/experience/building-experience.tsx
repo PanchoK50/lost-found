@@ -129,7 +129,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const hideDemo = settings?.demoPlayers === false;
   const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings' | 'damage' | 'readiness'>();
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings' | 'add-building' | 'damage' | 'readiness'>();
   // Emergencies: a what-if simulation or a live incident, shown on the map with its side panel.
   const hazard = useHazard(building);
   const incidents = useIncidents(building.building.id);
@@ -453,7 +453,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency && !brigade ? ' shell--emergency' : ''}${brigade ? ' shell--brigade' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
-        <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
+        <button type="button" className="shell-add-building" onClick={() => setSheet('add-building')} aria-label="Add a building" title="Add a building">+</button>
+        <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another`}>
           {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}<span aria-hidden>▾</span>
         </button>
         <span className="shell-spacer" />
@@ -676,6 +677,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
       {sheet === 'buildings' && <BuildingsSheet buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
+      {sheet === 'add-building' && <BuildingsSheet mode="add" buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
       {toast && (
         <button type="button" className="incident-toast" onClick={() => { openIncident(toast); setToast(null); }}>
           <i className={`hazard-dot hazard-dot--${toast.hazard}`} />

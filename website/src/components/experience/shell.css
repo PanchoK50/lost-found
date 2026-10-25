@@ -533,3 +533,7 @@
 .is-connecting .voice-drop { animation: drop-pulse 1.2s ease-in-out infinite; }
 @keyframes drop-pulse { 50% { transform: scale(1.12); opacity: .85; } }
 @media (prefers-reduced-motion: reduce) { .voice-drop-blob { animation: none; } }
+
+/* "+" left of the building selector: add a building (upload a building.json or floor plans). */
+.shell-add-building { display: inline-grid; place-items: center; width: 32px; height: 32px; flex: none; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-size: 20px; line-height: 1; font-weight: 400; cursor: pointer; }
+.shell-add-building:hover { background: #f4f4f4; }

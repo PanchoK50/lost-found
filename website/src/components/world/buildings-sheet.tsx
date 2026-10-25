@@ -20,8 +20,8 @@ interface UploadResult {
   questions: string[];
 }
 
-/** All buildings (dataset + uploaded plans) with search, and "Add a building" from floor-plan SVGs. */
-export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: BuildingRow[]; currentId: string; onClose(): void }) {
+/** All buildings (dataset + uploaded plans) with search ('pick'), or "Add a building" from a building.json or floor plans ('add'). */
+export function BuildingsSheet({ buildings, currentId, mode = 'pick', onClose }: { buildings: BuildingRow[]; currentId: string; mode?: 'pick' | 'add'; onClose(): void }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
@@ -63,7 +63,8 @@ export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: B
   const fields = result ? Object.entries(result.issues.by_field).map(([field, n]) => `${n} ${field.replace('_', ' ')}`).join(', ') : '';
 
   return (
-    <Sheet title="Buildings" onClose={onClose}>
+    <Sheet title={mode === 'add' ? 'Add a building' : 'Buildings'} onClose={onClose}>
+      {mode === 'pick' && <>
       <input className="buildings-search" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={`Search ${buildings.length} buildings`} aria-label="Search buildings" />
       <ul className="buildings-list">
         {shown.slice(0, MAX_ROWS).map(b => (
@@ -77,9 +78,9 @@ export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: B
       </ul>
       {shown.length > MAX_ROWS && <p className="sheet-hint">{shown.length - MAX_ROWS} more; type to narrow down.</p>}
       {!shown.length && <p className="sheet-hint">No building matches “{query}”.</p>}
+      </>}
 
-      <section className="buildings-upload">
-        <h3>Add a building</h3>
+      {mode === 'add' && <section className="buildings-upload buildings-upload--solo">
         <p className="sheet-hint"><strong>Best: upload a <code>building.json</code>.</strong> It is imported exactly as it is, with nothing to guess.</p>
         <p className="sheet-hint">No JSON? Upload one plan per floor, named <code>floor_0</code>, <code>floor_1</code>, … (basements <code>floor_-1</code>), or select all files of a building folder. Prefer SVG over PNG: images are traced and their scale and room numbers estimated, so they need more checking. Rooms, doors, stairs, room numbers and room types are read from the plans. Anything uncertain is checked with you in the chat.</p>
         <form onSubmit={upload}>
@@ -96,7 +97,7 @@ export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: B
             <Link className="button button--primary" href={`/?building=${result.id}&check=1`} onClick={onClose}>Open {result.name} and check it</Link>
           </div>
         )}
-      </section>
+      </section>}
     </Sheet>
   );
 }
