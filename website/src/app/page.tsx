@@ -4,11 +4,13 @@ import { getCampus } from '@/lib/buildings/campuses';
 import { applyEdits, loadEdits } from '@/lib/buildings/edits';
 
 export default async function Home({ searchParams }: PageProps<'/'>) {
-  const { building, campus, check, ask } = await searchParams;
+  const { building, campus, check, ask, view } = await searchParams;
+  // The fire brigade edition (default view) opens on its demo building unless another one is asked for.
+  const brigadeDefault = view !== 'ops' && typeof building !== 'string' && typeof campus !== 'string' ? 'proc-campus-test-005' : undefined;
   const site = getCampus(typeof campus === 'string' ? campus : undefined);
   // ?campus=<id> opens the campus view; its first member is the building in the foreground.
   const primary = site?.members[0]?.buildingId;
-  const entry = (await getCatalogEntry(typeof building === 'string' ? building : primary)) ?? (await getCatalogEntry(defaultBuildingId))!;
+  const entry = (await getCatalogEntry(typeof building === 'string' ? building : primary ?? brigadeDefault)) ?? (await getCatalogEntry(defaultBuildingId))!;
   // The plan as it is now: base plan plus the edits made by conversation (new doors, moved assets, ...).
   const { building: current } = applyEdits(entry.building, await loadEdits(entry.id));
   const report = (current as { ingest_report?: { issues?: { severity: string; question?: string }[] } }).ingest_report;

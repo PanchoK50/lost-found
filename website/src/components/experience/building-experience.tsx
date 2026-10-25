@@ -35,6 +35,7 @@ import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
 import { HazardPanel, HazardPlayback } from '@/components/hazards/hazard-panel';
 import { VoiceAgent, type VoiceActions } from '@/components/voice/voice-agent';
+import { AlarmCard, BrigadePanel, BrigadeTimeline, FactsStrip, brigadeChips, brigadeDirective, useBrigade } from '@/components/brigade/brigade';
 import { ReportDamage } from '@/components/hazards/report-damage';
 import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
@@ -220,6 +221,30 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     else if (view === 'xray') setHazardFloor('__xray__');
     else if (view && building.floors.some(f => f.id === view)) setHazardFloor(view);
   }, [hazard.view, building]);
+  // ---------- Fire brigade edition (default; ?view=ops for the operations platform) ----------
+  const search = useSyncExternalStore(noSubscribe, () => window.location.search, () => '');
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const brigade = params.get('view') !== 'ops' && !broll ? true : params.get('view') === 'brigade';
+  const tNow = Number(params.get('t') ?? 4) || 0;
+  const eta = Number(params.get('eta') ?? 8) || 8;
+  const brigadeOrigin = useMemo(() => {
+    if (!brigade) return null;
+    const [kind, id] = (params.get('alarm') ?? '').split(':');
+    if (kind === 'fire' && building.spaces.some(sp => sp.id === id)) return id;
+    if (building.spaces.some(sp => sp.id === 'proc-campus-test-005-F3-S025')) return 'proc-campus-test-005-F3-S025';
+    return scenariosFor(building).find(sc => sc.hazard === 'fire')?.spaceId ?? null;
+  }, [brigade, params, building]);
+  const [alarmOpen, setAlarmOpen] = useState(() => params.get('open') === '1');
+  const [rescueTarget, setRescueTarget] = useState<string | null>(params.get('crew1'));
+  const [brigadeTab, setBrigadeTab] = useState<'situation' | 'people' | 'routes'>(params.get('crew1') || params.get('routes') ? 'routes' : 'situation');
+  const brigadeStarted = useRef(false);
+  useEffect(() => {
+    if (!brigade || !brigadeOrigin || brigadeStarted.current) return;
+    brigadeStarted.current = true;
+    void hazard.open(brigadeOrigin, 'fire');
+    hazard.setT(tNow);
+  }, [brigade, brigadeOrigin, hazard, tNow]);
+  const brigadeData = useBrigade(building, brigadeOrigin, tNow, eta, hazard.view?.t ?? tNow, rescueTarget);
   const simulateHandled = useRef(false);
   useEffect(() => {
     if (simulateHandled.current) return;
@@ -248,7 +273,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [hazard.view, building, liveIncident?.fixedAt]);
   const baseDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor, fade) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive, fade]);
   // The chat's selected object lights up on the model, whatever the answer shows.
-  const shownDirective = useMemo(() => (chatContext?.kind === 'asset' ? { ...baseDirective, assets: [...new Set([...(baseDirective.assets ?? []), chatContext.id])] } : baseDirective), [baseDirective, chatContext]);
+  const brigadeScene = useMemo(() => (brigade && hazard.view ? brigadeDirective(baseDirective, building, brigadeData.briefing, brigadeData.people, brigadeData.routes, brigadeTab === 'routes' || (hazard.view.t >= tNow + eta)) : baseDirective),
+    [brigade, hazard.view, baseDirective, building, brigadeData.briefing, brigadeData.people, brigadeData.routes, brigadeTab, tNow, eta]);
+  const shownDirective = useMemo(() => (chatContext?.kind === 'asset' ? { ...brigadeScene, assets: [...new Set([...(brigadeScene.assets ?? []), chatContext.id])] } : brigadeScene), [brigadeScene, chatContext]);
   // A pushed alert (another screen raised it, or ?notify= for the video): tap to open.
   const [toast, setToast] = useState<Incident | null>(null);
   // Deep links for demos and the video: ?incident=<kind>:<space id> raises and opens a live incident;
@@ -423,14 +450,15 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency ? ' shell--emergency' : ''}`}>
+    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency || brigade ? ' shell--emergency' : ''}${brigade ? ' shell--brigade' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
           {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}<span aria-hidden>▾</span>
         </button>
         <span className="shell-spacer" />
-        <div className="shell-lamps" aria-label="Active incidents">
+        {brigade && <span className="brigade-tag">FIRE BRIGADE · SIMULATED</span>}
+        {!brigade && <div className="shell-lamps" aria-label="Active incidents">
           {(['fire', 'water', 'electrical'] as const).map(kind => {
             const active = incidents.active.filter(i => i.hazard === kind && !i.fixedAt);
             return (
@@ -439,8 +467,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
               </button>
             );
           })}
-        </div>
-        <details className="simulate-menu" ref={simulateMenu}>
+        </div>}
+        {!brigade && <details className="simulate-menu" ref={simulateMenu}>
           <summary className="shell-button">Simulate</summary>
           <div className="simulate-list" role="menu">
             {demoScenarios.map(scenario => (
@@ -450,9 +478,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             ))}
             <p>Or select any room on the model and pick Fire, Water or Power.</p>
           </div>
-        </details>
-        <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>
-        <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>
+        </details>}
+        {!brigade && <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>}
+        {!brigade && <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>}
         <button type="button" className="shell-account" onClick={() => setSheet('account')} aria-label={profile ? `Signed in as ${profile.name}. Switch account` : 'Sign in'}>{profile ? initials(profile.name) : 'Sign in'}</button>
         {SHOW_MULTIPLAYER && <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
           location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />}
@@ -460,7 +488,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
 
       <section className="shell-main">
-        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => {
+            if (brigade) { router.push(`/?view=brigade&building=${encodeURIComponent(building.building.id)}&alarm=fire:${encodeURIComponent(spaceId)}&t=0&eta=${eta}&open=1`); return; }
+            setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind);
+          }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
         {!hazard.view && (directive.routes?.length || directive.highlights?.length || directive.markers?.length) ? (
           <div className="answer-pill" role="status">
             <span>{lastAnswerTitle ?? 'Answer on the map'}</span>
@@ -481,12 +512,19 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         </div>
         </div>
         {building.building.license !== 'CC0-1.0' && <footer className="model-credit">{building.building.attribution} · {building.building.license}</footer>}
-        {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
+        {brigade && hazard.view && <FactsStrip briefing={brigadeData.briefing} t={hazard.view.t} />}
+        {hazard.view && (brigade
+          ? <BrigadeTimeline briefing={brigadeData.briefing} t={hazard.view.t} playing={hazard.view.playing} onT={hazard.setT} onPlay={hazard.togglePlay} />
+          : <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />)}
         {!broll && <VoiceAgent actions={voiceActions} />}
       </section>
 
       <aside className="shell-panel" aria-label="Assistant">
-        {hazard.view && (
+        {brigade && hazard.view && (
+          <BrigadePanel briefing={brigadeData.briefing} people={brigadeData.people} routes={brigadeData.routes} tab={brigadeTab} onTab={setBrigadeTab}
+            onRoom={spaceId => setHazardRoom(spaceId)} onRescue={spaceId => { setRescueTarget(spaceId); setBrigadeTab('routes'); }} />
+        )}
+        {!brigade && hazard.view && (
           <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onStartResponse={hazard.startResponse}
             onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onShowFloor={floorId => { setHazardRoom(null); setHazardFloor(floorId); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
             incident={liveIncident}
@@ -577,6 +615,17 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           )}
         </section>
         <section className="shell-ask" ref={dock}>
+          {brigade && hazard.view && (
+            <details className="brigade-chips" open>
+              <summary>Ask the building</summary>
+              <div>
+                {brigadeChips(brigadeData.briefing, brigadeData.people).slice(0, 4).map(chip => <button type="button" key={chip.label} onClick={() => void ask(chip.question)}>{chip.label}</button>)}
+                <details className="brigade-more"><summary>More</summary>
+                  {brigadeChips(brigadeData.briefing, brigadeData.people).slice(4).map(chip => <button type="button" key={chip.label} onClick={() => void ask(chip.question)}>{chip.label}</button>)}
+                </details>
+              </div>
+            </details>
+          )}
           {SHOW_MULTIPLAYER && profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
           {SHOW_MULTIPLAYER && (world && profile && mentionQuery(draft) !== undefined
             ? <MentionPicker players={world.players.filter(p => p.id !== profile.id)} draft={draft} onPick={text => { setDraft(text); input.current?.focus(); }} />
@@ -648,6 +697,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       }} />}
       {sheet === 'location' && profile && <LocationSheet building={building} room={myRoom} sharing={settings?.share !== 'off'} onChange={setLocation} onSettings={() => setSheet('settings')} onClose={closeSheet} />}
       {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
+      {brigade && !alarmOpen && !broll && (
+        <AlarmCard building={building} origin={brigadeData.briefing?.origin ?? (brigadeOrigin ? { space_id: brigadeOrigin, name: building.spaces.find(sp => sp.id === brigadeOrigin)?.name ?? '', floor: building.floors.find(f => f.id === building.spaces.find(sp => sp.id === brigadeOrigin)?.floor_id)?.name ?? '', floor_id: '' } : null)}
+          tNow={tNow} eta={eta} onOpen={() => setAlarmOpen(true)} onPick={() => { setAlarmOpen(true); setSheet('buildings'); }} />
+      )}
     </main>
   );
 }

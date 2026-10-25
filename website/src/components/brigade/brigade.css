@@ -1,0 +1,91 @@
+/* Fire brigade edition: "night ops" (docs/BRIGADE_BRIEF.md §6). */
+.shell--brigade { --bg: #0B1020; --s1: #121A2E; --s2: #18223A; --hair: rgba(255,255,255,.08); --tx: #E8ECF5; --tx2: #9AA6C2; --crew1: #2EE6D6; --crew2: #FFD23F; --danger: #FF4D6D; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--tx); }
+.shell--brigade .shell-top, .shell--brigade .shell-panel, .shell--brigade .hazard-playback { background: var(--s1) !important; border-color: var(--hair) !important; }
+.brigade-tag { margin-left: 8px; padding: 4px 10px; border-radius: 999px; background: rgba(255,59,48,.15); color: #ff8a80; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+/* F0 alarm */
+.alarm-screen { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(6,9,20,.78); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.alarm-dispatch { position: relative; width: min(460px, 100%); padding: 28px 24px 20px; border: 1px solid rgba(255,59,48,.45); border-radius: 22px; background: #121A2E; color: #E8ECF5; box-shadow: 0 0 0 1px rgba(255,59,48,.2), 0 30px 80px rgba(255,59,48,.25); text-align: left; }
+.alarm-ring { position: absolute; top: 22px; right: 22px; width: 14px; height: 14px; border-radius: 50%; background: #FF3B30; box-shadow: 0 0 0 0 rgba(255,59,48,.7); animation: alarm-ring 1.4s infinite; }
+@keyframes alarm-ring { 70% { box-shadow: 0 0 0 18px rgba(255,59,48,0); } 100% { box-shadow: 0 0 0 0 rgba(255,59,48,0); } }
+.alarm-kicker { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 800; letter-spacing: .14em; color: #FF6A2B; }
+.alarm-kicker em { font-style: normal; font-size: 10px; padding: 2px 6px; border: 1px solid #9AA6C2; border-radius: 4px; color: #9AA6C2; letter-spacing: .1em; }
+.alarm-sound { margin-left: auto; margin-right: 26px; width: 40px; height: 40px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; background: none; color: #E8ECF5; font-size: 16px; }
+.alarm-dispatch h1 { margin: 14px 0 2px; font-size: 30px; font-weight: 600; letter-spacing: -.01em; }
+.alarm-where { margin: 0 0 18px; font-size: 18px; color: #FFB020; font-weight: 600; }
+.alarm-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 22px; }
+.alarm-meta dt { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #9AA6C2; }
+.alarm-meta dd { margin: 4px 0 0; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.alarm-meta small { color: #9AA6C2; font-weight: 400; }
+.alarm-open { width: 100%; min-height: 56px; border: 0; border-radius: 14px; background: #FF3B30; color: #fff; font-size: 18px; font-weight: 700; }
+.alarm-pick { width: 100%; margin-top: 10px; min-height: 44px; border: 0; background: none; color: #9AA6C2; font-size: 14px; text-decoration: underline; }
+/* facts strip */
+.facts-strip { position: absolute; z-index: 3; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; border-radius: 18px; background: rgba(18,26,46,.92); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.facts-strip.is-loading { padding: 12px 18px; color: #9AA6C2; font-size: 13px; }
+.facts-strip > div { display: flex; flex-direction: column; min-width: 120px; padding: 8px 14px; border-radius: 12px; background: #18223A; }
+.facts-strip strong { font-size: 38px; line-height: 1.05; font-weight: 600; font-variant-numeric: tabular-nums; color: #E8ECF5; }
+.facts-strip > div:first-child strong { color: #FF6A2B; }
+.facts-strip strong span { font-size: 24px; color: #FFB020; }
+.facts-strip em { font-style: normal; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9AA6C2; }
+/* timeline */
+.brigade-timeline { padding: 10px 18px 12px; border-top: 1px solid rgba(255,255,255,.08); background: #121A2E; color: #E8ECF5; }
+.bt-row { display: flex; align-items: center; gap: 12px; }
+.bt-play { width: 48px; height: 48px; border: 0; border-radius: 50%; background: #FF3B30; color: #fff; font-size: 14px; }
+.bt-track { position: relative; flex: 1; padding-bottom: 20px; }
+.bt-track input { width: 100%; accent-color: #FF6A2B; }
+.bt-mark { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 11px; color: #9AA6C2; white-space: nowrap; }
+.bt-mark::before { content: ""; position: absolute; left: 50%; bottom: 16px; width: 2px; height: 10px; background: #9AA6C2; }
+.bt-mark--arrival { color: #2EE6D6; font-weight: 700; }
+.bt-mark--arrival::before { background: #2EE6D6; height: 14px; width: 3px; }
+.bt-clock { min-width: 64px; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bt-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 6px; }
+.bt-stairs { display: flex; flex-wrap: wrap; gap: 6px; }
+.bt-stair { display: inline-flex; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #18223A; font-size: 12px; }
+.bt-stair b { font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: .08em; align-self: center; }
+.bt-stair.is-clear b { color: #2EE6D6; } .bt-stair.is-smoke b { color: #B9B4E8; } .bt-stair.is-fire b { color: #FF3B30; }
+.bt-stair.is-smoke { box-shadow: inset 0 0 0 1px #8C86B8; } .bt-stair.is-fire { box-shadow: inset 0 0 0 1px #FF3B30; }
+.bt-next { font-size: 13px; color: #FFB020; }
+/* panel */
+.brigade-panel { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; color: #E8ECF5; }
+.brigade-tabs { display: flex; gap: 4px; padding: 12px 14px 8px; }
+.brigade-tabs button { flex: 1; min-height: 48px; border: 0; border-radius: 12px; background: #18223A; color: #9AA6C2; font-size: 14px; font-weight: 600; }
+.brigade-tabs button[aria-selected="true"] { background: #E8ECF5; color: #0B1020; }
+.brigade-body { flex: 1; overflow-y: auto; padding: 4px 14px 14px; }
+.brigade-body h3 { margin: 16px 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #9AA6C2; }
+.brigade-body h3 small { margin-left: 6px; text-transform: none; letter-spacing: 0; color: #66718c; }
+.brigade-empty, .bline { margin: 6px 0; font-size: 14px; color: #9AA6C2; }
+.bline--row { display: flex; justify-content: space-between; color: #E8ECF5; }
+.bcard { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin-bottom: 6px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: #18223A; color: #E8ECF5; text-align: left; }
+.bcard i { font-style: normal; font-size: 20px; width: 28px; text-align: center; }
+.bcard span { display: flex; flex-direction: column; }
+.bcard strong { font-size: 15px; }
+.bcard em { font-style: normal; font-size: 13px; color: #9AA6C2; }
+.bcard--fire { border-color: #FF3B30; }
+.bcard--lab_chemicals { border-color: rgba(255,176,32,.5); }
+.bentrance { margin-top: 14px; padding: 12px; border-radius: 14px; border: 1px solid #2EE6D6; background: rgba(46,230,214,.08); display: flex; flex-direction: column; gap: 4px; }
+.bentrance em { font-style: normal; font-size: 13px; color: #9AA6C2; }
+.bperson { margin-bottom: 8px; border: 1px solid #FF4D6D; border-radius: 14px; background: rgba(255,77,109,.08); overflow: hidden; }
+.bperson > button:first-child { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 12px; border: 0; background: none; color: #E8ECF5; text-align: left; font-size: 14px; }
+.bperson strong { font-size: 16px; }
+.bperson-reason { color: #FF4D6D; font-weight: 600; }
+.demo-tag { margin-left: 8px; font-style: normal; font-size: 10px; padding: 1px 5px; border: 1px solid #9AA6C2; border-radius: 4px; color: #9AA6C2; letter-spacing: .08em; }
+.bperson-plan { width: 100%; min-height: 48px; border: 0; border-top: 1px solid rgba(255,77,109,.3); background: rgba(255,77,109,.15); color: #fff; font-weight: 600; }
+.broute { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding: 12px; border-left: 4px solid; border-radius: 12px; background: #18223A; font-size: 14px; }
+.broute strong { font-size: 15px; }
+.broute ol { margin: 6px 0 0; padding-left: 20px; color: #C9D1E6; font-size: 14px; line-height: 1.45; }
+.bok { color: #2EE6D6; font-weight: 600; } .bbad { color: #FF4D6D; font-weight: 600; } .bavoid { color: #B9B4E8; }
+/* chips */
+.brigade-chips { margin-bottom: 8px; }
+.brigade-chips summary { cursor: pointer; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #9AA6C2; margin-bottom: 6px; }
+.brigade-chips div { display: flex; flex-wrap: wrap; gap: 6px; }
+.brigade-chips button { min-height: 40px; padding: 6px 12px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: #18223A; color: #E8ECF5; font-size: 13px; text-align: left; }
+.brigade-chips button:hover { border-color: #2EE6D6; }
+.shell--brigade .hazard-chip--water, .shell--brigade .hazard-chip--electrical { display: none; }
+.shell--brigade .room-card-simulate > span { font-size: 0; } .shell--brigade .room-card-simulate > span::after { content: "Simulate alarm here"; font-size: 11px; }
+@media (max-width: 899px) {
+  .facts-strip { top: 56px; } .facts-strip > div { min-width: 0; padding: 6px 10px; } .facts-strip strong { font-size: 30px; }
+  .bt-info { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .alarm-ring { animation: none; } }
+.brigade-more { display: contents; }
+.brigade-more summary { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1px dashed rgba(255,255,255,.18); color: #9AA6C2; font-size: 13px; cursor: pointer; list-style: none; }
+.brigade-more[open] summary { display: none; }

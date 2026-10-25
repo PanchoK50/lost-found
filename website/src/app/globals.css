@@ -8,6 +8,7 @@
 @import "../components/world/world.css";
 @import "../components/hazards/hazards.css";
 @import "../components/experience/shell.css";
+@import "../components/brigade/brigade.css";
 
 /* Mobile-first: base styles are the phone layout; the desktop layout is the min-width: 900px block at the end. */
 /*

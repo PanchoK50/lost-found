@@ -1,7 +1,7 @@
 import { supabaseConfigured, userFrom } from '@/lib/supabase/server';
 
 const AGENT_URL = process.env.LOSTFOUND_API_URL ?? 'http://127.0.0.1:8000';
-const ALLOWED = new Set(['simulate', 'classify', 'readiness', 'sensors']);
+const ALLOWED = new Set(['simulate', 'classify', 'readiness', 'sensors', 'brigade/briefing', 'brigade/people', 'brigade/routes']);
 
 /** Proxy to the agent's hazard endpoints (spread, impact, evacuation, playbook, readiness, photo assessment). */
 async function forward(request: Request, path: string[]) {
@@ -13,7 +13,7 @@ async function forward(request: Request, path: string[]) {
   }
   const url = new URL(request.url);
   try {
-    const res = await fetch(`${AGENT_URL}/hazards/${name}${url.search}`, {
+    const res = await fetch(`${AGENT_URL}/${name.startsWith('brigade/') ? name : `hazards/${name}`}${url.search}`, {
       method: request.method,
       headers: { 'Content-Type': 'application/json' },
       body: request.method === 'POST' ? await request.text() : undefined,
