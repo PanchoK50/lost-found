@@ -31,7 +31,10 @@ export async function POST(request: Request) {
   // People, reports and skills first (docs/MULTIPLAYER.md §7); everything else is a question about the building.
   // Every account can be addressed with @, also people who are not sharing their location right now.
   const input = { world: { ...viewFor(world, playerId), players: world.players.filter(p => !p.demo || p.id === playerId) }, playerId, skillId: typeof body.skillId === 'string' ? body.skillId : undefined, history: Array.isArray(body.history) ? body.history : undefined, closed: worldClosed };
-  const fromWorld = resolveWorld(entry.building, message, input);
+  // With something selected on the map ("this door", "this room") the message is about that thing: the building
+  // agent answers it. The people/reports layer only takes messages without a selection.
+  const hasSelection = Boolean(body.selection && typeof body.selection.id === 'string');
+  const fromWorld = hasSelection ? null : resolveWorld(entry.building, message, input);
   if (fromWorld?.usedSkill && playerId) await worldStore.apply(entry.building, { type: 'skill.use', buildingId: entry.building.building.id, skillId: fromWorld.usedSkill, playerId }, Date.now()).catch(() => undefined);
 
   let resolved: ChatResponse;

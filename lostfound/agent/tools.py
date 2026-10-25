@@ -771,8 +771,9 @@ class Toolbox:
         from shapely.geometry import LineString, Point
         if door not in self.building.openings:
             raise MapError(f"No door with id '{door}'. Select the door on the map or name the two rooms it joins.")
-        if not 0 < distance_m <= 50:
-            raise MapError("Move a door by more than 0 and at most 50 m.")
+        if distance_m <= 0:
+            raise MapError("Give a distance in metres (more than 0).")
+        distance_m = min(distance_m, 500.0)  # "as far as possible": the door stops at the end of its wall
         opening = self.building.openings[door]
         inside = [s for s in opening["space_ids"] if s in self.building.spaces]
         here = Point(opening["position"])

@@ -209,7 +209,7 @@ def selection_note(building, selection: dict | None) -> str:
         state = "closed" if item in building.closed else "open"
         return (f"[Selected on the map: the {opening['kind']} {item} between {sides}, {opening['width_m']:.2f} m wide, "
                 f"{'step-free' if opening['step_free'] else 'with a step'}, currently {state}. 'This door' and 'it' mean this "
-                f"opening; use its id {item} with set_closed, set_door_width or move_door (left/right are as the person sees the screen).]\n")
+                f"opening; use its id {item} with set_closed, set_door_width or move_door (left/right are as the person sees the screen; for 'as far as possible' pass a large distance, e.g. 100 — the door stops at the end of its wall). Don't ask where the person is.]\n")
     if kind == "space" and item in building.spaces:
         return f"[Selected on the map: {building.label(item)} (space id {item}). 'This room' and 'here' mean this space.]\n"
     return ""
