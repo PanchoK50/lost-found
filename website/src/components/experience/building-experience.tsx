@@ -108,7 +108,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   useEffect(() => {
     if (!autoAsk || autoAsked.current) return;
     autoAsked.current = true;
-    void ask(autoAsk); // eslint-disable-line @typescript-eslint/no-use-before-define -- ask is a hoisted function declaration
+    void ask(autoAsk);
   }, [autoAsk]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (directive.focus.mode === 'campus') void ensureSite(directive.focus.members.map(m => ({ buildingId: m.buildingId, offset: m.offset }))); }, [directive.focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const [draft, setDraft] = useState('');
@@ -135,6 +135,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const [hazardFloor, setHazardFloor] = useState<string | null>(null);
   const hazardPanel = useRef<HTMLElement>(null);
   const [mapStyle, setMapStyle] = useMapStyle();
+  // Emergency mode: while a live incident is open and not yet fixed, the whole platform turns dark and vivid.
+  const emergency = incidents.active.some(i => !i.fixedAt);
   // The room selected on the model: a report starts there.
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   // An object or door picked on the model, attached to the chat as a chip (like a file in an editor's chat).
@@ -364,7 +366,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}`}>
+    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency ? ' shell--emergency' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
@@ -439,7 +441,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       </aside>
 
       <section className="shell-main">
-        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} onSelectRoom={setSelectedRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={setSelectedRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
       </section>
 

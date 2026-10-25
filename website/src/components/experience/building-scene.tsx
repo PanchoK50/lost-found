@@ -12,6 +12,8 @@ import type { WorldState } from '@/lib/world/types';
 import { hazardMeta, type HazardKind } from '@/lib/hazards/types';
 import { worldAnchors } from '@/components/world/world-anchors';
 import { People } from './scene-people';
+import { Scenery } from './scene-scenery';
+import { HazardEffects } from './scene-effects';
 import { DetailedAssets, Doors, type PickObject, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
 /**
@@ -64,6 +66,8 @@ interface Props {
   onSimulate?(spaceId: string, hazard: HazardKind): void;
   /** Map style chosen outside the scene (the platform sidebar); when set, the scene shows no switch of its own. */
   mapStyle?: SceneStyle;
+  /** Emergency mode (a live incident): night scene with darker surroundings, so the hazards stand out. */
+  emergency?: boolean;
   /** The room currently selected on the model (or null), e.g. to prefill a report. */
   onSelectRoom?(spaceId: string | null): void;
   /** An object (furniture, machine) or a door picked on the model: it becomes the chat's context. */
@@ -85,7 +89,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject }: Props) {
+export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject, emergency = false }: Props) {
   const model = useMemo(() => {
     const members = [...(site?.values() ?? [])];
     const placed = members.length > 1 || (members.length === 1 && members[0].building.building.id !== building.building.id)
@@ -166,19 +170,21 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
   return (
     <div className="scene-root">
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
-        <color attach="background" args={[palette.background]} />
-        <fog attach="fog" args={[palette.background, Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
+        <color attach="background" args={[emergency ? '#05080e' : '#dfe7ee']} />
+        <fog attach="fog" args={[emergency ? '#05080e' : '#dfe7ee', Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
         {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
-        <ambientLight intensity={0.3} />
-        <hemisphereLight args={['#fff6ea', '#dfe3ea', 0.95]} />
-        <directionalLight position={[80, 130, 55]} intensity={1.6} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
+        <ambientLight intensity={emergency ? 0.22 : 0.3} />
+        <hemisphereLight args={emergency ? ['#7d8db0', '#0b0f18', 0.55] : ['#fff6ea', '#dfe3ea', 0.95]} />
+        <directionalLight position={[80, 130, 55]} intensity={emergency ? 0.7 : 1.6} color={emergency ? '#b8c6ff' : '#ffffff'} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
             onPickObject={onSelectObject ? (kind, id) => onSelectObject(kind, id) : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
-        <Ground y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} />
+        <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency} />
         <Podium model={model} />
+        {directive.hazards?.length ? <HazardEffects model={model} poses={poses} hazards={directive.hazards} floorBase={floorBase} /> : null}
+        <HazardPulse />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
         {directive.focus.mode === 'floor' && directive.focus.around && (
@@ -553,6 +559,20 @@ function hazardMaterial(kind: HazardKind, level: number) {
   return material;
 }
 
+/** Water shimmers and a power cut flickers: the shared tint materials breathe a little every frame. */
+function HazardPulse() {
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    for (const [key, material] of hazardMaterials) {
+      const [kind, step] = key.split('-');
+      const base = (kind === 'electrical' ? 0.18 + 0.34 : 0.35 + 0.55) * (Number(step) / HAZARD_STEPS) + (kind === 'electrical' ? 0.18 : 0.35) * (1 - Number(step) / HAZARD_STEPS);
+      const wave = kind === 'water' ? 0.1 * Math.sin(t * 2.2) : kind === 'electrical' ? (Math.sin(t * 13) > 0.85 ? -0.12 : 0) : 0.06 * Math.sin(t * 7);
+      material.opacity = Math.max(0.05, Math.min(1, base + wave));
+    }
+  });
+  return null;
+}
+
 /** Per-frame fade of a floor's shared materials (three.js objects are mutated imperatively). */
 function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null, s: { opacity: number; flat: number }, overview: boolean, assetBase: number) {
   const ghost = s.opacity < 0.6;
@@ -611,14 +631,6 @@ function colorAssets(mesh: THREE.InstancedMesh, model: FloorModel, lit: Set<stri
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 
-function Ground({ y }: { y: number }) {
-  return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} receiveShadow>
-      <planeGeometry args={[3000, 3000]} />
-      <meshStandardMaterial color="#dcd7cd" roughness={1} />
-    </mesh>
-  );
-}
 
 /** Base plate under the building, like a plinth under a scale model; its top sits just under the slab tops. */
 function Podium({ model }: { model: BuildingModel }) {

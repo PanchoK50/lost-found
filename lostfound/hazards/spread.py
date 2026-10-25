@@ -18,7 +18,7 @@ from lostfound.core.building import DOOR_PREFIX, OUTSIDE, Building
 from lostfound.hazards.model import HAZARDS, POWERED_ASSETS, WET_ASSETS
 
 RAMP = {"fire": 5.0, "water": 6.0, "electrical": 0.5}
-MIN_LEVEL = {"fire": 0.12, "water": 0.2}
+MIN_LEVEL = {"fire": 0.12, "water": 0.25}
 WALL_GAP_M = 0.35
 MIN_WALL_M = 1.0
 MIN_OVERLAP = 0.05
@@ -27,8 +27,9 @@ MIN_OVERLAP = 0.05
 FIRE = {"door": (2.0, 0.95), "wall": (28.0, 0.75), "stairs": (4.0, 0.85), "above": (18.0, 0.7)}
 # Fire grows across a room in minutes; smoke runs along corridors and up stairwells at tens of metres a minute.
 FIRE_M_PER_MIN = {"room": 6.0, "hall": 12.0, "corridor": 30.0, "stair": 30.0, "lift": 30.0, "outdoor": 2.0}
-WATER = {"door": (1.0, 0.5), "wall": (12.0, 0.35), "below": (6.0, 0.8), "stairs": (3.0, 0.5)}
+WATER = {"door": (1.0, 0.38), "wall": (12.0, 0.35), "below": (6.0, 0.8), "stairs": (3.0, 0.5)}
 WATER_M_PER_MIN = 6.0
+POOL_LEVEL = 0.45  # water drips to the floor below only from spaces at least this wet
 
 
 def simulate(building: Building, hazard: str, origin: str, minutes: float = 30.0) -> dict:
@@ -137,8 +138,8 @@ def _structure(building: Building) -> dict:
     return {"doors": doors, "walls": walls, "stairs": stairs, "below": below, "above": above}
 
 
-def _edges(building: Building, hazard: str, space_id: str):
-    """(neighbour, delay minutes, factor, via) for one space."""
+def _edges(building: Building, hazard: str, space_id: str, peak: float = 1.0):
+    """(neighbour, delay minutes, factor, via) for one space; `peak` is how strongly it is hit."""
     s = _structure(building)
     if hazard == "fire":
         for other, walk in s["doors"][space_id]:
@@ -157,7 +158,8 @@ def _edges(building: Building, hazard: str, space_id: str):
             yield other, WATER["door"][0] + walk / WATER_M_PER_MIN, WATER["door"][1], "door"
         for other in s["walls"][space_id]:
             yield other, *WATER["wall"], "wall"
-        for other, share in s["below"][space_id]:
+        # Water only comes through the ceiling below where it actually pools, not from a damp corridor.
+        for other, share in s["below"][space_id] if peak >= POOL_LEVEL else []:
             yield other, WATER["below"][0], WATER["below"][1] * min(1.0, 0.4 + share), "below"
         for other, rise in s["stairs"][space_id]:
             if rise < 0:  # water only runs down
@@ -172,7 +174,7 @@ def _dijkstra(building: Building, hazard: str, origin: str, minutes: float) -> d
         if reached[space_id]["arrival_min"] < arrival - 1e-9:
             continue
         peak = -negative_peak
-        for other, delay, factor, via in _edges(building, hazard, space_id):
+        for other, delay, factor, via in _edges(building, hazard, space_id, peak):
             time, level = arrival + delay, peak * factor
             if time > minutes or level < MIN_LEVEL[hazard]:
                 continue
