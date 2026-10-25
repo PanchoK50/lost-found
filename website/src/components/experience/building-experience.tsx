@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Building } from '@/lib/buildings/types';
+import { floorCounts } from '@/components/world/world-anchors';
 import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
@@ -253,7 +254,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
           <div className="floor-list" ref={floorList}>
             {floors.map(floor => (
-              <button type="button" key={floor.id} className={focusedFloor === floor.id ? 'active' : ''} onClick={() => focusFloor(floor.id)} aria-label={floor.name} aria-pressed={focusedFloor === floor.id}>{floorShort(floor.level)}</button>
+              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={floorCounts(world, floor.id)} onClick={() => focusFloor(floor.id)} />
             ))}
           </div>
         </nav>
@@ -323,8 +324,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
         <section className="dock" ref={dock}>
           {intro && <div className="hero">
-            <AgentAvatar size="lg" />
-            <p className="eyebrow">{building.building.name} · {building.floors.length} floors · {building.spaces.length} spaces</p>
             <h1>Ask me anything.</h1>
           </div>}
           {intro && importIntro && (
@@ -405,6 +404,18 @@ function AgentAvatar({ thinking = false, size }: { thinking?: boolean; size?: 'l
 /** Benchmark replies end with an "Answer: …" line; the headline card already shows it. */
 function withoutAnswerLine(reply: string) {
   return reply.replace(/\n*^\s*Answer:.*$/gim, '').trim();
+}
+
+/** A floor on the rail, with fixed badges for alerts (red) and people (blue) instead of chips floating in the model. */
+function FloorButton({ floor, active, counts, onClick }: { floor: Building['floors'][number]; active: boolean; counts: ReturnType<typeof floorCounts>; onClick(): void }) {
+  const label = counts.summary ? `${floor.name}: ${counts.summary}` : floor.name;
+  return (
+    <button type="button" className={`floor-button${active ? ' active' : ''}`} onClick={onClick} aria-label={label} title={label} aria-pressed={active}>
+      {floorShort(floor.level)}
+      {counts.alerts > 0 && <span className="floor-badge floor-badge--alert">{counts.alerts}</span>}
+      {counts.people > 0 && <span className="floor-badge floor-badge--people">{counts.people}</span>}
+    </button>
+  );
 }
 
 function floorShort(level: number) {

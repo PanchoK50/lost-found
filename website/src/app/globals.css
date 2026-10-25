@@ -60,6 +60,11 @@ button:disabled { cursor: default; }
 .floor-list::-webkit-scrollbar, .building-switch::-webkit-scrollbar, .chips::-webkit-scrollbar { display: none; }
 .floor-rail button { flex: none; min-width: 44px; height: 40px; border: 0; border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; color: var(--muted); transition: background .2s, color .2s; }
 .floor-rail button.active { background: var(--ink); color: #fff; }
+.floor-rail .floor-button { position: relative; min-width: 52px; }
+/* Fixed per-floor badges (instead of chips floating in the model): red = alerts, blue = people. */
+.floor-badge { position: absolute; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; font-size: 9px; font-weight: 700; line-height: 14px; color: #fff; pointer-events: none; }
+.floor-badge--alert { top: 50%; left: 1px; margin-top: -7px; background: #e5484d; }
+.floor-badge--people { top: 50%; right: 1px; margin-top: -7px; background: var(--blue); }
 
 /* Bottom console: conversation sheet + dock, stacked and in thumb reach */
 .console { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }

@@ -88,9 +88,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   }, [directive.highlights, picked]);
   const anchors = useMemo(() => [
     ...answerAnchors(model, poses, directive),
-    ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
     ...(hovered && !overview && hovered !== picked ? hoverAnchor(model, poses, hovered) : []),
-  ], [model, poses, directive, overview, onFocusFloor, hovered, picked]);
+  ], [model, poses, directive, overview, hovered, picked]);
   const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onPerson, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onPerson, onFocusFloor]);
   const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const routePaths = useMemo(() => (directive.routes ?? []).map(r => (r.points ?? []).filter(p => shown(poses, p.floorId)).map(p => worldAt(model, poses, p, ROUTE_HEIGHT))), [directive.routes, model, poses]);
@@ -539,16 +538,6 @@ function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, dire
   });
   (directive.closed ?? []).flatMap(id => model.anchors.get(id) ?? []).filter(point => shown(poses, point.floorId)).forEach((point, i) => anchors.push({ key: `cl-${i}`, position: worldAt(model, poses, point, 2), placement: 'above', priority: 1.5, content: <div className="scene-label scene-label--closed">Closed</div> }));
   return anchors;
-}
-
-function floorAnchors(model: BuildingModel, poses: Map<string, FloorPose>, onFocusFloor: (id: string) => void): Anchor[] {
-  // Down the right-hand edge of the building as seen from the default camera.
-  return model.floors.map(f => ({
-    key: `fl-${f.floor.id}`,
-    group: 'floors' as const,
-    position: [model.box.maxX + 4, poses.get(f.floor.id)!.y + f.storey * 0.45, model.box.minZ],
-    content: <button type="button" className="floor-tag-3d" onClick={() => onFocusFloor(f.floor.id)}>{f.floor.name}</button>,
-  }));
 }
 
 /** Hover: the room's name and area. */

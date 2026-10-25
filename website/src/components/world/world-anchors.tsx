@@ -6,6 +6,17 @@ import type { Pin, Player, Presence, WorldState } from '@/lib/world/types';
 import { blockHeight, type BuildingModel, type FloorPose } from '@/components/experience/scene-model';
 import type { Anchor } from '@/components/experience/building-scene';
 
+/** Alerts, notes and people on one floor, for the badges on the floor rail. */
+export function floorCounts(world: WorldState | undefined, floorId: string) {
+  if (!world) return { alerts: 0, notes: 0, people: 0, summary: '' };
+  const pins = world.pins.filter(p => p.floorId === floorId);
+  const alerts = pins.filter(p => p.kind === 'blocked' || p.kind === 'broken').length;
+  const notes = pins.length - alerts;
+  const people = world.presence.filter(p => p.precision !== 'building' && p.floorId === floorId).length;
+  const summary = [alerts && plural(alerts, 'alert'), notes && plural(notes, 'note'), people && plural(people, 'person', 'people')].filter(Boolean).join(' · ');
+  return { alerts, notes, people, summary };
+}
+
 /**
  * The world as scene anchors (docs/MULTIPLAYER.md §11): people and pins on the floors that are shown,
  * and one count chip per floor in the building overview. Unlike answer anchors, they persist across answers.
@@ -26,21 +37,8 @@ export function worldAnchors(
   };
   const visible = world.presence.filter(p => p.precision !== 'building');
 
-  if (focus.mode === 'building') {
-    return model.floors.flatMap(f => {
-      const alerts = world.pins.filter(p => p.floorId === f.floor.id && (p.kind === 'blocked' || p.kind === 'broken')).length;
-      const notes = world.pins.filter(p => p.floorId === f.floor.id).length - alerts;
-      const people = visible.filter(p => p.floorId === f.floor.id).length;
-      const parts = [alerts && plural(alerts, 'alert'), notes && plural(notes, 'note'), people && plural(people, 'person', 'people')].filter(Boolean);
-      if (!parts.length) return [];
-      return [{
-        key: `w-count-${f.floor.id}`,
-        group: 'counts' as const,
-        position: [model.box.minX - 4, poses.get(f.floor.id)!.y + f.storey * 0.45, model.box.minZ] as [number, number, number],
-        content: <button type="button" className={`world-count${alerts ? ' world-count--alert' : ''}`} onClick={() => handlers.onFocusFloor(f.floor.id)} aria-label={`${f.floor.name}: ${parts.join(', ')}`}><strong>{f.floor.name}</strong> {parts.join(' · ')}</button>,
-      }];
-    });
-  }
+  // The building overview shows no floating chips: per-floor counts are badges on the floor rail (floorCounts).
+  if (focus.mode === 'building') return [];
 
   const players = new Map(world.players.map(p => [p.id, p]));
   const anchors: Anchor[] = [];
