@@ -115,12 +115,17 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     ? [{ from: { floorId: origin.floor_id, position: centroid(origin.polygon) }, to: { floorId: target.floor_id, position: centroid(target.polygon) }, label: `${origin.name} → ${target.name}` }]
     : undefined;
   const routes: SceneDirective['routes'] = view.hazard === 'fire' && data?.evacuation && view.t >= 1
-    ? data.evacuation.routes.slice(0, 3).map(route => ({ spacePath: route.space_path, points: route.polylines.flatMap(run => run.points.map(position => ({ floorId: run.floor_id, position }) as FloorPoint)), label: route.name }))
+    ? [...(data.firefighting && view.t >= data.firefighting.arrive_min - 1 ? [{ points: data.firefighting.path.map(([floorId, x, y]) => ({ floorId, position: [x, y] as [number, number] }) as FloorPoint), label: 'Fire brigade', responder: true }] : []), ...data.evacuation.routes.slice(0, 3).map(route => ({ spacePath: route.space_path, points: route.polylines.flatMap(run => run.points.map(position => ({ floorId: run.floor_id, position }) as FloorPoint)), label: route.name }))]
     : undefined;
   const evacuees = data ? evacueesOf(data) : undefined;
+  // Fire brigade: arrives at the staging point, then walks its attack route in (red line, firefighter figures).
+  const attack = data?.firefighting;
+  const attackPoints = attack ? attack.path.map(([floorId, x, y]) => ({ floorId, position: [x, y] as [number, number] }) as FloorPoint) : [];
+  const responders = attack && view.t >= attack.arrive_min - 1
+    ? [{ id: 'fire-brigade', path: attackPoints, startMin: attack.arrive_min, count: 4, firefighter: true, speed: 35 }] : [];
   return {
     focus,
-    evacuees,
+    evacuees: [...(evacuees ?? []), ...responders],
     minute: view.t,
     walkMPerMin: data?.evacuation?.walk_m_per_min,
     // The whole building stays in view while the spread plays; a room tapped in the panel zooms to it.

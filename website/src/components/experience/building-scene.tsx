@@ -816,7 +816,7 @@ function Overlays({ model, poses, directive }: { model: BuildingModel; poses: Ma
         <mesh position-y={1.2}><cylinderGeometry args={[0.06, 0.06, 2.4, 8]} /><meshStandardMaterial color={palette.ink} /></mesh>
       </group>
     ))}
-    {(directive.routes ?? []).map(route => (route.points ?? []).filter(p => shown(poses, p.floorId))).filter(points => points.length >= 2).map((points, i) => <RouteLine key={i} points={points.map(p => at(p, ROUTE_HEIGHT))} />)}
+    {(directive.routes ?? []).map(route => ({ responder: route.responder, points: (route.points ?? []).filter(p => shown(poses, p.floorId)) })).filter(r => r.points.length >= 2).map((r, i) => <RouteLine key={i} responder={r.responder} points={r.points.map(p => at(p, ROUTE_HEIGHT))} />)}
     {(directive.routes ?? []).map((route, i, all) => {
       const pts = route.points ?? [];
       const first = pts[0], last = pts.at(-1);
@@ -865,10 +865,11 @@ function RouteEnd({ kind, position }: { kind: 'origin' | 'stop' | 'destination';
   );
 }
 
-function gradientAt(t: number): [number, number, number] {
-  const x = THREE.MathUtils.clamp(t, 0, 1) * (routeGradient.length - 1);
-  const i = Math.min(Math.floor(x), routeGradient.length - 2);
-  const c = routeGradient[i].clone().lerp(routeGradient[i + 1], x - i);
+const responderGradient = ['#b91c1c', '#ff3b30'].map(c => new THREE.Color(c));
+function gradientAt(t: number, stops = routeGradient): [number, number, number] {
+  const x = THREE.MathUtils.clamp(t, 0, 1) * (stops.length - 1);
+  const i = Math.min(Math.floor(x), stops.length - 2);
+  const c = stops[i].clone().lerp(stops[i + 1], x - i);
   return [c.r, c.g, c.b];
 }
 
@@ -889,7 +890,7 @@ function Cursor({ position }: { position: [number, number, number] }) {
   );
 }
 
-function RouteLine({ points }: { points: [number, number, number][] }) {
+function RouteLine({ points, responder = false }: { points: [number, number, number][]; responder?: boolean }) {
   const line = useRef<Line2>(null);
   const walker = useRef<THREE.Mesh>(null);
   const curve = useMemo(() => {
@@ -903,10 +904,10 @@ function RouteLine({ points }: { points: [number, number, number][] }) {
     const out: [number, number, number][] = [];
     for (let i = 0, walked = 0; i < points.length; i++) {
       if (i > 0) walked += new THREE.Vector3(...points[i]).distanceTo(new THREE.Vector3(...points[i - 1]));
-      out.push(gradientAt(walked / total));
+      out.push(gradientAt(walked / total, responder ? responderGradient : routeGradient));
     }
     return out;
-  }, [curve, points]);
+  }, [curve, points, responder]);
   const clock = useRef(0);
   useFrame((_, delta) => {
     clock.current += delta;

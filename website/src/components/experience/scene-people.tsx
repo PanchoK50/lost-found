@@ -7,7 +7,7 @@ import type { FloorPoint } from '@/lib/chat/contract';
 import type { BuildingModel, FloorPose } from './scene-model';
 
 /** People walking out during a drill: one entry per room, drawn as a few figures following the room's way out. */
-export interface Evacuee { id: string; path: FloorPoint[]; startMin: number; outMin?: number; count: number; cutOff?: boolean }
+export interface Evacuee { id: string; path: FloorPoint[]; startMin: number; outMin?: number; count: number; cutOff?: boolean; firefighter?: boolean; speed?: number }
 
 const MAX_FIGURES = 320;
 const PER_ROOM = 4;
@@ -28,9 +28,12 @@ HEAD.translate(0, 1.32, 0);
 const SHIRTS = ['#2f6fdf', '#e5484d', '#2f9e62', '#f5a623', '#8a4fd8', '#f26a1b', '#1aa3b8', '#d6409f'].map(c => new THREE.Color(c));
 const SKIN = ['#f6d7c3', '#e8b796', '#c98e6b', '#8d5a3b', '#f1c8a2'].map(c => new THREE.Color(c));
 const TRAPPED = new THREE.Color('#ff2d3d');
+// Fire brigade: dark tunic, yellow helmet.
+const FIREFIGHTER = new THREE.Color('#1f2a44');
+const HELMET = new THREE.Color('#ffd400');
 // Few states, quiet colours: grey waiting, navy moving (walking or queuing), green safe, red only when trapped.
 
-interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; queueAt: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 ; shirt: THREE.Color; skin: THREE.Color }
+interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; queueAt: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 ; shirt: THREE.Color; skin: THREE.Color; firefighter: boolean; speed?: number }
 
 /** The polyline segment [k - 1, k] holding the point `distance` metres along it. */
 function segmentAt(lengths: number[], distance: number) {
@@ -89,7 +92,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
           queueAt: Math.max(0, lengths.at(-1)! - QUEUE_FRONT_M - i * QUEUE_GAP_M),
           // Through the exit door once the queue lets them (spread over the room's share of the wait).
           out: evacuee.outMin !== undefined ? Math.max(evacuee.startMin, evacuee.outMin - (n - 1 - i) * QUEUE_MIN) : Infinity,
-          offset: new THREE.Vector2((jitter(seed) - 0.5) * 1.6, (jitter(seed + 3) - 0.5) * 1.6), cutOff: !!evacuee.cutOff,
+          offset: new THREE.Vector2((jitter(seed) - 0.5) * 1.6, (jitter(seed + 3) - 0.5) * 1.6), cutOff: !!evacuee.cutOff, firefighter: !!evacuee.firefighter, speed: evacuee.speed,
           exitOut: last.clone().add(out3).add(new THREE.Vector3((jitter(seed + 5) - 0.5) * 3, 0, (jitter(seed + 9) - 0.5) * 3)),
           shirt: SHIRTS[Math.floor(jitter(seed + 11) * SHIRTS.length)], skin: SKIN[Math.floor(jitter(seed + 13) * SKIN.length)],
         });
@@ -122,7 +125,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
         color = 'trapped';
         s = t >= figure.start ? 1 + 0.15 * Math.sin(clock.elapsedTime * 8 + i) : 1;
       } else {
-        const walked = Math.max(0, t - figure.start) * speed;
+        const walked = Math.max(0, t - figure.start) * (figure.speed ?? speed);
         // Until the exit lets them through they only get as far as their place in the queue.
         const stop = t < figure.out ? figure.queueAt : figure.total;
         if (walked <= 0) {
@@ -161,9 +164,9 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
       matrix.compose(position, turn.setFromAxisAngle(up, heading), scale);
       instance.setMatrixAt(i, matrix);
       // Shirts keep their colour; trapped people flash red.
-      instance.setColorAt(i, color === 'trapped' && Math.sin(clock.elapsedTime * 8 + i) > 0 ? TRAPPED : figure.shirt);
+      instance.setColorAt(i, figure.firefighter ? FIREFIGHTER : color === 'trapped' && Math.sin(clock.elapsedTime * 8 + i) > 0 ? TRAPPED : figure.shirt);
       headInstance.setMatrixAt(i, matrix);
-      headInstance.setColorAt(i, figure.skin);
+      headInstance.setColorAt(i, figure.firefighter ? HELMET : figure.skin);
     });
     for (const m of [instance, headInstance]) {
       m.instanceMatrix.needsUpdate = true;

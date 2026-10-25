@@ -254,6 +254,17 @@ function Overview({ view, data, reached, progress, incident, onShowFloor, onRoom
         <button type="button" className="hazard-link" onClick={onDetails}>All {data.playbook.length} steps →</button>
       </section>
 
+      {data.firefighting && (
+        <section className="hz-section">
+          <header><h3>Fire brigade</h3><span>{view.t < data.firefighting.arrive_min ? `arrives +${data.firefighting.arrive_min} min` : view.t < data.firefighting.at_fire_min ? 'advancing' : 'at the fire'}</span></header>
+          <dl className="hz-facts">
+            <div><dt>Enter by</dt><dd>{data.firefighting.entrance_room}<small>Staging point outside this entrance</small></dd></div>
+            <div><dt>Way in</dt><dd>{data.firefighting.stairs.length ? data.firefighting.stairs.join(' → ') : 'Same floor, no stairs'}<small>{Math.round(data.firefighting.distance_m)} m · lifts not used</small></dd></div>
+            <div><dt>At the fire</dt><dd>+{data.firefighting.at_fire_min.toFixed(1)} min<small>{data.firefighting.through_smoke.length ? `Through smoke in ${data.firefighting.through_smoke.slice(0, 2).map(s => s.name).join(', ')}` : 'Clear of smoke on the way'}</small></dd></div>
+          </dl>
+        </section>
+      )}
+
       {progress && progress.total > 0 && (
         <section className="hz-section">
           <header><h3>{main === 'fire' ? 'Evacuation' : 'Clearing the affected rooms'}</h3><span>{progress.out} of {progress.total} out</span></header>

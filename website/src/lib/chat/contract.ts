@@ -122,7 +122,7 @@ export interface SceneDirective {
    * scores) and drives the step list. `points` is the drawn polyline; if omitted, the API fills it in from
    * `spacePath` with the walking model (lib/buildings/walk.ts). Points on different floors draw a vertical hop.
    */
-  routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string; outdoor?: boolean }[];
+  routes?: { spacePath?: string[]; points?: FloorPoint[]; steps?: RouteStep[]; label?: string; outdoor?: boolean; /** Fire brigade route: drawn red. */ responder?: boolean }[];
   /** Straight 3D lines, e.g. sensor links between room centroids. `breakdown` also draws the across and up legs (dashed). */
   links?: { from: FloorPoint; to: FloorPoint; label?: string; breakdown?: boolean }[];
   /** Asset ids to light up (their footprint boxes turn orange). */
@@ -136,7 +136,7 @@ export interface SceneDirective {
   /** Spaces the camera frames (with context around them), when the highlights are not the right ones. */
   frameSpaces?: string[];
   /** Evacuation drill: people per room and their way out; they move with `minute` at `walkMPerMin`. */
-  evacuees?: { id: string; path: FloorPoint[]; startMin: number; outMin?: number; count: number; cutOff?: boolean }[];
+  evacuees?: { id: string; path: FloorPoint[]; startMin: number; outMin?: number; count: number; cutOff?: boolean; firefighter?: boolean; speed?: number }[];
   minute?: number;
   walkMPerMin?: number;
 }

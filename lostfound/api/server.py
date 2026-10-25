@@ -383,6 +383,7 @@ def import_building_json(content: str, name: str, created_by: str | None) -> dic
 
 from lostfound.hazards import classify as hazard_classify  # noqa: E402
 from lostfound.hazards import evacuation as hazard_evacuation  # noqa: E402
+from lostfound.hazards import firefighting as hazard_firefighting  # noqa: E402
 from lostfound.hazards import impact as hazard_impact  # noqa: E402
 from lostfound.hazards import playbooks as hazard_playbooks  # noqa: E402
 from lostfound.hazards import readiness as hazard_readiness  # noqa: E402
@@ -413,9 +414,10 @@ def simulate_hazard(request: SimulateRequest) -> dict:
     result = hazard_spread.simulate(building, request.hazard, request.space_id, minutes)
     summary = hazard_impact.impact(building, result)
     evacuation = hazard_evacuation.evacuate(building, result, request.evacuate_at_min)
+    attack = hazard_firefighting.attack_route(building, result)
     return {
         "building_id": request.building_id, "simulation": result, "impact": summary, "evacuation": evacuation,
-        "playbook": hazard_playbooks.plan(building, summary, evacuation, request.severity, request.contacts),
+        "playbook": hazard_playbooks.plan(building, summary, evacuation, request.severity, request.contacts), "firefighting": attack,
     }
 
 

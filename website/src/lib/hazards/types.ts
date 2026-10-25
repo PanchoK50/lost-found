@@ -38,7 +38,13 @@ export interface PlaybookAction {
   order: number; kind: 'alarm' | 'call' | 'notify' | 'shutoff' | 'evacuate'; title: string; detail: string; auto: boolean; space_ids: string[];
   contact: Contact | null; eta_min: number | null; timeline: { at_s: number; status: string }[];
 }
-export interface SimulateResponse { building_id: string; simulation: Simulation; impact: Impact; evacuation: Evacuation | null; playbook: PlaybookAction[] }
+/** Fire brigade attack route (lostfound/hazards/firefighting.py). */
+export interface Firefighting {
+  entrance: string; entrance_room: string; entrance_floor_id: string; staging: [number, number]; stairs: string[];
+  distance_m: number; arrive_min: number; at_fire_min: number; through_smoke: { space_id: string; name: string; level: number }[];
+  path: [string, number, number][]; space_path: string[];
+}
+export interface SimulateResponse { building_id: string; simulation: Simulation; impact: Impact; evacuation: Evacuation | null; playbook: PlaybookAction[]; firefighting?: Firefighting | null }
 
 export interface Assessment {
   is_damage: boolean; hazard: HazardKind | 'none'; severity: 1 | 2 | 3; confidence: number; title: string; description: string;
