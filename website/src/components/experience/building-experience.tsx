@@ -153,36 +153,36 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const lastAnswerTitle = messages.findLast(m => m.response?.answer)?.response?.answer?.title;
   // The live voice agent drives the same actions as the UI (components/voice/voice-agent.tsx).
   const voiceActions: VoiceActions = {
-    ask: question => ask(question),
+    ask: question => ask(question, undefined, true),
     simulate: (kind, room) => {
       const hazardKind = /fire|feuer|smoke/i.test(kind) ? 'fire' : /water|leak|wasser|flood/i.test(kind) ? 'water' : /power|electric|strom/i.test(kind) ? 'electrical' : null;
       const space = findSpace(building, room);
       if (!hazardKind) return 'Say fire, water or power.';
-      if (!space) return `I couldn't find a room called "${room}". Ask the building which rooms there are.`;
+      if (!space) return `No room "${room}" in the plans.`;
       setHazardRoom(null); setHazardFloor(null);
       void hazard.open(space.id, hazardKind);
-      return `Started a ${hazardKind === 'electrical' ? 'power fault' : hazardKind} simulation in ${space.name}. The map shows the spread${hazardKind === 'fire' ? ', the evacuation and the fire brigade route' : ''}.`;
+      return `${hazardKind === 'electrical' ? 'Power fault' : hazardKind === 'fire' ? 'Fire' : 'Water'} in ${space.name}. On the map.`;
     },
     showFloor: floor => {
       const target = findFloor(building, floor);
-      if (!target) return `There is no floor "${floor}" in this building.`;
+      if (!target) return `No floor "${floor}".`;
       if (hazard.view) { setHazardRoom(null); setHazardFloor(target === 'all' ? ALL_FLOORS : target); }
       else if (target === 'all') showOverview(); else focusFloor(target);
-      return target === 'all' ? 'Showing the whole building.' : `Showing ${building.floors.find(f => f.id === target)?.name}.`;
+      return target === 'all' ? 'Whole building.' : `${building.floors.find(f => f.id === target)?.name}.`;
     },
     reportIncident: (kind, room) => {
       const hazardKind = /fire|feuer|smoke/i.test(kind) ? 'fire' : /water|leak|wasser|flood/i.test(kind) ? 'water' : 'electrical';
       const space = findSpace(building, room);
-      if (!space) return `I couldn't find a room called "${room}".`;
+      if (!space) return `No room "${room}" in the plans.`;
       const incident: Incident = { id: crypto.randomUUID(), buildingId: building.building.id, hazard: hazardKind, spaceId: space.id, severity: 2, source: 'report',
         title: `${hazardMeta[hazardKind].label} reported`, description: 'Reported by voice', reporter: profile?.name, createdAt: Date.now(), status: 'active' };
       incidents.raise(incident); playAlarm(); openIncident(incident);
-      return `Alarm raised: ${hazardMeta[hazardKind].label.toLowerCase()} in ${space.name}.`;
+      return `Alarm raised. ${hazardMeta[hazardKind].label} in ${space.name}.`;
     },
     callFireBrigade: () => {
-      if (!hazard.view) return 'There is no open incident or simulation. Start one first.';
+      if (!hazard.view) return 'No open incident.';
       hazard.startResponse();
-      return hazard.view.mode === 'incident' ? 'Calling the fire brigade and the other contacts now.' : 'Running the response drill: the calls are simulated.';
+      return hazard.view.mode === 'incident' ? 'Fire brigade called.' : 'Fire brigade called. Drill.';
     },
     clearMap: () => clearAnswer(),
   };
@@ -402,9 +402,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     return { hazard: view.hazard, origin: view.spaceId, t: Math.round(view.t), affected };
   }
 
-  async function ask(text: string, skillId?: string): Promise<string> {
+  async function ask(text: string, skillId?: string, voice = false): Promise<string> {
     const message = text.trim();
-    if (!message || busy) return busy ? 'I am still working on the previous question.' : '';
+    if (!message || busy) return busy ? 'Still on the last one.' : '';
     const history = messages.map(({ role, content }) => ({ role, content }));
     setMessages(current => [...current, { id: nextId.current++, role: 'user', content: message }]);
     setDraft('');
@@ -424,7 +424,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
       setDirective(chatContext ? keepSelectionInView(response, building, chatContext) : response.scene);
       setActiveStep(undefined);
-      return withoutAnswerLine(response.reply);
+      return voice ? voiceBrief(response) : withoutAnswerLine(response.reply);
     } catch (error) {
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: error instanceof Error ? error.message : 'Something went wrong.', error: true }]);
       return error instanceof Error ? error.message : 'Something went wrong.';
@@ -832,6 +832,24 @@ function findFloor(building: Building, text: string): string | 'all' | undefined
   if (/basement|keller|^b\d?$|underground/.test(q)) return building.floors.find(f => f.level === (Number(q.match(/\d+/)?.[0] ?? 1) * -1))?.id ?? building.floors.find(f => f.level < 0)?.id;
   const n = q.match(/-?\d+/)?.[0];
   return n !== undefined ? building.floors.find(f => f.level === Number(n))?.id : building.floors.find(f => f.name.toLowerCase() === q)?.id;
+}
+
+/**
+ * What the voice co-pilot says back: the answer in a few words ("Lab 4.10, floor 4. Route is on the map."), not the
+ * whole chat reply. The full answer stays in the chat and on the map.
+ */
+function voiceBrief(response: ChatResponse): string {
+  const routed = Boolean(response.scene?.routes?.length);
+  const tail = routed ? ' Route is on the map.' : '';
+  if (response.answer) {
+    const { title, value, detail } = response.answer;
+    const parts = [title, value, detail && detail.length <= 32 ? detail : undefined].filter(Boolean).join(', ');
+    return `${parts.replace(/\s*→\s*/g, ' to ').replace(/\s*↔\s*/g, ' and ')}.${tail}`.replace(/\.\./g, '.');
+  }
+  const plain = withoutAnswerLine(response.reply).replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim();
+  const first = plain.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? plain;
+  const words = first.split(' ');
+  return `${words.length > 18 ? `${words.slice(0, 18).join(' ')}.` : first}${tail}`;
 }
 
 /** The chat chip for a selection: what it is, where, and the edits that make sense for it. */
