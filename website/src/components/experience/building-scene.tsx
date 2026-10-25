@@ -188,7 +188,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={framedRoom} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
-            onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
+            onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} facade={facadeKind(building)} night={emergency} />
         ))}
         <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency}
           buildingId={building.building.id} toWorld={sceneryToWorld} footprint={footprint} />
@@ -429,6 +429,9 @@ interface FloorViewProps {
   hazards: Map<string, { kind: HazardKind; level: number }[]>;
   onPickObject?(kind: 'asset' | 'opening', id: string): void;
   selectedDoor?: string | null;
+  /** Facade family for the solid exterior, and night (emergency) textures. */
+  facade?: FacadeKind;
+  night?: boolean;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
@@ -436,7 +439,7 @@ interface FloorViewProps {
   onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect, onPickObject, selectedDoor }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect, onPickObject, selectedDoor, facade = 'campus', night = false }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
@@ -532,7 +535,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     <group ref={group} position-y={pose.y}>
       <group ref={blocks} scale-y={blockHeight(model.storey, pose.flat)}>
         {plain.map(m => (
-          <mesh key={m.space.id} geometry={m.geometry} material={solid ? SOLID_MATERIALS : detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
+          <mesh key={m.space.id} geometry={m.geometry} material={solid ? solidMaterials(facade, night, model.floor.level === 0) : detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
         ))}
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
@@ -596,11 +599,44 @@ function facadeTexture() {
   texture.anisotropy = 4;
   return texture;
 }
-/** ExtrudeGeometry groups: 0 = caps (roof), 1 = sides (facade). Shared by every floor in the overview. */
-const SOLID_MATERIALS: THREE.Material[] = typeof document === 'undefined' ? [] : [
-  new THREE.MeshStandardMaterial({ color: '#cfccc4', roughness: 0.95 }),
-  new THREE.MeshStandardMaterial({ map: facadeTexture(), roughness: 0.7 }),
-];
+type FacadeKind = 'office' | 'campus' | 'brick' | 'industrial';
+/** Facade family from what the building is (works for any building.json). */
+function facadeKind(building: Building): FacadeKind {
+  const id = building.building.id, source = building.building.source;
+  if (id.includes('factory') || building.spaces.some(sp => /production|warehouse|assembly/.test(sp.room_type))) return 'industrial';
+  if (source === 'swiss_dwellings' || source === 'resplan' || building.spaces.some(sp => sp.room_type === 'bedroom')) return 'brick';
+  if (building.spaces.filter(sp => sp.room_type === 'office').length > building.spaces.length * 0.4) return 'office';
+  return 'campus';
+}
+const exteriorTextures = new Map<string, THREE.Texture>();
+function exteriorTexture(name: string, repeat: [number, number], fallback?: () => THREE.Texture) {
+  let texture = exteriorTextures.get(name);
+  if (!texture) {
+    texture = new THREE.TextureLoader().load(`/art/exterior/${name}.jpg`, undefined, undefined, () => { if (fallback) exteriorTextures.set(name, fallback()); });
+    texture.wrapS = THREE.RepeatWrapping; texture.wrapT = name.startsWith('facade') ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+    texture.repeat.set(...repeat);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    exteriorTextures.set(name, texture);
+  }
+  return texture;
+}
+const solidCache = new Map<string, THREE.Material[]>();
+/** Solid exterior: generated facade per building type (one bay = 3 m, one repeat per storey), gravel roof; night variants in emergencies. */
+function solidMaterials(kind: FacadeKind, night: boolean, ground: boolean): THREE.Material[] {
+  const name = `facade-${ground && kind === 'office' ? 'ground-office' : kind}${night && (kind === 'office' || kind === 'campus') && !(ground && kind === 'office') ? '-night' : ''}`;
+  const key = `${name}|${night}`;
+  let materials = solidCache.get(key);
+  if (!materials) {
+    const roof = exteriorTexture('roof-flat', [1 / 5, 1 / 5]);
+    materials = [
+      new THREE.MeshStandardMaterial({ map: roof, color: night ? '#6b7280' : '#ffffff', roughness: 0.95 }),
+      new THREE.MeshStandardMaterial({ map: exteriorTexture(name, [1 / 3, 1], facadeTexture), color: night ? '#9aa4b8' : '#ffffff', roughness: 0.7, emissive: night ? '#2a1d08' : '#000000', emissiveIntensity: night ? 0.6 : 0 }),
+    ];
+    solidCache.set(key, materials);
+  }
+  return materials;
+}
 
 /** Water shimmers and a power cut flickers: the shared tint materials breathe a little every frame. */
 function HazardPulse() {
