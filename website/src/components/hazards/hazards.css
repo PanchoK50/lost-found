@@ -28,7 +28,8 @@
 .hazard-panel { position: absolute; z-index: 5; left: 8px; right: 8px; bottom: 8px; max-height: 52vh; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 .hazard-panel--live { border-color: #e5484d; }
 @media (min-width: 900px) {
-  .hazard-panel { top: 76px; bottom: 16px; left: 16px; right: auto; width: 380px; max-height: none; }
+  .hazard-panel { top: 76px; bottom: 16px; right: 16px; left: auto; width: 420px; max-height: none; }
+  .experience--hazard .floor-rail { right: 452px; }
 }
 .hazard-head { display: flex; gap: 12px; align-items: flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--line); }
 .hazard-panel--fire .hazard-head { background: linear-gradient(180deg, #fff1f1, #fff); }
@@ -38,7 +39,7 @@
 .hazard-head > div { flex: 1; min-width: 0; }
 .hazard-kicker { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .hazard-panel--live .hazard-kicker { color: #e5484d; }
-.hazard-head h2 { margin: 2px 0; font-size: 18px; color: var(--ink); }
+.hazard-head h2 { margin: 2px 0 4px; font-size: 22px; line-height: 1.15; letter-spacing: -.02em; color: var(--ink); }
 .hazard-place { font-size: 12px; color: var(--muted); }
 .hazard-close { flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--paper); color: var(--muted); }
 .hazard-report { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 12px; }
@@ -122,3 +123,39 @@
 .hazard-drill { display: flex; flex-direction: column; gap: 4px; margin: 0 14px 10px; font-size: 12px; }
 .hazard-drill-bar { height: 6px; border-radius: 999px; background: var(--paper); overflow: hidden; }
 .hazard-drill-bar span { display: block; height: 100%; background: #2f8f5b; transition: width .2s; }
+
+/* Header badge while a simulation or incident is open */
+.mode-badge { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border: 1px solid #f5a623; border-radius: 999px; background: #fff7e8; color: #8a5a00; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.mode-badge i { width: 8px; height: 8px; border-radius: 50%; background: #f5a623; animation: alarm-pulse 1.2s infinite; }
+.mode-badge--live { border-color: #e5484d; background: #fff1f1; color: #b42318; }
+.mode-badge--live i { background: #e5484d; }
+
+/* Overview: numbered response steps */
+.hazard-steps { list-style: none; margin: 0; padding: 6px 14px 10px; }
+.hazard-step { position: relative; display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.hazard-step::before { content: ""; position: absolute; left: 16px; top: 46px; bottom: -12px; width: 2px; background: #dbe6f7; }
+.hazard-step:last-of-type::before { display: none; }
+.hazard-step-n { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #e7effd; color: var(--blue); font-weight: 700; z-index: 1; }
+.hazard-step.is-done .hazard-step-n { background: var(--blue); color: #fff; }
+.hazard-step strong { display: block; font-size: 15px; color: var(--ink); }
+.hazard-step p { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
+.hazard-step time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hazard-link { border: 0; background: none; color: var(--blue); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.hazard-responders { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 10px; }
+.hazard-responder { display: grid; grid-template-columns: 10px auto; column-gap: 7px; align-items: center; font-size: 13px; font-weight: 600; color: var(--ink); }
+.hazard-responder i { width: 9px; height: 9px; border-radius: 50%; background: #b8c0cc; }
+.hazard-responder em { grid-column: 2; font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.hazard-responder.is-ok i { background: #2f8f5b; }
+.hazard-responder.is-busy i { background: #f5a623; animation: alarm-pulse 1s infinite; }
+.hazard-step-actions { padding-top: 12px; }
+.hazard-run { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; box-shadow: 0 8px 24px rgba(240, 92, 3, .25); }
+.hazard-run:hover { background: var(--accent-hover); }
+
+/* Scenario playback bar under the model */
+.hazard-playback { position: absolute; z-index: 4; max-width: 640px; margin: 0 auto; padding: 10px 14px 6px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.hazard-playback-head { display: flex; justify-content: space-between; font-size: 13px; }
+.hazard-playback-head strong { color: var(--ink); }
+.hazard-playback-head span { color: var(--muted); font-size: 12px; }
+.hazard-playback .hazard-timeline { padding: 6px 0 4px; }
+.hazard-playback .hazard-play { background: var(--blue); }
+.hazard-playback .hazard-clock { min-width: 36px; font-weight: 500; color: var(--muted); font-size: 12px; text-align: center; }

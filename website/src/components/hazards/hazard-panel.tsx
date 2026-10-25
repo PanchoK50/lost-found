@@ -3,21 +3,22 @@
 import { useEffect, useMemo, useState, type Ref } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import { hazardMeta, type ImpactRoom, type PlaybookAction, type Relation } from '@/lib/hazards/types';
-import { evacuationProgress, type HazardView } from './use-hazard';
+import { evacuationProgress, keyRoom, type HazardView } from './use-hazard';
 
 const RELATION_LABEL: Record<Relation, string> = {
   origin: 'Where it started', below: 'Floor below', 'next door': 'Next door', above: 'Floor above', 'same floor': 'Same floor', 'other floor': 'Other floors',
 };
-type Tab = 'rooms' | 'assets' | 'evacuation' | 'response';
+type Tab = 'overview' | 'rooms' | 'assets' | 'evacuation' | 'response';
+const TITLE: Record<string, string> = { fire: 'Fire', water: 'Water leak', electrical: 'Power fault' };
 
 /** Side panel for a simulation or a live incident: timeline, what is hit, evacuation and the response. */
-export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResponse, onRoom, onClose, onResolve }: {
+export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom, onShowModel, onClose, onResolve }: {
   building: Building;
   view: HazardView;
   panelRef?: Ref<HTMLElement>;
-  onT(t: number): void;
-  onPlay(): void;
   onStartResponse(): void;
+  /** Back to the whole-building view of the hazard. */
+  onShowModel(): void;
   onRoom(spaceId: string): void;
   onClose(): void;
   onResolve?(): void;
@@ -26,12 +27,12 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
   const origin = building.spaces.find(s => s.id === view.spaceId);
   const floorName = building.floors.find(f => f.id === origin?.floor_id)?.name;
   const data = view.data;
-  const [tab, setTab] = useState<Tab>(view.mode === 'incident' ? 'response' : 'rooms');
+  const [tab, setTab] = useState<Tab>('overview');
+  const key = data ? keyRoom(data) : undefined;
   const reached = useMemo(() => (data?.impact.rooms ?? []).filter(r => r.arrival_min <= view.t + 1e-6), [data, view.t]);
   const people = useMemo(() => sum(dedupe(reached).map(r => r.people)), [reached]);
   const assets = useMemo(() => (data?.impact.assets_at_risk ?? []).filter(a => a.arrival_min <= view.t + 1e-6), [data, view.t]);
   const powerOut = reached.filter(r => r.kind === 'electrical').length;
-  const minutes = data?.simulation.minutes ?? 30;
   const progress = data?.evacuation ? evacuationProgress(data, view.t) : undefined;
 
   return (
@@ -39,9 +40,8 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
       <header className="hazard-head">
         <span className="hazard-icon" aria-hidden>{meta.icon}</span>
         <div>
-          <span className="hazard-kicker">{view.mode === 'incident' ? 'Live incident' : 'Simulation'} · {meta.label}</span>
-          <h2>{view.incident?.title ?? origin?.name}</h2>
-          <span className="hazard-place">{origin?.name}{floorName ? ` · ${floorName}` : ''}</span>
+          <h2>{TITLE[view.hazard]} / {origin?.name}</h2>
+          <span className="hazard-place">{view.mode === 'incident' ? `Live incident${view.incident?.reporter ? ` · reported by ${view.incident.reporter}` : ''}` : 'Practice response · Calls simulated'}{floorName ? ` · ${floorName}` : ''}</span>
         </div>
         <button type="button" className="hazard-close" onClick={onClose} aria-label="Close">✕</button>
       </header>
@@ -58,12 +58,6 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
       {!data && !view.error && <p className="hazard-loading">Working out what this means for the building…</p>}
 
       {data && <>
-        <div className="hazard-timeline">
-          <button type="button" className="hazard-play" onClick={onPlay} aria-label={view.playing ? 'Pause' : 'Play'}>{view.playing ? '❚❚' : '▶'}</button>
-          <input type="range" min={0} max={minutes} step={0.25} value={view.t} onChange={event => onT(Number(event.target.value))} aria-label="Minutes after the start" />
-          <span className="hazard-clock">{view.t < 1 ? 'Start' : `+${Math.round(view.t)} min`}</span>
-        </div>
-
         <div className="hazard-stats">
           <Stat value={dedupe(reached).length} label="spaces hit" />
           <Stat value={people} label="people at risk" />
@@ -81,12 +75,16 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
         ))}
 
         <nav className="hazard-tabs" role="tablist">
-          {(['rooms', 'assets', ...(data.evacuation?.walkers.length ? ['evacuation' as const] : []), 'response'] as Tab[]).map(t => (
-            <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t === 'rooms' ? 'Rooms' : t === 'assets' ? 'Assets' : t === 'evacuation' ? 'Evacuation' : 'Response'}</button>
+          {(['overview', 'rooms', 'assets', ...(data.evacuation?.walkers.length ? ['evacuation' as const] : []), 'response'] as Tab[]).map(t => (
+            <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
           ))}
         </nav>
 
         <div className="hazard-body">
+          {tab === 'overview' && (
+            <Overview view={view} originName={origin?.name ?? ''} keyName={key?.name} keyRelation={key?.relation} reached={dedupe(reached).length} people={people} assets={assets.length}
+              actions={data.playbook} progress={progress} onShowModel={onShowModel} onStart={onStartResponse} onDetails={() => setTab('response')} />
+          )}
           {tab === 'rooms' && <Rooms rooms={reached} onRoom={onRoom} />}
           {tab === 'assets' && (assets.length ? (
             <ul className="hazard-list">
@@ -149,16 +147,111 @@ function Rooms({ rooms, onRoom }: { rooms: ImpactRoom[]; onRoom(spaceId: string)
   </>;
 }
 
+const TAB_LABEL: Record<Tab, string> = { overview: 'Overview', rooms: 'Rooms', assets: 'Assets', evacuation: 'Evacuation', response: 'Response' };
+
+function clockTime(at: number) {
+  return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** The response as numbered steps, like a checklist: report → affected spaces → responders → (evacuation). */
+function Overview({ view, originName, keyName, keyRelation, reached, people, assets, actions, progress, onShowModel, onStart, onDetails }: {
+  view: HazardView; originName: string; keyName?: string; keyRelation?: Relation; reached: number; people: number; assets: number;
+  actions: PlaybookAction[]; progress?: ReturnType<typeof evacuationProgress>; onShowModel(): void; onStart(): void; onDetails(): void;
+}) {
+  const now = useNow(view.responseStartedAt);
+  const elapsed = view.responseStartedAt ? (now - view.responseStartedAt) / 1000 : -1;
+  const calls = actions.filter(a => a.contact && (a.kind === 'call' || a.kind === 'notify'));
+  const unique = calls.filter((a, i) => calls.findIndex(b => b.contact!.name === a.contact!.name) === i).slice(0, 4);
+  const live = view.mode === 'incident';
+  const started = view.incident?.createdAt ?? view.responseStartedAt;
+  return (
+    <ol className="hazard-steps">
+      <li className="hazard-step is-done">
+        <span className="hazard-step-n">1</span>
+        <div><strong>{live ? 'Report received' : 'Scenario started'}</strong><p>{live ? `Room confirmed: ${originName}` : `${TITLE[view.hazard]} starts in ${originName}`}</p></div>
+        {started && <time>{clockTime(started)}</time>}
+      </li>
+      <li className="hazard-step">
+        <span className="hazard-step-n">2</span>
+        <div>
+          <strong>Review affected spaces</strong>
+          <p>{keyName ? `${originName} and ${keyName}${keyRelation && keyRelation !== 'same floor' ? ` (${keyRelation})` : ''}` : originName} · {reached} spaces · {people} people{assets ? ` · ${assets} critical assets` : ''}</p>
+        </div>
+        <button type="button" className="hazard-link" onClick={onShowModel}>Show on model →</button>
+      </li>
+      <li className="hazard-step">
+        <span className="hazard-step-n">3</span>
+        <div>
+          <strong>Notify responders</strong>
+          <p>{unique.map(a => a.contact!.name.split(' (')[0]).join(' · ')}</p>
+          <div className="hazard-responders">
+            {unique.map(action => {
+              const status = statusOf(action, elapsed, live);
+              const tone = status === 'confirmed' || status === 'done' ? 'ok' : status ? 'busy' : 'idle';
+              return <span key={action.order} className={`hazard-responder is-${tone}`}><i />{action.contact!.name.split(' (')[0]}<em>{status ? `${live ? '' : 'Demo '}${STATUS_LABEL[status]?.toLowerCase() ?? status}` : 'Pending'}</em></span>;
+            })}
+          </div>
+        </div>
+      </li>
+      {progress && progress.total > 0 && (
+        <li className="hazard-step">
+          <span className="hazard-step-n">4</span>
+          <div>
+            <strong>{view.hazard === 'fire' ? 'Evacuate' : 'Clear the affected rooms'}</strong>
+            <p>{progress.out} of {progress.total} people safe{progress.trapped ? ` · ${progress.trapped} trapped` : ''} · all out by +{progress.lastOutMin.toFixed(1)} min</p>
+          </div>
+        </li>
+      )}
+      <li className="hazard-step-actions">
+        {!view.responseStartedAt
+          ? <button type="button" className="hazard-run" onClick={onStart}>▶ {live ? 'Start response' : 'Run demo response'}</button>
+          : <button type="button" className="hazard-link" onClick={onDetails}>All {actions.length} response steps →</button>}
+      </li>
+    </ol>
+  );
+}
+
+function statusOf(action: PlaybookAction, elapsed: number, live: boolean) {
+  if (elapsed < 0 || !(action.auto || live)) return undefined;
+  return [...action.timeline].reverse().find(step => elapsed >= step.at_s)?.status;
+}
+
+function useNow(active?: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
+/** Scenario playback under the model: play/pause and scrub the minutes. */
+export function HazardPlayback({ view, onT, onPlay, style }: { view: HazardView; onT(t: number): void; onPlay(): void; style?: React.CSSProperties }) {
+  const minutes = view.data?.simulation.minutes ?? 30;
+  return (
+    <div className="hazard-playback" style={style}>
+      <div className="hazard-playback-head"><strong>Scenario playback</strong><span>{view.mode === 'incident' ? 'Predicted spread' : 'Illustrative scenario'}</span></div>
+      <div className="hazard-timeline">
+        <button type="button" className="hazard-play" onClick={onPlay} disabled={!view.data} aria-label={view.playing ? 'Pause' : 'Play'}>{view.playing ? '❚❚' : '▶'}</button>
+        <span className="hazard-clock">{fmt(view.t)}</span>
+        <input type="range" min={0} max={minutes} step={0.25} value={view.t} onChange={event => onT(Number(event.target.value))} aria-label="Minutes after the start" disabled={!view.data} />
+        <span className="hazard-clock">{fmt(minutes)}</span>
+      </div>
+    </div>
+  );
+}
+
+function fmt(minutes: number) {
+  const m = Math.floor(minutes), s = Math.round((minutes - m) * 60);
+  return `${m}:${String(s === 60 ? 0 : s).padStart(2, '0')}`;
+}
+
 const STATUS_LABEL: Record<string, string> = { dialing: 'Calling…', connected: 'Connected', confirmed: 'Confirmed', in_progress: 'In progress', done: 'Done' };
 
 /** The playbook; once started, calls go out one after another (simulated, the same timeline on every screen). */
 function Response({ actions, startedAt, live, onStart }: { actions: PlaybookAction[]; startedAt?: number; live: boolean; onStart(): void }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!startedAt) return;
-    const timer = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, [startedAt]);
+  const now = useNow(startedAt);
   const elapsed = startedAt ? (now - startedAt) / 1000 : -1;
   return <>
     {!startedAt && (
@@ -169,7 +262,7 @@ function Response({ actions, startedAt, live, onStart }: { actions: PlaybookActi
     )}
     <ol className="hazard-actions">
       {actions.map(action => {
-        const status = startedAt && (action.auto || live) ? [...action.timeline].reverse().find(step => elapsed >= step.at_s)?.status : undefined;
+        const status = startedAt ? statusOf(action, elapsed, live) : undefined;
         return (
           <li key={action.order} className={`hazard-action hazard-action--${action.kind}${status ? ` is-${status}` : ''}`}>
             <span className="hazard-action-icon" aria-hidden>{ACTION_ICON[action.kind]}</span>

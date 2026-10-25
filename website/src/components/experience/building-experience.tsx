@@ -32,7 +32,7 @@ import { unreadCount, useSentHistory } from '@/lib/world/history';
 import { settingsFor } from '@/lib/world/profile';
 import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
-import { HazardPanel } from '@/components/hazards/hazard-panel';
+import { HazardPanel, HazardPlayback } from '@/components/hazards/hazard-panel';
 import { ReportDamage } from '@/components/hazards/report-damage';
 import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
@@ -103,6 +103,12 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     openIncident(arrived);
     clearArrived();
   }, [arrived, building.building.id, openIncident, clearArrived]);
+  // Deep link for demos and the video: ?simulate=water:<space id> (or fire:, electrical:) opens that simulation.
+  const openSimulation = hazard.open;
+  useEffect(() => {
+    const [kind, spaceId] = (new URLSearchParams(window.location.search).get('simulate') ?? '').split(':');
+    if ((kind === 'fire' || kind === 'water' || kind === 'electrical') && building.spaces.some(s => s.id === spaceId)) void openSimulation(spaceId, kind);
+  }, [building, openSimulation]);
   const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive]);
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
@@ -145,10 +151,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       const sheet = transcript.current?.getBoundingClientRect();
       const panel = hazardPanel.current?.getBoundingClientRect();
       const next = wide
-        ? { top, left: Math.max(sheet ? sheet.right : 0, panel ? panel.right : 0), bottom: h - dockTop }
+        ? { top, left: sheet ? sheet.right : 0, bottom: h - dockTop, right: panel ? window.innerWidth - panel.left : 0 }
         : { top, left: 0, bottom: h - Math.min(dockTop, sheet?.top ?? h, panel?.top ?? h) };
       const round = (v: number) => Math.round(v / 8) * 8;
-      setInsets(prev => (round(prev.top) === round(next.top) && round(prev.left) === round(next.left) && round(prev.bottom) === round(next.bottom) ? prev : next));
+      setInsets(prev => (round(prev.top) === round(next.top) && round(prev.left) === round(next.left) && round(prev.bottom) === round(next.bottom) && round(prev.right ?? 0) === round(next.right ?? 0) ? prev : next));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -259,7 +265,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience${started ? ' experience--started' : ''}`}>
+    <main className={`experience${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}`}>
       <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
 
       <div className="hud-top" ref={header}>
@@ -273,6 +279,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             <button type="button" onClick={() => setSheet('buildings')}>{buildings.length} buildings</button>
           </nav>
           <nav className="emergency-actions" aria-label="Emergencies">
+            {hazard.view && <span className={`mode-badge${hazard.view.mode === 'incident' ? ' mode-badge--live' : ''}`}><i />{hazard.view.mode === 'incident' ? 'Live incident' : 'Simulation'}</span>}
             <button type="button" className="emergency-report" onClick={() => setSheet('damage')}>🚨 Report damage</button>
             <button type="button" onClick={() => setSheet('readiness')}>🛡 Readiness</button>
           </nav>
@@ -280,7 +287,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />
         </header>
         <nav className="floor-rail" aria-label="Floors">
-          <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
+          <button type="button" className={(hazard.view ? !hazardFloor && !hazardRoom : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardFloor(null); setHazardRoom(null); } else showOverview(); }} aria-label="Whole building">⌂</button>
           <div className="floor-list" ref={floorList}>
             {floors.map(floor => (
               <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(world, floor.id), incidents.active, building, floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
@@ -405,10 +412,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         </div>
       )}
       {hazard.view && (
-        <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onT={hazard.setT} onPlay={hazard.togglePlay} onStartResponse={hazard.startResponse}
-          onRoom={spaceId => setHazardRoom(spaceId)} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
+        <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onStartResponse={hazard.startResponse}
+          onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
           onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
       )}
+      {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} style={{ bottom: insets.bottom + 10, left: insets.left + 16, right: (insets.right ?? 0) + 16 }} />}
       {sheet === 'damage' && <ReportDamage building={building} myRoom={myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
         incidents.raise(incident);
         closeSheet();

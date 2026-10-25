@@ -94,7 +94,9 @@ export type SceneFocus =
    * Several floors shown together. `spread` (default) pulls them apart so they can be compared;
    * `true` keeps their real heights, e.g. for 3D distances.
    */
-  | { mode: 'stack'; floorIds: string[]; spacing?: 'spread' | 'true' };
+  | { mode: 'stack'; floorIds: string[]; spacing?: 'spread' | 'true' }
+  /** The whole building as glass at real heights, with `floorIds` drawn solid and opened up (emergency views). */
+  | { mode: 'xray'; floorIds: string[] };
 
 export type Tone = 'primary' | 'secondary' | 'muted';
 
@@ -124,6 +126,8 @@ export interface SceneDirective {
   hazards?: { spaceId: string; kind: 'fire' | 'water' | 'electrical'; level: number }[];
   /** Frame the whole focused floor(s) instead of the highlights and routes (emergency views). */
   frameAll?: boolean;
+  /** Spaces the camera frames (with context around them), when the highlights are not the right ones. */
+  frameSpaces?: string[];
   /** Evacuation drill: people per room and their way out; they move with `minute` at `walkMPerMin`. */
   evacuees?: { id: string; path: FloorPoint[]; startMin: number; outMin?: number; count: number; cutOff?: boolean }[];
   minute?: number;

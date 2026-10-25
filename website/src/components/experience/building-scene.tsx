@@ -39,7 +39,7 @@ const routeGradient = ['#2f55d4', '#8a3fc4', '#e04f9a', '#f26b4f'].map(c => new 
 const lift: Record<Tone, number> = { primary: 1, secondary: 0.2, muted: 0.1 };
 
 /** Pixels covered by UI on each side; the camera frames the model in the remaining area. */
-export interface SceneInsets { top: number; left: number; bottom: number }
+export interface SceneInsets { top: number; left: number; bottom: number; right?: number }
 
 interface Props {
   building: Building;
@@ -274,7 +274,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   const controls = useRef<CameraControls>(null);
   const { size, camera } = useThree();
   // Frame the answer: the spaces it names or counts and its reference room, not the background candidates.
-  const frame = useMemo(() => (directive.frameAll ? [] : (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId)), [directive.highlights, directive.frameAll]);
+  const frame = useMemo(() => directive.frameSpaces ?? (directive.frameAll ? [] : (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId)), [directive.highlights, directive.frameAll, directive.frameSpaces]);
   const routePoints = useMemo(() => (directive.frameAll ? [] : [...(directive.routes ?? []).flatMap(r => r.points ?? []), ...(directive.links ?? []).flatMap(l => [l.from, l.to])]), [directive.routes, directive.links, directive.frameAll]);
   const focusKey = JSON.stringify([directive.focus, frame, routePoints.length, room]);
   const first = useRef(true);
@@ -286,12 +286,13 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const extent = box.getSize(new THREE.Vector3());
     const radius = Math.max(4, 0.5 * Math.hypot(extent.x, extent.z, directive.focus.mode === 'floor' ? 0 : extent.y));
     // Fit the bounding sphere into the part of the viewport not covered by the chat UI.
-    const freeW = Math.max(0.2, (size.width - insets.left) / size.width);
+    const right = insets.right ?? 0;
+    const freeW = Math.max(0.2, (size.width - insets.left - right) / size.width);
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.56 : 0.72);
-    const polar = room ? 0.32 : directive.focus.mode === 'floor' ? 0.5 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.56 : directive.focus.mode === 'xray' ? 0.6 : 0.72);
+    const polar = room ? 0.32 : directive.focus.mode === 'floor' ? 0.5 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.95;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
     const smooth = !first.current;
@@ -299,9 +300,9 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setLookAt(centre.x + offset.x, centre.y + offset.y, centre.z + offset.z, centre.x, centre.y, centre.z, smooth);
     // Shift the picture into the free area. Focal offset is in screen axes (Y down): move the camera left/down.
     const worldPerPx = (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / size.height;
-    c.setFocalOffset(-(insets.left / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
+    c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
-  }, [focusKey, insets.top, insets.left, insets.bottom, size.width, size.height]);
+  }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
   return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.08} />;
 }
 

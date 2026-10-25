@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective } from '@/lib/chat/contract';
-import { levelAt, type HazardKind, type Incident, type SimulateResponse } from '@/lib/hazards/types';
+import { levelAt, type HazardKind, type ImpactRoom, type Incident, type SimulateResponse } from '@/lib/hazards/types';
 
 /** One emergency on screen: a manager's what-if simulation, or a live incident (reported or from a sensor). */
 export interface HazardView {
@@ -86,16 +86,24 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
   const floorOf = new Map(building.spaces.map(s => [s.id, s.floor_id]));
   const levels = new Map(building.floors.map(f => [f.id, f.level]));
   const hazards = data ? data.simulation.spaces.map(e => ({ spaceId: e.space_id, kind: e.kind, level: levelAt(e, view.t, data.simulation.ramp_min) })).filter(h => h.level > 0.02) : [];
-  // Floors the hazard reaches in the whole run (stable, so the camera doesn't jump while it plays), origin floor first.
-  const reached = data ? [...new Set(data.simulation.spaces.filter(e => e.peak >= 0.3).map(e => floorOf.get(e.space_id)!).filter(Boolean))] : [];
-  const originFloor = origin?.floor_id;
-  const near = reached.filter(f => Math.abs((levels.get(f) ?? 0) - (levels.get(originFloor ?? '') ?? 0)) <= 1);
-  const floorIds = [...new Set([originFloor!, ...near])].filter(Boolean).sort((a, b) => (levels.get(a) ?? 0) - (levels.get(b) ?? 0));
+  const key = data ? keyRoom(data) : undefined;
+  const target = key && building.spaces.find(s => s.id === key.space_id);
+  // Floors drawn solid: where it starts, plus (water) the floor below it reaches. The rest of the building is glass.
+  const originFloor = origin?.floor_id ?? building.floors[0].id;
+  const below = view.hazard === 'water' && data
+    ? [...new Set(data.simulation.spaces.filter(e => e.kind === 'water' && e.peak >= 0.3).map(e => floorOf.get(e.space_id)!))].filter(f => (levels.get(f) ?? 0) === (levels.get(originFloor) ?? 0) - 1)
+    : [];
+  const floorIds = [...new Set([originFloor, ...below, ...(target ? [target.floor_id] : [])])];
   const focus: SceneDirective['focus'] = focusRoom && floorOf.get(focusRoom)
     ? { mode: 'floor', floorId: floorOf.get(focusRoom)! }
     : focusFloor ? { mode: 'floor', floorId: focusFloor }
-    : floorIds.length > 1 && view.hazard === 'water' ? { mode: 'stack', floorIds } : { mode: 'floor', floorId: originFloor ?? building.floors[0].id };
-  const markers: SceneDirective['markers'] = origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: `${view.hazard === 'fire' ? '🔥' : view.hazard === 'water' ? '💧' : '⚡'} ${origin.name}`, tone: 'primary' }] : [];
+    : { mode: 'xray', floorIds };
+  const icon = view.hazard === 'fire' ? '🔥' : view.hazard === 'water' ? '💧' : '⚡';
+  const markers: SceneDirective['markers'] = origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: `${icon} ${origin.name}`, tone: 'primary' }] : [];
+  // The one consequence that matters most, as an arrow with a label: "Kitchen 3.14 → Server room 2.14".
+  const links: SceneDirective['links'] = origin && target && target.id !== origin.id
+    ? [{ from: { floorId: origin.floor_id, position: centroid(origin.polygon) }, to: { floorId: target.floor_id, position: centroid(target.polygon) }, label: `${origin.name} → ${target.name}` }]
+    : undefined;
   const routes: SceneDirective['routes'] = view.hazard === 'fire' && data?.evacuation && view.t >= 1
     ? data.evacuation.routes.slice(0, 6).map(route => ({ spacePath: route.space_path, points: route.polylines.flatMap(run => run.points.map(position => ({ floorId: run.floor_id, position }) as FloorPoint)), label: route.name }))
     : undefined;
@@ -105,14 +113,26 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     evacuees,
     minute: view.t,
     walkMPerMin: data?.evacuation?.walk_m_per_min,
-    // The whole floor stays in view while the spread plays; a room tapped in the panel zooms to it.
+    // The whole building stays in view while the spread plays; a room tapped in the panel zooms to it.
     frameAll: !focusRoom,
+    // X-ray: frame where it starts and the key room it reaches, with the building around them.
+    frameSpaces: !focusRoom && !focusFloor && origin ? [origin.id, ...(target ? [target.id] : [])] : undefined,
     hazards,
     markers,
+    links,
     routes,
-    highlights: focusRoom ? [{ spaceId: focusRoom, tone: 'secondary' }] : undefined,
+    highlights: [...(target && target.id !== origin?.id ? [{ spaceId: target.id, tone: 'secondary' as const }] : []), ...(focusRoom ? [{ spaceId: focusRoom, tone: 'secondary' as const }] : [])],
     closed: view.hazard === 'fire' && data?.evacuation ? data.evacuation.lifts_off : undefined,
   };
+}
+
+/** The affected room that matters most besides the origin: critical equipment first, then people, then how hard it is hit. */
+export function keyRoom(data: SimulateResponse): ImpactRoom | undefined {
+  const rooms = data.impact.rooms.filter(r => r.relation !== 'origin' && r.kind === data.simulation.hazard && (r.type === 'room' || r.type === 'hall'));
+  const preferred = data.simulation.hazard === 'water' ? rooms.filter(r => r.relation === 'below') : rooms;
+  const pool = preferred.length ? preferred : rooms;
+  const score = (r: ImpactRoom) => r.critical_assets.length * 100 + r.people * 2 + r.peak * 10 - r.arrival_min;
+  return [...pool].sort((a, b) => score(b) - score(a))[0];
 }
 
 // One evacuee list per simulation result: the scene rebuilds its figures only when this changes, not every frame.

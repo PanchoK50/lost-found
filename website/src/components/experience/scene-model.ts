@@ -76,11 +76,25 @@ function extrude(polygon: Point[], cx: number, cy: number) {
 /** Where each floor sits and how it looks for a given focus. */
 export interface FloorPose { y: number; opacity: number; flat: number; interactive: boolean }
 
+const XRAY_GAP = 7;
+
 export function layoutFloors(model: BuildingModel, focus: SceneFocus): Map<string, FloorPose> {
   const poses = new Map<string, FloorPose>();
   const elevation = (floor: Floor) => floor.elevation_m;
   if (focus.mode === 'building') {
     for (const f of model.floors) poses.set(f.floor.id, { y: elevation(f.floor), opacity: 1, flat: 0, interactive: true });
+    return poses;
+  }
+  if (focus.mode === 'xray') {
+    // The floors that matter are opened (2.5D cut) and pulled a few metres apart, so one can be seen under the
+    // other; the rest of the building stays full-height glass around them for context.
+    let offset = 0;
+    model.floors.forEach((f, i) => {
+      const chosen = focus.floorIds.includes(f.floor.id);
+      const previous = model.floors[i - 1];
+      if (i > 0 && (chosen || focus.floorIds.includes(previous.floor.id))) offset += XRAY_GAP;
+      poses.set(f.floor.id, { y: elevation(f.floor) + offset, opacity: chosen ? 1 : 0.13, flat: chosen ? 1 : 0, interactive: chosen });
+    });
     return poses;
   }
   if (focus.mode === 'floor') {
@@ -142,7 +156,7 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
     const y = poses.get(focus.floorId)?.y ?? 0;
     return new THREE.Box3(new THREE.Vector3(x - 9, y, z - 9), new THREE.Vector3(x + 9, y + 1, z + 9));
   }
-  const onView = (floorId: string) => (focus.mode === 'floor' ? floorId === focus.floorId : focus.mode === 'stack' && focus.floorIds.includes(floorId));
+  const onView = (floorId: string) => (focus.mode === 'floor' ? floorId === focus.floorId : (focus.mode === 'stack' || focus.mode === 'xray') && focus.floorIds.includes(floorId));
   const box = new THREE.Box3();
   for (const id of frame) {
     const m = model.spaces.get(id);
@@ -157,7 +171,7 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
   }
   if (focus.mode !== 'building' && !box.isEmpty()) {
     const c = box.getCenter(new THREE.Vector3());
-    let minSize = 26; // routes and stacks: close enough to follow the path
+    let minSize = focus.mode === 'xray' ? 40 : 26; // routes and stacks: close enough to follow the path; x-ray: the incident with some building around it
     if (focus.mode === 'floor' && !points.length) {
       // Rooms on one floor: keep enough of the floor around them to read where they are.
       const floor = model.floors.find(f => f.floor.id === focus.floorId)!;
@@ -169,7 +183,7 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
     return new THREE.Box3(new THREE.Vector3(c.x - half, box.min.y, c.z - half), new THREE.Vector3(c.x + half, top, c.z + half));
   }
   const all = new THREE.Box3();
-  const visible = model.floors.filter(f => focus.mode === 'building' || (poses.get(f.floor.id)?.opacity ?? 0) > 0.5);
+  const visible = model.floors.filter(f => focus.mode === 'building' || focus.mode === 'xray' || (poses.get(f.floor.id)?.opacity ?? 0) > 0.5);
   for (const f of visible.length ? visible : model.floors) {
     const pose = poses.get(f.floor.id)!;
     all.expandByPoint(new THREE.Vector3(f.box.minX, pose.y, f.box.minZ));
