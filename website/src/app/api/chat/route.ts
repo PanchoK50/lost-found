@@ -31,7 +31,10 @@ export async function POST(request: Request) {
   // People, reports and skills first (docs/MULTIPLAYER.md §7); everything else is a question about the building.
   // Every account can be addressed with @, also people who are not sharing their location right now.
   const input = { world: { ...viewFor(world, playerId), players: world.players.filter(p => !p.demo || p.id === playerId) }, playerId, skillId: typeof body.skillId === 'string' ? body.skillId : undefined, history: Array.isArray(body.history) ? body.history : undefined, closed: worldClosed };
-  const fromWorld = resolveWorld(entry.building, message, input);
+  // With something selected on the map ("this door", "this room") the message is about that thing: the building
+  // agent answers it. The people/reports layer only takes messages without a selection.
+  const hasSelection = Boolean(body.selection && typeof body.selection.id === 'string');
+  const fromWorld = hasSelection ? null : resolveWorld(entry.building, message, input);
   if (fromWorld?.usedSkill && playerId) await worldStore.apply(entry.building, { type: 'skill.use', buildingId: entry.building.building.id, skillId: fromWorld.usedSkill, playerId }, Date.now()).catch(() => undefined);
 
   let resolved: ChatResponse;
@@ -64,7 +67,9 @@ export async function POST(request: Request) {
       return Response.json(await withRoutePoints(entry.building, { ...demo, source: 'demo', reply: `${demo.reply}\n\n(The AI agent reached today's budget, so this is the simple offline answer.)` }));
     }
     const location = typeof body.location === 'string' && entry.building.spaces.some(s => s.id === body.location) ? body.location : undefined;
-    const selection = body.selection && ['asset', 'opening', 'space'].includes(body.selection.kind) && typeof body.selection.id === 'string' ? body.selection : undefined;
+    const selection = body.selection && ['asset', 'opening', 'space'].includes(body.selection.kind) && typeof body.selection.id === 'string'
+      ? { kind: body.selection.kind, id: body.selection.id, view_right: Array.isArray(body.selection.view_right) && body.selection.view_right.length === 2 ? body.selection.view_right.map(Number) as [number, number] : undefined }
+      : undefined;
     const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location, selection);
     if (agent.ok) {
       resolved = markBroken(entry.building, agent.response, input.world);

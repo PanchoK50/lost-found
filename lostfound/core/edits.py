@@ -5,7 +5,7 @@ website/src/lib/buildings/edits.ts) loads base plan + edits: a closed lift, a ne
 stays for everyone. Plan-import corrections use the same mechanism (rename, room type, door width, rescale).
 
 Actions: close / reopen {element_id}; add_door {opening}; move_asset {asset_id, to_space_id, position};
-rename_room {space_id, ref, name}; set_room_type {space_id, room_type}; set_door_width {opening_id, width_m};
+move_door {opening_id, position}; rename_room {space_id, ref, name}; set_room_type {space_id, room_type}; set_door_width {opening_id, width_m};
 rescale {factor}; set_floor_height {floor_id, height_m}."""
 
 import copy
@@ -48,6 +48,10 @@ def apply_edit(building: dict, edit: dict, closed: set[str]) -> None:
         case "set_room_type":
             if edit["space_id"] in spaces:
                 spaces[edit["space_id"]]["room_type"] = edit["room_type"]
+        case "move_door":
+            for opening in building["openings"]:
+                if opening["id"] == edit["opening_id"]:
+                    opening["position"] = list(edit["position"])
         case "set_door_width":
             for opening in building["openings"]:
                 if opening["id"] == edit["opening_id"]:

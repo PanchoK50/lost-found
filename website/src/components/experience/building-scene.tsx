@@ -119,6 +119,9 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
   const picked = selected && selected.directive === directiveKey && !overview ? selected.id : null;
+  // The camera keeps the last tapped room in frame even after the selection moves to an object in it.
+  const [cameraRoom, setCameraRoom] = useState<{ id: string; directive: string } | null>(null);
+  const framedRoom = cameraRoom && cameraRoom.directive === directiveKey && !overview ? cameraRoom.id : null;
   // The answer's rooms keep their colours; a tapped room is tinted light blue instead of being covered by a label.
   const tones = useMemo(() => {
     const map = new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone]));
@@ -137,7 +140,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
     if (el) elements.current.set(key, el); else elements.current.delete(key);
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
-  const select = useCallback((id: string) => setSelected({ id, directive: directiveKey }), [directiveKey]);
+  const select = useCallback((id: string) => { setSelected({ id, directive: directiveKey }); setCameraRoom({ id, directive: directiveKey }); }, [directiveKey]);
   useEffect(() => { onSelectRoom?.(picked); }, [picked, onSelectRoom]);
   // Esc first leaves a zoomed-in room (back to its floor) before the page's own Esc handling.
   useEffect(() => {
@@ -159,6 +162,12 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
   const detailed = style === 'detailed';
   const textures = useTextures(detailed);
   const models = useAssetModels(useMemo(() => building.assets.map(asset => asset.type), [building]), detailed);
+  // Scenery in the main building's frame, and its ground outlines (so trees and streets keep clear of it).
+  const sceneryToWorld = useCallback((p: [number, number]) => model.toWorld(p), [model]);
+  const footprint = useMemo(() => {
+    const ground = model.floors.filter(f => f.floor.level <= 0).sort((a, b) => b.floor.level - a.floor.level)[0] ?? model.floors[0];
+    return (ground?.spaces ?? []).map(m => m.space.polygon.map(p => model.toWorld(p, ground.floor.id)));
+  }, [model]);
   // Where people stand on a floor: on the slab (detailed) or on the block tops (blocks).
   const floorBase = useCallback((floorId: string | null) => {
     if (floorId === null) return SLAB;  // the campus ground between buildings
@@ -169,20 +178,21 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
 
   return (
     <div className="scene-root">
-      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
+      <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); setCameraRoom(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[emergency ? '#05080e' : '#dfe7ee']} />
-        <fog attach="fog" args={[emergency ? '#05080e' : '#dfe7ee', Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
+        <fog attach="fog" args={[emergency ? '#05080e' : '#dfe7ee', Math.max(700, sceneSpan * 2.5), Math.max(3200, sceneSpan * 8)]} />
         {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
         <ambientLight intensity={emergency ? 0.22 : 0.3} />
         <hemisphereLight args={emergency ? ['#7d8db0', '#0b0f18', 0.55] : ['#fff6ea', '#dfe3ea', 0.95]} />
         <directionalLight position={[80, 130, 55]} intensity={emergency ? 0.7 : 1.6} color={emergency ? '#b8c6ff' : '#ffffff'} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
-        <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
+        <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={framedRoom} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
-            onPickObject={onSelectObject ? (kind, id) => onSelectObject(kind, id) : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
+            onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
-        <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency} />
-        <Podium model={model} />
+        <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency}
+          buildingId={building.building.id} toWorld={sceneryToWorld} footprint={footprint} />
+        <Plinth model={model} />
         {directive.hazards?.length ? <HazardEffects model={model} poses={poses} hazards={directive.hazards} floorBase={floorBase} /> : null}
         <HazardPulse />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
@@ -354,6 +364,12 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
   }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
+  // The screen's "right" on the plan (x east, y north), so "move it to the left" means what the person sees.
+  useFrame(({ camera }) => {
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const length = Math.hypot(right.x, right.z) || 1;
+    (window as unknown as { __lfViewRight?: [number, number] }).__lfViewRight = [right.x / length, -right.z / length];
+  });
   // B-roll: a slow orbit, and the camera handed to a recording script on request.
   useEffect(() => {
     if (!BROLL.on) return;
@@ -374,7 +390,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   });
   // A campus can span kilometres (far pairs route too): let the camera reach as far as the scene does.
   const span = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
-  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.max(1500, span * 4)} maxPolarAngle={Math.PI / 2 - 0.35} />;
+  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.min(Math.max(900, span * 3), Math.max(3200, span * 8) * 0.55)} maxPolarAngle={Math.PI / 2 - 0.35} />;
 }
 
 /** A room and a little of its surroundings, at least 9 m across so small rooms keep some context. */
@@ -429,6 +445,8 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const hazardLayer = useRef<THREE.Group>(null);
   const edges = useRef<THREE.LineSegments>(null);
   const detailed = style === 'detailed';
+  // Solid: the whole-building view, and the floors below an opened one (context, not interactive).
+  const solid = (overview || !pose.interactive) && pose.flat < 0.05 && pose.opacity > 0.9;
   // Objects and doors can be picked on the floor that is opened, not in the whole-building overview.
   const pickObject: PickObject | undefined = onPickObject && pose.interactive && !overview ? (kind, id) => onPickObject(kind, id) : undefined;
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -468,18 +486,20 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     group.current.position.y = s.y;
     group.current.visible = s.opacity > 0.01;
     // Detailed: rooms are thin slabs (highlights a little thicker) with walls standing on them.
-    const top = detailed ? SLAB : blockHeight(model.storey, s.flat);
+    // Whole-building view: one solid building (storeys flush, facade with windows, closed roof), not cut floors.
+    const solidNow = solid && s.flat < 0.05;
+    const top = solidNow ? model.storey : detailed ? SLAB : blockHeight(model.storey, s.flat);
     blocks.current.scale.y = top;
     for (const tone of ['primary', 'secondary', 'muted'] as const) {
       const g = raised.current[tone];
       if (g) g.scale.y = detailed ? SLAB + 0.03 + lift[tone] * 0.05 : blockHeight(model.storey, s.flat, lift[tone]);
     }
     if (walls.current) {
-      walls.current.visible = detailed;
+      walls.current.visible = detailed && !solidNow;
       walls.current.position.y = SLAB;
       walls.current.scale.y = wallHeight(model.storey, s.flat);
     }
-    if (edges.current) edges.current.visible = !detailed;
+    if (edges.current) edges.current.visible = !detailed && !solidNow;
     if (doors.current) {
       // Blocks: doors only on an opened floor (on the block tops); detailed: wherever the floor is shown.
       doors.current.visible = s.opacity > 0.5 && (detailed || s.flat > 0.3);
@@ -488,10 +508,10 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     if (hazardLayer.current) {
       // Just over the floor's top (slabs or blocks), so the tint reads from above and from the side.
       hazardLayer.current.scale.y = (detailed ? SLAB + 0.04 + lift.primary * 0.05 : blockHeight(model.storey, s.flat, lift.primary)) + 0.06;
-      hazardLayer.current.visible = s.opacity > 0.3;
+      hazardLayer.current.visible = s.opacity > 0.3 && !(solidNow && !overview);
     }
     if (furniture.current) {
-      furniture.current.visible = detailed && s.opacity > 0.5;
+      furniture.current.visible = detailed && s.opacity > 0.5 && !solidNow;
       furniture.current.position.y = SLAB;
     }
     applyFade(materials, assets, s, overview, blockHeight(model.storey, s.flat, lift.secondary) + 0.02);
@@ -512,7 +532,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     <group ref={group} position-y={pose.y}>
       <group ref={blocks} scale-y={blockHeight(model.storey, pose.flat)}>
         {plain.map(m => (
-          <mesh key={m.space.id} geometry={m.geometry} material={detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
+          <mesh key={m.space.id} geometry={m.geometry} material={solid ? SOLID_MATERIALS : detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
         ))}
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
@@ -558,6 +578,29 @@ function hazardMaterial(kind: HazardKind, level: number) {
   }
   return material;
 }
+
+/** Facade texture: wall panels with a window band per storey (v runs 0 → 1 up one storey, u in metres). */
+function facadeTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#e9e6df'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#5d6e80'; g.fillRect(10, 22, 108, 58);           // glass (top part of the storey)
+  g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(10, 22, 108, 14);
+  g.fillStyle = '#d8d4cb'; g.fillRect(0, 118, 128, 10);           // slab edge between storeys
+  g.fillStyle = '#c9c5bc'; g.fillRect(62, 22, 4, 58);             // mullion
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(1 / 3, 1);                                   // one window bay every 3 m
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+/** ExtrudeGeometry groups: 0 = caps (roof), 1 = sides (facade). Shared by every floor in the overview. */
+const SOLID_MATERIALS: THREE.Material[] = typeof document === 'undefined' ? [] : [
+  new THREE.MeshStandardMaterial({ color: '#cfccc4', roughness: 0.95 }),
+  new THREE.MeshStandardMaterial({ map: facadeTexture(), roughness: 0.7 }),
+];
 
 /** Water shimmers and a power cut flickers: the shared tint materials breathe a little every frame. */
 function HazardPulse() {
@@ -633,6 +676,18 @@ function colorAssets(mesh: THREE.InstancedMesh, model: FloorModel, lit: Set<stri
 
 
 /** Base plate under the building, like a plinth under a scale model; its top sits just under the slab tops. */
+/** A low plinth that follows the building's own ground outline (not a rectangle), so nature reaches the walls. */
+function Plinth({ model }: { model: BuildingModel }) {
+  const ground = model.floors.find(f => f.floor.level === 0) ?? model.floors[0];
+  if (!ground) return null;
+  return (
+    <group position-y={ground.floor.elevation_m - 0.14} scale-y={0.14}>
+      {ground.spaces.map(m => <mesh key={m.space.id} geometry={m.geometry} receiveShadow raycast={() => null}><meshStandardMaterial color="#e9e5dd" roughness={0.95} /></mesh>)}
+    </group>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for reference: the old rectangular base
 function Podium({ model }: { model: BuildingModel }) {
   const base = (model.floors[0]?.floor.elevation_m ?? 0) - 0.02;
   const width = model.box.maxX - model.box.minX + 6, depth = model.box.maxZ - model.box.minZ + 6;

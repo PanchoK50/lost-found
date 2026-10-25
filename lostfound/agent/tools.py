@@ -213,6 +213,21 @@ EDIT_TOOLS = [
         "description": "Record that a thing (machine, furniture, equipment) is now in another room (edits the building).",
         "input_schema": _schema({"asset": _string("Asset name or id, e.g. 'Press 3' or 'Desk 2.03-B'."), "to_room": PLACE}),
     },
+    {
+        "name": "move_door",
+        "description": "Slide an existing door or opening along its wall by a distance (it stays in the same wall, never past its "
+        "ends). direction: 'left' | 'right' | 'up' | 'down' as seen on the person's screen (use these when they say left/right), "
+        "or 'north' | 'south' | 'east' | 'west' on the plan. Saved for everyone; routes use the new position.",
+        "input_schema": _schema({"door": _string("Door/opening id (e.g. from the selection)."), "distance_m": {"type": "number", "description": "Metres, e.g. 3."},
+                                 "direction": _string("left, right, up, down, north, south, east or west.")}),
+    },
+    {
+        "name": "move_object",
+        "description": "Shift a thing (furniture, machine, equipment) by a distance in a direction, within the building "
+        "(it changes room if it ends up in another one). direction as for move_door. Saved for everyone.",
+        "input_schema": _schema({"asset": _string("Asset id or name."), "distance_m": {"type": "number", "description": "Metres, e.g. 2."},
+                                 "direction": _string("left, right, up, down, north, south, east or west.")}),
+    },
 ]
 
 CROSS_TOOLS = [
@@ -742,6 +757,125 @@ class Toolbox:
         self.turn["edits"].append(edit)
         self._scene(lambda: scene.edit(self.building, edit))
         return edit
+
+    # ---------- moving doors and objects ----------
+
+    def _direction(self, direction: str) -> tuple[float, float]:
+        """Unit vector on the plan (x east, y north). Screen directions use the viewer's camera, sent with the selection."""
+        d = direction.strip().lower()
+        compass = {"north": (0.0, 1.0), "south": (0.0, -1.0), "east": (1.0, 0.0), "west": (-1.0, 0.0)}
+        if d in compass:
+            return compass[d]
+        right = getattr(self, "view_right", None) or (1.0, 0.0)
+        rx, ry = right
+        screen = {"right": (rx, ry), "left": (-rx, -ry), "up": (-ry, rx), "down": (ry, -rx)}
+        if d not in screen:
+            raise MapError("direction must be left, right, up, down, north, south, east or west.")
+        return screen[d]
+
+    def tool_move_door(self, door: str, distance_m: float, direction: str) -> dict:
+        from shapely.geometry import LineString, Point
+        if door not in self.building.openings:
+            raise MapError(f"No door with id '{door}'. Select the door on the map or name the two rooms it joins.")
+        if distance_m <= 0:
+            raise MapError("Give a distance in metres (more than 0).")
+        distance_m = min(distance_m, 500.0)  # "as far as possible": the door stops at the end of its wall
+        opening = self.building.openings[door]
+        inside = [s for s in opening["space_ids"] if s in self.building.spaces]
+        here = Point(opening["position"])
+        # The wall the door sits in: the shared stretch of the two spaces' outlines (or the one outline for an entrance).
+        ring = self.building.polygon(inside[0]).exterior
+        wall = ring.intersection(self.building.polygon(inside[1]).exterior.buffer(0.35)) if len(inside) == 2 else ring
+        lines = [g for g in getattr(wall, "geoms", [wall]) if isinstance(g, LineString)] or [ring]
+        line = min(lines, key=lambda g: g.distance(here))
+        # The straight segment of that line the door is on, so the door slides along one wall and doesn't turn corners.
+        coords = list(line.coords)
+        segment = min((LineString([a, b]) for a, b in zip(coords, coords[1:])), key=lambda seg: seg.distance(here))
+        (x0, y0), (x1, y1) = segment.coords
+        length = segment.length
+        ux, uy = (x1 - x0) / length, (y1 - y0) / length
+        dx, dy = self._direction(direction)
+        along = dx * ux + dy * uy
+        if abs(along) < 0.2:
+            raise MapError(f"That direction is across the wall, not along it. The wall runs {'east–west' if abs(ux) > abs(uy) else 'north–south'}; say left/right along it.")
+        current = segment.project(here)
+        t = current + distance_m * (1 if along > 0 else -1)
+        lo, hi = self._door_span(segment, door, inside)
+        half = opening["width_m"] / 2
+        if hi - lo < 2 * half:
+            raise MapError("There is no room to move this door along its wall.")
+        t_clamped = min(max(t, lo + half), hi - half)
+        point = segment.interpolate(t_clamped)
+        position = [round(point.x, 3), round(point.y, 3)]
+        self.building.walks = dict(self.building.walks)
+        for space_id in inside:
+            self.building.walks.pop(space_id, None)
+        opening["position"] = position
+        for record in self.building.data["openings"]:
+            if record["id"] == door:
+                record["position"] = position
+        moved = round(abs(t_clamped - segment.project(here)), 2)
+        edit = {"action": "move_door", "opening_id": door, "position": position}
+        self._record(edit)
+        return {**edit, "moved_m": moved, "note": "stopped at the end of the wall" if moved + 1e-6 < distance_m else ""}
+
+    WALL_CLEARANCE_M = 0.25  # a door keeps this much solid wall at either end (wall thickness plus a frame)
+
+    def _door_span(self, segment, door_id: str, inside: list[str]) -> tuple[float, float]:
+        """The stretch of `segment` the door may slide in, around where it is now: not past the wall's ends, not
+        across a point where another room's wall joins this one, and not over another door."""
+        from shapely.geometry import Point
+        length = segment.length
+        current = segment.project(Point(self.building.openings[door_id]["position"]))
+        blocked: list[tuple[float, float]] = []
+        near = segment.buffer(0.2)
+        floor_id = self.building.openings[door_id]["floor_id"]
+        for other in self.building.spaces_by_floor[floor_id]:
+            if other["id"] in inside:
+                continue
+            touch = self.building.polygon(other["id"]).exterior.intersection(near)
+            if touch.is_empty:
+                continue
+            # Where its outline meets this wall: project the touching part onto the wall line.
+            points = [Point(c) for g in getattr(touch, "geoms", [touch]) for c in getattr(g, "coords", [])] or [touch.centroid]
+            ts = [segment.project(pt) for pt in points]
+            a, b = min(ts), max(ts)
+            # A room alongside (sharing much of the wall) is not a junction; its corners are.
+            if b - a > 0.6:
+                blocked += [(a - 0.05, a + 0.05), (b - 0.05, b + 0.05)]
+            else:
+                blocked.append((a, b))
+        for oid, o in self.building.openings.items():
+            # Doors in this wall, and doors in a wall meeting it at a corner (their leaves would clash).
+            if oid == door_id or o["floor_id"] != floor_id or segment.distance(Point(o["position"])) > o["width_m"] / 2 + 0.3:
+                continue
+            t = segment.project(Point(o["position"]))
+            blocked.append((t - o["width_m"] / 2 - 0.1, t + o["width_m"] / 2 + 0.1))
+        lo, hi = 0.0, length
+        for a, b in blocked:
+            if b <= current:
+                lo = max(lo, b)
+            elif a >= current:
+                hi = min(hi, a)
+        return lo + self.WALL_CLEARANCE_M, hi - self.WALL_CLEARANCE_M
+
+    def tool_move_object(self, asset: str, distance_m: float, direction: str) -> dict:
+        from shapely.geometry import Point
+        asset_id = asset if asset in self.building.assets else next((a["id"] for a in self.building.assets.values() if a["name"].casefold() == asset.casefold()), None)
+        if asset_id is None:
+            raise MapError(f"No object '{asset}'. Select it on the map.")
+        if not 0 < distance_m <= 100:
+            raise MapError("Move an object by more than 0 and at most 100 m.")
+        record = self.building.assets[asset_id]
+        dx, dy = self._direction(direction)
+        x, y = record["position"][0] + dx * distance_m, record["position"][1] + dy * distance_m
+        target = next((s["id"] for s in self.building.spaces_by_floor[record["floor_id"]] if self.building.polygon(s["id"]).contains(Point(x, y))), None)
+        if target is None:
+            raise MapError("That would put it outside the building on this floor. Try a shorter distance.")
+        record.update({"space_id": target, "position": [round(x, 3), round(y, 3)]})
+        edit = {"action": "move_asset", "asset_id": asset_id, "to_space_id": target, "position": record["position"]}
+        self._record(edit)
+        return {**edit, "room": self.building.label(target)}
 
     def _record(self, edit: dict) -> dict:
         self.edits.append(edit)
