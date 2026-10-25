@@ -20,7 +20,8 @@ from lostfound.env import load_env
 from lostfound.run_benchmark import structured, with_conditions
 
 DEV = Path(__file__).resolve().parent.parent / "data" / "dev"
-FACTORIES = sorted(p for p in DEV.glob("proc-factory-*") if (p / "building.json").exists())
+# dev factories plus the test ones, whose layouts train never shows (bigger halls, L-shaped wings, basements)
+FACTORIES = sorted(p for split in (DEV, DEV.parent / "test") for p in split.glob("proc-factory-*") if (p / "building.json").exists())
 PAIRS_PER_BUILDING = 12
 # The rules as the organizers state them, written out here rather than imported from the code under test.
 FORKLIFT_WIDTH = 3.0
@@ -92,10 +93,9 @@ def measure(b: Building, path: list[str], forklift: bool) -> float:
     return min(cost + (0.0 if at == last else walks[last].get((at, last), float("inf"))) for at, cost in states.items())
 
 
-@pytest.fixture(scope="module", params=[p.name for p in FACTORIES])
+@pytest.fixture(scope="module", params=FACTORIES, ids=[p.name for p in FACTORIES])
 def factory(request) -> tuple[Path, Building]:
-    directory = DEV / request.param
-    return directory, Building.load(directory)
+    return request.param, Building.load(request.param)
 
 
 def sample_pairs(b: Building, seed: str) -> list[tuple[str, str]]:

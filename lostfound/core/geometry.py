@@ -28,10 +28,17 @@ def distance_3d(building: Building, first: str, second: str) -> float:
 def stacked(building: Building, space_id: str, direction: str) -> tuple[str, float]:
     """The space on the next floor up/down whose outline covers most of this room's outline.
 
+    The next floor is the nearest level that exists in that direction: plans may skip levels (OSM: 0 and 2, or a
+    basement at -2 and none at -1).
+
     Returns (space_id, overlap share of this room's area)."""
     step = {"above": 1, "below": -1}[direction]
-    level = building.space_level(space_id) + step
-    floor = building.floor_by_level(level)
+    here = building.space_level(space_id)
+    levels = [level for level in building.floors_by_level if (level - here) * step > 0]
+    if not levels:
+        raise MapError(f"No floor {direction} {building.floor_name(building.spaces[space_id]['floor_id'])}.")
+    level = min(levels, key=lambda candidate: abs(candidate - here))
+    floor = building.floors_by_level[level]
     outline = building.polygon(space_id)
     best, best_overlap = None, 0.0
     for other in building.spaces_by_floor[floor["id"]]:

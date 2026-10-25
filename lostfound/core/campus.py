@@ -131,7 +131,7 @@ class Campus:
         for a, b in itertools.combinations(self.members, 2):
             for id_a, pos_a, level_a in self._entrances[a.building.id]:
                 for id_b, pos_b, level_b in self._entrances[b.building.id]:
-                    weight = math.dist(pos_a, pos_b) + NON_GROUND_EXIT_PENALTY_M * (abs(level_a) + abs(level_b))
+                    weight = self._across(id_a, id_b, pos_a, pos_b) + NON_GROUND_EXIT_PENALTY_M * (abs(level_a) + abs(level_b))
                     graph.add_edge(DOOR_PREFIX + id_a, DOOR_PREFIX + id_b, weight=max(weight, 1.0), outdoor=True)
         return graph
 
@@ -141,6 +141,13 @@ class Campus:
             if {way.get("from"), way.get("to")} == {door_a, door_b} and way.get("path"):
                 return way["path"]
         return None
+
+    def _across(self, door_a: str, door_b: str, pos_a: tuple[float, float], pos_b: tuple[float, float]) -> float:
+        """The outdoor walk between two entrances: along a curated walkway if there is one, else straight."""
+        path = self._walkway_path(door_a, door_b)
+        if path:
+            return sum(math.dist(path[i], path[i + 1]) for i in range(len(path) - 1))
+        return math.dist(pos_a, pos_b)
 
     def outdoor_distance(self, opening_a: str, opening_b: str) -> float:
         positions = {opening_id: position for member in self.members for opening_id, position, _ in self._entrances[member.building.id]}
@@ -163,17 +170,25 @@ class Campus:
             raise MapError("No route between these buildings (check the entrances).") from error
 
         # Split the node path into per-building runs at the outdoor edges; door nodes stay at the run ends.
+        # Each run's walk is measured on the path itself, door to door: from the start to the exit door, and from
+        # the entrance door to the destination (the indoor legs below are drawn to and from the entrance spaces).
         runs: list[list[str]] = []
+        walks: list[float] = []
         crossings: list[tuple[str, str]] = []
         run: list[str] = [nodes[0]]
+        walk = 0.0
         for here, following in itertools.pairwise(nodes):
             data = graph.get_edge_data(here, following) or {}
             if any(attrs.get("outdoor") for attrs in data.values()):
                 runs.append(run)
+                walks.append(walk)
                 crossings.append((here.removeprefix(DOOR_PREFIX), following.removeprefix(DOOR_PREFIX)))
-                run = []
+                run, walk = [], 0.0
+            else:
+                walk += min(attrs["weight"] for attrs in data.values())
             run.append(following)
         runs.append(run)
+        walks.append(walk)
         # The exit/entry door nodes (and chains of doors between them) belong to the outdoor leg;
         # the indoor runs start and end at spaces.
         trimmed = []
@@ -199,8 +214,9 @@ class Campus:
             first = path[0] if index == 0 else _inside_space(member.building, crossings[index - 1][1])
             last = path[-1] if index == len(trimmed) - 1 else _inside_space(member.building, crossings[index][0])
             details = directions.route_details(member.building, first, last, step_free)
-            length += details["length_m"]
-            legs.append({"kind": "indoor", "building_id": member.building.id, "building_name": name, "route": details})
+            length += walks[index]
+            legs.append({"kind": "indoor", "building_id": member.building.id, "building_name": name, "route": details,
+                         "length_m": round(walks[index], 2)})
             if index == 0:
                 steps.extend(details["steps"])
                 if index < len(crossings):  # a way point, not the destination: no "arrived" yet
@@ -235,10 +251,7 @@ class Campus:
         positions = {opening_id: position for member in self.members for opening_id, position, _ in self._entrances[member.building.id]}
         path = self._walkway_path(door_a, door_b)
         points = path if path else [list(positions[door_a]), list(positions[door_b])]
-        if path:  # curated walkway: its length along the path
-            length = sum(math.dist(points[i], points[i + 1]) for i in range(len(points) - 1))
-        else:
-            length = math.dist(positions[door_a], positions[door_b])
+        length = self._across(door_a, door_b, positions[door_a], positions[door_b])
         return {
             "kind": "outdoor",
             "from": {"building_id": self._building_of_door(door_a), "opening_id": door_a},

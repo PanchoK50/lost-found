@@ -1,6 +1,6 @@
 """Sunday benchmark (challenge PDF): one building, a questions.json, an answers.json.
 
-  uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions.json> <answers.json> [--csv out.csv]
+  uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions.json> <answers.json> [--csv out.csv] [--details out.json]
   uv run --env-file .env python -m lostfound.run_benchmark data/test data/test/questions.csv SUBMISSION/answers.json
 
 <building_dir> is one building folder (with building.json), or a folder of building folders; then each question
@@ -10,7 +10,12 @@ questions: a list of questions, {"questions": [...]}, JSON lines, or a CSV with 
 (or `question_id`) and its text (`question` or `text`); optional conditions such as `step_free`, `closed`, `from`,
 `to`, `min_width` or `forklift` (also `vehicle: "forklift"`) are added to the text when it doesn't say them already.
 
-answers.json: one entry per question id:
+answers.json, as the organizers asked: a list with one entry per question, in question order:
+  [{"question_id": "<id>", "answer": "Answer: <value>"}, …]
+`answer` is the reply's committed line, "Answer:" included, so benchmark/score.py grades it exactly as the full reply
+(it only reads the last Answer: line) and nothing else in the field can be mistaken for the answer.
+
+--details <file> also writes everything per question id (kept out of SUBMISSION/, which holds exactly two files):
   {"<id>": {"answer": "<the Answer: line value>", "reply": "<full reply>", "kind": "route",
             "space_id": "…", "item_id": "…",                    # what was found, when the answer is a room/thing
             "route": ["<space id>", …],                          # spaces walked through, in order
@@ -18,8 +23,7 @@ answers.json: one entry per question id:
             "element_path": ["<opening or connector id>", …],    # as in the dataset: doors and stairs/lifts only
             "length_m": 42.17, "reachable": true}}
 When no route exists under the rules: "answer": "no route", "reachable": false, "route": [], "length_m": null.
-No schema has been published yet; the fields cover what the PDF names (found item or room, route as ordered node ids,
-route length). The same replies can also be written as the challenge CSV with --csv."""
+The same replies can also be written as the challenge CSV with --csv."""
 
 import argparse
 import csv
@@ -100,6 +104,12 @@ def with_conditions(text: str, item: dict) -> str:
     return full if "answer:" in full.lower() else f"{full} {DEFAULT_INSTRUCTION}"
 
 
+def submission(results: list[tuple[str, dict]]) -> list[dict]:
+    """The organizers' answers.json: [{question_id, answer}], one per question, in question order."""
+    return [{"question_id": question_id, "answer": f"Answer: {entry['answer']}" if entry.get("answer") else ""}
+            for question_id, entry in results]
+
+
 def structured(building_dir: Path, result: dict | None) -> dict:
     """Found room/item and the route as ordered node ids, from the agent's last answering tool."""
     if not result:
@@ -167,6 +177,7 @@ def main() -> None:
     parser.add_argument("questions", type=Path)
     parser.add_argument("answers", type=Path)
     parser.add_argument("--csv", type=Path, default=None, help="also write question_id,answer (the test-set format)")
+    parser.add_argument("--details", type=Path, default=None, help="also write reply, route and length per question id")
     parser.add_argument("--model", default="opus")
     parser.add_argument("--effort", default="low")
     parser.add_argument("--workers", type=int, default=6)
@@ -199,9 +210,13 @@ def main() -> None:
 
     with ThreadPoolExecutor(max_workers=arguments.workers) as pool:
         results = list(pool.map(one, questions))
-    answers = {question_id: entry for question_id, entry, _ in results}
     arguments.answers.parent.mkdir(parents=True, exist_ok=True)
+    answers = submission([(question_id, entry) for question_id, entry, _ in results])
     arguments.answers.write_text(json.dumps(answers, ensure_ascii=False, indent=1), encoding="utf-8")
+    if arguments.details:
+        arguments.details.parent.mkdir(parents=True, exist_ok=True)
+        details = {question_id: entry for question_id, entry, _ in results}
+        arguments.details.write_text(json.dumps(details, ensure_ascii=False, indent=1), encoding="utf-8")
     if arguments.csv:
         with arguments.csv.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.writer(handle)

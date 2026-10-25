@@ -5,17 +5,18 @@ The submission copy is [SUBMISSION/BENCHMARK.md](SUBMISSION/BENCHMARK.md), next 
 ## Sunday building (challenge PDF format)
 
 ```sh
-uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions.json> <answers.json> [--csv answers.csv]
+uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions.json> <answers.json> [--csv answers.csv] [--details details.json]
 ```
 
 - `<building_dir>` holds the new `building.json`.
 - `questions.json` is a list of `{id, question}` (also `{"questions": [...]}` or JSON lines). Optional structured
   conditions (`step_free`, `closed`, `from`, `to`, `min_width`, `forklift` or `vehicle: "forklift"`) are added to the text.
-- `answers.json` has one entry per question id: `answer` (the value of the `Answer:` line), `reply` (full text), `kind`,
-  the found `space_id` / `item_id`, the `route` as ordered space ids, `route_nodes` (spaces and the doors between them,
-  in order) and `length_m`. When no route exists under the rules: `answer: "no route"`, `reachable: false`,
-  `route: []`, `length_m: null`. The organisers have not published a schema yet; see `lostfound/run_benchmark.py`
-  to adapt the field names in one place.
+- `answers.json` is what the organizers asked for: a list of `{"question_id", "answer"}`, one per question, in
+  question order. `answer` is the reply's committed line, e.g. `"Answer: 42.17"` (`"Answer: no route"` when no route
+  exists under the rules).
+- `--details out.json` also writes, per question id, the full `reply`, `kind`, the found `space_id` / `item_id`, the
+  `route` as ordered space ids, `route_nodes` (spaces and the doors between them, in order), `length_m` and
+  `reachable`. The test-set run's details are in `evals/results/test__answers_details.json`.
 - The API key is read from the environment or the repo-root `.env`; the run stops at once if there is none.
 
 ### Route rules (organizers' scoring note)

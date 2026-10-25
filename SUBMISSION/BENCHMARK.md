@@ -16,7 +16,8 @@ uv run --env-file .env python -m lostfound.run_benchmark data/test data/test/que
 ```
 
 Options: `--model opus|sonnet|haiku` (default `opus`, Claude Opus 5.5), `--effort low|medium|high` (default `low`),
-`--workers N` (default 6), `--csv out.csv` (also write the kit's `question_id,answer` CSV).
+`--workers N` (default 6), `--csv out.csv` (also write the kit's `question_id,answer` CSV),
+`--details details.json` (full replies and routes).
 
 ## Input
 
@@ -27,31 +28,20 @@ Options: `--model opus|sonnet|haiku` (default `opus`, Claude Opus 5.5), `--effor
 
 ## Output: `answers.json`
 
-One entry per question id:
+A list with one entry per question, in question order, as the organizers specified:
 
 ```json
-{
-  "<question id>": {
-    "answer": "42.17",
-    "reply": "Full reply … Answer: 42.17",
-    "kind": "route",
-    "space_id": "<found room, when the answer is a room>",
-    "item_id": "<found asset, when the answer is a thing>",
-    "route": ["<space id>", "…"],
-    "route_nodes": ["<space id>", "<opening id>", "<stair or lift id>", "…"],
-    "element_path": ["<opening or stair/lift id>", "…"],
-    "length_m": 42.17,
-    "reachable": true
-  }
-}
+[
+ {"question_id": "osm-way363805324-H01", "answer": "Answer: 1.02, 162.33 m²"},
+ {"question_id": "osm-way363805324-H02", "answer": "Answer: 54.77"}
+]
 ```
 
-- `answer` is the value of the reply's final `Answer:` line (what the kit's `benchmark/score.py` grades).
-- `route` is the ordered list of spaces the route passes through, start and destination included. For a tour it
-  passes every stop in order; for an item it ends in the room or bay that holds the item.
-- When no route exists under the rules: `"answer": "no route"`, `"reachable": false`, `"route": []`,
-  `"length_m": null`.
-- Questions that are not routes have `answer`, `reply`, `kind` and, where it applies, `space_id` / `item_id`.
+- `answer` is the last `Answer:` line of the agent's reply, which is what the kit's `benchmark/score.py` grades.
+- When no route exists under the rules, the answer is `"Answer: no route"`.
+- `--details details.json` also writes the full reply per question, plus the found `space_id` / `item_id`, the
+  `route` as ordered space ids, `route_nodes` / `element_path` (doors, stairs and lifts in order), `length_m` and
+  `reachable`. Keep that file outside `SUBMISSION/`.
 
 ## How it works
 

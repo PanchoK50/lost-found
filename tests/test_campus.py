@@ -61,7 +61,7 @@ def test_cross_route_composes_three_legs(campus, buildings):
     assert kinds == ["indoor", "outdoor", "indoor"]
     assert result["legs"][0]["building_id"] == N3
     assert result["legs"][2]["building_id"] == N8
-    indoor = sum(leg["route"]["length_m"] for leg in result["legs"] if leg["kind"] == "indoor")
+    indoor = sum(leg["length_m"] for leg in result["legs"] if leg["kind"] == "indoor")  # door to door, not centre to centre
     outdoor = next(leg for leg in result["legs"] if leg["kind"] == "outdoor")["length_m"]
     assert outdoor > 100  # the real walk across between the buildings
     assert result["length_m"] == pytest.approx(indoor + outdoor, abs=1.0)
