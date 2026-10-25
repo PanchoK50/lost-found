@@ -66,22 +66,35 @@ function Bubble({ actions }: { actions: VoiceActions }) {
     }
   }, [conversation]);
 
+  // The orb breathes with the voice: output volume while the agent speaks, the microphone while it listens.
+  const orb = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const node = orb.current;
+    if (!live || !node) return;
+    let frame = 0, level = 0;
+    const tick = () => {
+      const v = conversation.isSpeaking ? conversation.getOutputVolume() : conversation.getInputVolume();
+      level += ((Number.isFinite(v) ? v : 0) - level) * 0.25;
+      node.style.setProperty('--level', String(Math.min(1, level * 2.2)));
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(frame); node.style.setProperty('--level', '0'); };
+  }, [live, conversation]);
+
+  const label = starting ? 'Starting voice assistant' : live ? 'End voice conversation' : 'Talk to the building';
   return (
-    <div className={`voice-agent${live ? ' is-live' : ''}${conversation.isSpeaking ? ' is-speaking' : ''}`}>
+    <div className={`voice-agent${live ? ' is-live' : ''}${conversation.isSpeaking ? ' is-speaking' : ''}${starting || conversation.status === 'connecting' ? ' is-connecting' : ''}`}>
       {(line || error) && (
         <p className={`voice-line${error ? ' voice-line--error' : ''}`}>{error ?? <><strong>{line!.who === 'you' ? 'You' : 'Assistant'}</strong> {line!.text}</>}</p>
       )}
-      <div className="voice-controls">
-        {live ? <>
-          <span className="voice-orb" aria-hidden><i /><i /><i /></span>
-          <span className="voice-state">{conversation.status === 'connecting' ? 'Connecting…' : conversation.isSpeaking ? 'Speaking…' : 'Listening…'}</span>
-          <button type="button" className="voice-end" onClick={() => { conversation.endSession(); setLine(null); }}>End</button>
-        </> : (
-          <button type="button" className="voice-start" onClick={() => void start()} disabled={starting}>
-            <span className="voice-mic" aria-hidden />{starting ? 'Starting…' : 'Talk to the building'}
-          </button>
-        )}
-      </div>
+      <button ref={orb} type="button" className="voice-drop" aria-label={label} title={label} disabled={starting}
+        onClick={() => { if (live) { conversation.endSession(); setLine(null); } else void start(); }}>
+        <span className="voice-drop-blob voice-drop-blob--a" aria-hidden />
+        <span className="voice-drop-blob voice-drop-blob--b" aria-hidden />
+        <span className="voice-drop-blob voice-drop-blob--c" aria-hidden />
+        <span className="voice-drop-shine" aria-hidden />
+      </button>
     </div>
   );
 }

@@ -510,3 +510,26 @@
 @keyframes voice-bar { 50% { height: 22px; } }
 .voice-state { min-width: 86px; font-size: 13px; color: #d7d7d7; }
 .voice-end { height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: #ff3b4e; color: #fff; font-size: 13px; font-weight: 600; }
+
+/* Voice orb: a living water drop (Siri-like). Idle it slowly morphs; live it swells with the voice (--level 0..1). */
+.voice-agent { bottom: 26px; }
+.voice-drop { --level: 0; position: relative; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer;
+  transform: scale(calc(1 + var(--level) * .45)); transition: transform .08s linear; filter: drop-shadow(0 10px 24px rgba(60, 80, 255, .35)); }
+.voice-drop:disabled { cursor: progress; }
+.voice-drop-blob { position: absolute; inset: 0; border-radius: 46% 54% 52% 48% / 55% 45% 55% 45%; animation: drop-morph 7s ease-in-out infinite; }
+.voice-drop-blob--a { background: conic-gradient(from 210deg, #2563eb, #7c3aed, #db2777, #06b6d4, #2563eb); }
+.voice-drop-blob--b { inset: 5px; background: radial-gradient(circle at 65% 35%, rgba(236, 72, 153, .95), rgba(124, 58, 237, .7) 50%, transparent 74%); animation-duration: 5.5s; animation-direction: reverse; }
+.voice-drop-blob--c { inset: 9px; background: radial-gradient(circle at 40% 72%, rgba(34, 211, 238, .95), rgba(37, 99, 235, .45) 58%, transparent 78%); animation-duration: 9s; }
+.voice-drop-shine { position: absolute; top: 14%; left: 24%; width: 30%; height: 18%; border-radius: 50%; background: rgba(255, 255, 255, .45); filter: blur(4px); }
+@keyframes drop-morph {
+  0%, 100% { border-radius: 46% 54% 52% 48% / 55% 45% 55% 45%; transform: rotate(0deg) scale(1); }
+  33% { border-radius: 58% 42% 40% 60% / 45% 58% 42% 55%; transform: rotate(120deg) scale(1.03); }
+  66% { border-radius: 40% 60% 58% 42% / 60% 40% 60% 40%; transform: rotate(240deg) scale(.97); }
+}
+.is-live .voice-drop-blob { animation-duration: 2.4s; }
+.is-live .voice-drop-blob--b { animation-duration: 1.9s; }
+.is-live .voice-drop-blob--c { animation-duration: 3s; }
+.is-speaking .voice-drop { filter: drop-shadow(0 12px 30px rgba(236, 72, 153, .45)); }
+.is-connecting .voice-drop { animation: drop-pulse 1.2s ease-in-out infinite; }
+@keyframes drop-pulse { 50% { transform: scale(1.12); opacity: .85; } }
+@media (prefers-reduced-motion: reduce) { .voice-drop-blob { animation: none; } }
