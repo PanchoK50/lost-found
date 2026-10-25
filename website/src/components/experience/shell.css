@@ -472,3 +472,23 @@
 .answer-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .answer-pill button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: #f0f0f0; font-size: 15px; line-height: 1; color: #3d3d3d; }
 .answer-pill button:hover { background: #e4e4e4; }
+
+/* Model toolbar (top of the model): floors as a horizontal strip, map style on the right. */
+.model-toolbar { position: absolute; z-index: 3; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.model-toolbar > * { pointer-events: auto; }
+.model-toolbar-gap { flex: 1; pointer-events: none; }
+.model-toolbar .floor-picker { position: static; transform: none; flex-direction: row; max-height: none; max-width: 70%; overflow-x: auto; padding: 4px; border-radius: 999px; }
+.model-toolbar .floor-picker button { min-width: 38px; height: 32px; border-radius: 999px; }
+.model-toolbar .view-switch { position: static; }
+.experience--hazard .model-toolbar .view-switch { bottom: auto; }
+.answer-pill { top: 62px; }
+@media (max-width: 899px) { .model-toolbar { top: 8px; left: 8px; right: 8px; } .model-toolbar .floor-picker { max-width: 62%; } }
+/* One floating bar, centred at the top of the model, like a menu: floors | map style. */
+.model-toolbar { left: 50%; right: auto; transform: translateX(-50%); gap: 0; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, .96); box-shadow: 0 6px 22px rgba(0, 0, 0, .13); pointer-events: auto; max-width: calc(100% - 24px); }
+.model-toolbar-gap { flex: none; width: 1px; height: 22px; margin: 0 6px; background: #e3e3e3; }
+.model-toolbar .floor-picker, .model-toolbar .view-switch { background: none; box-shadow: none; padding: 0; }
+.model-toolbar .floor-picker { max-width: none; }
+.shell--emergency .model-toolbar { background: rgba(15, 21, 32, .94); }
+.shell--emergency .model-toolbar-gap { background: #263142; }
+
+.incident-toast { top: 110px; }

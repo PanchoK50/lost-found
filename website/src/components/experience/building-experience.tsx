@@ -428,15 +428,18 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             <button type="button" onClick={clearAnswer} aria-label="Clear from the map (Esc)">×</button>
           </div>
         ) : null}
-        {/* Floor picker on the model's edge (as in Google Maps indoors): short labels, live counts as badges. */}
-        <nav className="floor-picker" ref={floorList} aria-label="Floors">
+        {/* Toolbar along the top of the model: floors (bottom to top, left to right) and the map style. */}
+        <div className="model-toolbar">
+          <nav className="floor-picker" ref={floorList} aria-label="Floors">
           <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }} aria-label="Whole building" title="Whole building">⌂</button>
-          {[...floors].reverse().map(floor => (
+          {floors.map(floor => (
             <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} hazard={hazardByFloor.get(floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
           ))}
         </nav>
-        <div className="view-switch" role="group" aria-label="Map style">
+          <span className="model-toolbar-gap" />
+          <div className="view-switch" role="group" aria-label="Map style">
           {(['blocks', 'detailed'] as const).map(option => <button type="button" key={option} aria-pressed={mapStyle === option} onClick={() => setMapStyle(option)}>{option === 'blocks' ? 'Blocks' : 'Detailed'}</button>)}
+        </div>
         </div>
         {building.building.license !== 'CC0-1.0' && <footer className="model-credit">{building.building.attribution} · {building.building.license}</footer>}
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
