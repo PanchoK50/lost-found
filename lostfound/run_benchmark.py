@@ -10,7 +10,8 @@ answers.json: one entry per question id:
   {"<id>": {"answer": "<the Answer: line value>", "reply": "<full reply>", "kind": "route",
             "space_id": "…", "item_id": "…",                    # what was found, when the answer is a room/thing
             "route": ["<space id>", …],                          # spaces walked through, in order
-            "route_nodes": ["<space id>", "<opening id>", …],    # spaces and the doors between them, in order
+            "route_nodes": ["<space id>", "<opening id>", …],    # spaces, doors, stairs and lifts, in order
+            "element_path": ["<opening or connector id>", …],    # as in the dataset: doors and stairs/lifts only
             "length_m": 42.17, "reachable": true}}
 No schema has been published yet; the fields cover what the PDF names (found item or room, route as ordered node ids,
 route length). The same replies can also be written as the challenge CSV with --csv."""
@@ -31,6 +32,7 @@ from lostfound.core.building import Building, MapError
 from lostfound.evals.variants import MODELS
 
 DEFAULT_INSTRUCTION = "Finish with a line 'Answer: <answer>'."
+TEXT_KEYS = ("question", "text", "prompt", "query", "q", "message")
 
 
 def load_questions(path: Path) -> list[dict]:
@@ -46,9 +48,10 @@ def load_questions(path: Path) -> list[dict]:
         if isinstance(item, str):
             item = {"question": item}
         question_id = str(item.get("id") or item.get("question_id") or f"Q{index:03d}")
-        body = str(item.get("question") or item.get("text") or "").strip()
+        body = str(next((item[key] for key in TEXT_KEYS if item.get(key)), "")).strip()
         if not body:
-            raise SystemExit(f"Question {question_id} has no text.")
+            # One malformed entry must not stop the run: it gets an empty answer and a warning.
+            print(f"[run_benchmark] {question_id}: no question text (looked for {', '.join(TEXT_KEYS)})", file=sys.stderr)
         questions.append({"id": question_id, "question": with_conditions(body, item), "raw": item})
     return questions
 
@@ -64,8 +67,9 @@ def with_conditions(text: str, item: dict) -> str:
         names = closed if isinstance(closed, list) else [closed]
         if not all(str(name).lower() in text.lower() for name in names):
             extra.append(f"Closed: {', '.join(map(str, names))}.")
-    if conditions.get("min_width") and "wide" not in text.lower():
-        extra.append(f"Every door must be at least {conditions['min_width']} m wide.")
+    width = conditions.get("min_width") or conditions.get("min_width_m")
+    if width and "wide" not in text.lower():
+        extra.append(f"Every door must be at least {width} m wide.")
     for key, words in (("from", "Start"), ("start", "Start"), ("to", "Destination"), ("destination", "Destination")):
         value = conditions.get(key)
         if isinstance(value, str) and value and value.lower() not in text.lower():
@@ -102,13 +106,34 @@ def structured(building_dir: Path, result: dict | None) -> dict:
         try:
             with building.temporarily_closed(*closed):
                 details = directions.route_details(building, stops[0], stops[-1], step_free, stops[1:-1])
-            out.update(route=[s for s in details["space_path"] if s in building.spaces], route_nodes=details["nodes"])
+                nodes = with_connectors(building, details["nodes"], step_free)
+            out.update(route=[s for s in details["space_path"] if s in building.spaces], route_nodes=nodes,
+                       element_path=[n for n in nodes if n not in building.spaces])
             out.setdefault("length_m", details["length_m"])
             out["reachable"] = True
         except MapError:
             out.update(reachable=False, route=[], route_nodes=[], length_m=None)
     elif kind == "route" and not out.get("reachable"):
         out.update(route=[], route_nodes=[], length_m=None)
+    return out
+
+
+def with_connectors(building: Building, nodes: list[str], step_free: bool = False) -> list[str]:
+    """Insert the stair or lift between consecutive spaces on different floors, as in the dataset's element_path
+    (one entry per flight: a stair walked over two floors appears twice)."""
+    out: list[str] = []
+    for node in nodes:
+        previous = out[-1] if out else None
+        if previous in building.spaces and node in building.spaces and building.spaces[previous]["floor_id"] != building.spaces[node]["floor_id"]:
+            # The one the router used: open, step-free when asked, and cheapest under the route model.
+            candidates = [c for c in building.connectors.values() if previous in c["space_ids"] and node in c["space_ids"]
+                          and c["id"] not in building.closed and (c["step_free"] or not step_free)]
+            rise = abs(building.floors[building.spaces[previous]["floor_id"]]["elevation_m"] - building.floors[building.spaces[node]["floor_id"]]["elevation_m"])
+            cost = lambda c: 15.0 + rise if c["kind"] == "lift" else 2.0 * rise  # noqa: E731
+            connector = min(candidates, key=cost)["id"] if candidates else None
+            if connector:
+                out.append(connector)
+        out.append(node)
     return out
 
 
@@ -130,14 +155,19 @@ def main() -> None:
     started = time.monotonic()
 
     def one(item: dict) -> tuple[str, dict, float]:
+        if not item["question"].strip() or item["question"].strip() == DEFAULT_INSTRUCTION:
+            return item["id"], {"answer": "", "reply": "", "error": "no question text"}, 0.0
         try:
             outcome = qa.answer_question(arguments.building_dir, item["question"])
-            entry = {"answer": committed_answer(outcome.reply) or "", "reply": outcome.reply,
-                     **structured(arguments.building_dir, outcome.notes.get("result"))}
-            return item["id"], entry, outcome.cost()
         except Exception as error:  # noqa: BLE001 - one failed question must not lose the others
             print(f"[run_benchmark] {item['id']}: {type(error).__name__}: {error}", file=sys.stderr)
             return item["id"], {"answer": "", "reply": "", "error": str(error)}, 0.0
+        entry = {"answer": committed_answer(outcome.reply) or "", "reply": outcome.reply}
+        try:
+            entry.update(structured(arguments.building_dir, outcome.notes.get("result")))
+        except Exception as error:  # noqa: BLE001 - keep the answer even if the route details fail
+            entry["structured_error"] = str(error)
+        return item["id"], entry, outcome.cost()
 
     with ThreadPoolExecutor(max_workers=arguments.workers) as pool:
         results = list(pool.map(one, questions))
