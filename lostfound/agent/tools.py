@@ -409,13 +409,14 @@ class Toolbox:
         result = skills.route(self.building, stops[0], stops[-1], step_free, closed_ids, stops[1:-1])
         # The agent sometimes also works out a fallback (e.g. "if staircase 1 is blocked too") after the route it
         # recommends. Within one answer, the route shown and stored is the one for the real situation: fewest extra
-        # closures between the same stops, then the shortest. A later route between other stops always replaces it.
+        # closures from the same start, then the shortest. A route from another start always replaces it.
         rank = (len(closed_ids), result["length_m"] if result["reachable"] else float("inf"))
         kept = self.turn.get("route_rank") if isinstance(getattr(self, "turn", None), dict) else None
-        keep_previous = bool(kept and kept[0] == (tuple(stops), step_free) and kept[1] <= rank)
+        # Same start (the agent may also try a second exit as a fallback): keep the better of the two.
+        keep_previous = bool(kept and kept[0] == (stops[0], step_free) and kept[1] <= rank)
         if not keep_previous:
             if isinstance(getattr(self, "turn", None), dict):
-                self.turn["route_rank"] = ((tuple(stops), step_free), rank)
+                self.turn["route_rank"] = ((stops[0], step_free), rank)
             self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result))
             self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
         if not result["reachable"]:

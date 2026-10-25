@@ -52,3 +52,6 @@ next-env.d.ts
 
 # Python agent output (kit scratch files)
 /agent_output/
+
+# Screen recordings for the pitch video (large binaries; share them outside git)
+video/out/

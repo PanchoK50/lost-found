@@ -204,8 +204,14 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     const pane = transcript.current;
     const target = busy ? transcriptEnd.current : latestQuestion.current ?? transcriptEnd.current;
     if (!pane || !target) return;
-    const top = target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop - 8;
-    pane.scrollTo({ top: busy ? pane.scrollHeight : top, behavior: 'smooth' });
+    // Twice: now, and once the answer (card, directions) has laid out, which can move the question.
+    const go = () => {
+      const top = target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop - 8;
+      pane.scrollTo({ top: busy ? pane.scrollHeight : top });
+    };
+    go();
+    const timer = window.setTimeout(go, 350);
+    return () => window.clearTimeout(timer);
   }, [messages, busy, expanded]);
 
   // Whole building, keeping the current answer's highlights and route.
