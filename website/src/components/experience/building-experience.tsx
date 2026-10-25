@@ -237,7 +237,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [brigade, params, building]);
   const [alarmOpen, setAlarmOpen] = useState(() => params.get('open') === '1');
   const [rescueTarget, setRescueTarget] = useState<string | null>(params.get('crew1'));
-  const [brigadeTab, setBrigadeTab] = useState<'situation' | 'people' | 'routes'>(params.get('crew1') || params.get('routes') ? 'routes' : 'situation');
+  const [brigadeTab, setBrigadeTab] = useState<'situation' | 'people' | 'routes' | 'ask'>(params.get('crew1') || params.get('routes') ? 'routes' : 'situation');
   const brigadeStarted = useRef(false);
   useEffect(() => {
     if (!brigade || !brigadeOrigin || brigadeStarted.current) return;
@@ -424,7 +424,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       if (wide) input.current?.focus();
     }
   }
-  const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft); };
+  const submit = (event: FormEvent) => { event.preventDefault(); if (brigade) setBrigadeTab('ask'); void ask(draft); };
   // Voice goes into the box like typed text, so it can be checked before sending.
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const addTranscript = (text: string) => {
@@ -451,7 +451,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency || brigade ? ' shell--emergency' : ''}${brigade ? ' shell--brigade' : ''}`}>
+    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency && !brigade ? ' shell--emergency' : ''}${brigade ? ' shell--brigade' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
@@ -545,7 +545,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             <button type="button" className="chat-new" onClick={startOver}>＋ New chat</button>
           </div>
         )}
-        <section ref={transcript} className={`shell-chat${hazard.view ? ' shell-chat--compact' : ''}`} hidden={Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
+        <section ref={transcript} className={`shell-chat${hazard.view && !brigade ? ' shell-chat--compact' : ''}`} hidden={brigade ? brigadeTab !== 'ask' : Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
           {!started && !hazard.view && (
             <div className="shell-intro">
               <h1>Ask about this building</h1>
@@ -622,13 +622,13 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           )}
         </section>
         <section className="shell-ask" ref={dock}>
-          {brigade && hazard.view && (
+          {brigade && hazard.view && brigadeTab === 'ask' && (
             <details className="brigade-chips" open>
               <summary>Ask the building</summary>
               <div>
-                {brigadeChips(brigadeData.briefing, brigadeData.people).slice(0, 4).map(chip => <button type="button" key={chip.label} onClick={() => void ask(chip.question)}>{chip.label}</button>)}
+                {brigadeChips(brigadeData.briefing, brigadeData.people).slice(0, 4).map(chip => <button type="button" key={chip.label} onClick={() => { setBrigadeTab('ask'); void ask(chip.question); }}>{chip.label}</button>)}
                 <details className="brigade-more"><summary>More</summary>
-                  {brigadeChips(brigadeData.briefing, brigadeData.people).slice(4).map(chip => <button type="button" key={chip.label} onClick={() => void ask(chip.question)}>{chip.label}</button>)}
+                  {brigadeChips(brigadeData.briefing, brigadeData.people).slice(4).map(chip => <button type="button" key={chip.label} onClick={() => { setBrigadeTab('ask'); void ask(chip.question); }}>{chip.label}</button>)}
                 </details>
               </div>
             </details>

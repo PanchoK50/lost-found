@@ -119,7 +119,6 @@ export function AlarmCard({ building, origin, tNow, eta, onOpen, onPick }: { bui
   return (
     <div className="alarm-screen" role="dialog" aria-label="Incoming alarm">
       <div className="alarm-dispatch">
-        <span className="alarm-ring" aria-hidden />
         <div className="alarm-kicker"><span>🔥 FIRE</span><em>SIMULATED</em><button type="button" className="alarm-sound" onClick={() => setSound(s => !s)} aria-pressed={sound} aria-label={sound ? 'Mute alarm tone' : 'Play alarm tone'}>{sound ? '🔊' : '🔈'}</button></div>
         <h1>{building.building.name}</h1>
         <p className="alarm-where">{origin ? `${origin.floor} · ${origin.name}` : 'Locating…'}</p>
@@ -174,7 +173,7 @@ export function BrigadeTimeline({ briefing, t, playing, onT, onPlay }: { briefin
   );
 }
 
-type Tab = 'situation' | 'people' | 'routes';
+type Tab = 'situation' | 'people' | 'routes' | 'ask';
 
 /** Right rail: Situation (hazards), People, Routes. The chat (Ask) sits below it. */
 export function BrigadePanel({ briefing, people, routes, onRoom, onRescue, tab, onTab }: {
@@ -183,9 +182,9 @@ export function BrigadePanel({ briefing, people, routes, onRoom, onRescue, tab, 
   return (
     <section className="brigade-panel">
       <nav className="brigade-tabs" role="tablist">
-        {(['situation', 'people', 'routes'] as Tab[]).map(t => <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => onTab(t)}>{t === 'situation' ? 'Situation' : t === 'people' ? `People${people?.cannot_self_evacuate?.length ? ` · ${people.cannot_self_evacuate.length}` : ''}` : 'Routes'}</button>)}
+        {(['situation', 'people', 'routes', 'ask'] as Tab[]).map(t => <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => onTab(t)}>{t === 'situation' ? 'Situation' : t === 'people' ? `People${people?.cannot_self_evacuate?.length ? ` · ${people.cannot_self_evacuate.length}` : ''}` : t === 'routes' ? 'Routes' : 'Ask'}</button>)}
       </nav>
-      <div className="brigade-body">
+      {tab !== 'ask' && <div className="brigade-body">
         {!briefing && <p className="brigade-empty">Loading…</p>}
         {briefing && tab === 'situation' && <>
           <h3>Fire</h3>
@@ -235,7 +234,7 @@ export function BrigadePanel({ briefing, people, routes, onRoom, onRescue, tab, 
             </div>
           ))}
         </>}
-      </div>
+      </div>}
     </section>
   );
 }

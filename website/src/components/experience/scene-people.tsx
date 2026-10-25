@@ -14,13 +14,14 @@ const PER_ROOM = 4;
 const QUEUE_MIN = 0.06;  // figures from one room leave a few seconds apart
 // Waiting for the exit: one behind the other on their own way out, the first this far before the door.
 const QUEUE_FRONT_M = 0.6;
-const QUEUE_GAP_M = 0.5;
+const QUEUE_GAP_M = 0.85;   // one person per 0.85 m in a queue: shoulders don't overlap
+const SLOT_M = 0.9;         // spacing of the grids people stand on (in their room, at the assembly point)
 // Walking: a small step to the side of the route, so a room's people don't walk in single file but stay off the walls.
 const WALK_SIDE_M = 0.2;
 // A little larger than life, so people read at building scale.
 // Mii-style figures: a round head on a small rounded body (no arms), a little larger than life to read at
 // building scale. Both stand on y = 0.
-const FIGURE_SCALE = 1.35;
+const FIGURE_SCALE = 1.1;
 const BODY = new THREE.CapsuleGeometry(0.25, 0.5, 6, 14);
 BODY.translate(0, 0.52, 0);
 const HEAD = new THREE.SphereGeometry(0.29, 20, 16);
@@ -71,29 +72,54 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
     const out: Figure[] = [];
     const total = evacuees.reduce((sum, e) => sum + Math.min(e.count, PER_ROOM), 0);
     const share = Math.min(1, MAX_FIGURES / Math.max(total, 1));
-    evacuees.forEach((evacuee, roomIndex) => {
+    const rooms = evacuees.map(evacuee => {
       const n = Math.max(1, Math.round(Math.min(evacuee.count, PER_ROOM) * share));
       const points = evacuee.path.map(p => {
         const [x, z] = model.toWorld(p.position);
         return new THREE.Vector3(x, (p.floorId === null ? 0 : poses.get(p.floorId)?.y ?? 0) + floorBase(p.floorId), z);
       });
+      return { evacuee, n, points };
+    });
+    // Assembly points: one per exit door, shared by every room that leaves through it. One frame (direction and
+    // centre) per exit, so rooms sharing a door fill the same spiral instead of drawing overlapping ones.
+    const exits = new Map<string, { centre: THREE.Vector3; out3: THREE.Vector3; across: THREE.Vector3; count: number; used: number }>();
+    for (const { n, points } of rooms) {
+      if (!points.length) continue;
+      const last = points.at(-1)!, before = points.at(-2) ?? last;
+      const key = `${Math.round(last.x)}:${Math.round(last.z)}`;
+      const exit = exits.get(key);
+      if (exit) { exit.count += n; continue; }
+      // Outside the exit, away from the building: along the last step of the path.
+      const out3 = last.clone().sub(before).setY(0);
+      if (out3.lengthSq() < 1e-6) out3.set(last.x, 0, last.z);
+      out3.normalize();
+      exits.set(key, { centre: last.clone(), out3, across: new THREE.Vector3(-out3.z, 0, out3.x), count: n, used: 0 });
+    }
+    // The crowd's near edge stays a few metres outside the door, however many people gather there.
+    for (const exit of exits.values()) exit.centre.addScaledVector(exit.out3, 3 + SLOT_M * 0.62 * Math.sqrt(exit.count));
+    rooms.forEach(({ evacuee, n, points }, roomIndex) => {
       if (!points.length) return;
       const lengths = [0];
       for (let i = 1; i < points.length; i++) lengths.push(lengths[i - 1] + points[i].distanceTo(points[i - 1]));
-      // Outside the exit: a few metres past the last door, away from the building centre.
-      const last = points.at(-1)!, before = points.at(-2) ?? last;
-      const out3 = last.clone().sub(before).setY(0);
-      if (out3.lengthSq() < 1e-6) out3.set(last.x, 0, last.z);
-      out3.normalize().multiplyScalar(3);
+      const last = points.at(-1)!;
+      const exit = exits.get(`${Math.round(last.x)}:${Math.round(last.z)}`)!;
       for (let i = 0; i < n; i++) {
         const seed = roomIndex * 31 + i * 7 + 1;
+        const slot = exit.used++;
+        // Sunflower spiral: loose and natural (no rows), about a metre between neighbours, nobody inside anyone.
+        const radius = SLOT_M * 0.62 * Math.sqrt(slot + 0.5), angle = slot * 2.39996;
+        const gather = exit.centre.clone()
+          .addScaledVector(exit.across, Math.cos(angle) * radius + (jitter(seed + 5) - 0.5) * 0.15)
+          .addScaledVector(exit.out3, Math.sin(angle) * radius + (jitter(seed + 9) - 0.5) * 0.15);
         out.push({
           path: points, floors: evacuee.path.map(p => p.floorId ?? ''), lengths, total: lengths.at(-1)!, start: evacuee.startMin + i * QUEUE_MIN,
-          queueAt: Math.max(0, lengths.at(-1)! - QUEUE_FRONT_M - i * QUEUE_GAP_M),
+          // Queue places are numbered per exit door (not per room), so rooms sharing a door don't stand on each other.
+          queueAt: Math.max(0, lengths.at(-1)! - QUEUE_FRONT_M - (slot % 24) * QUEUE_GAP_M),
           // Through the exit door once the queue lets them (spread over the room's share of the wait).
           out: evacuee.outMin !== undefined ? Math.max(evacuee.startMin, evacuee.outMin - (n - 1 - i) * QUEUE_MIN) : Infinity,
-          offset: new THREE.Vector2((jitter(seed) - 0.5) * 1.6, (jitter(seed + 3) - 0.5) * 1.6), cutOff: !!evacuee.cutOff, firefighter: !!evacuee.firefighter, speed: evacuee.speed,
-          exitOut: last.clone().add(out3).add(new THREE.Vector3((jitter(seed + 5) - 0.5) * 3, 0, (jitter(seed + 9) - 0.5) * 3)),
+          // Loosely around the room's point (×0.5 below): a small spiral with jitter, at least SLOT_M apart.
+          offset: new THREE.Vector2(Math.cos(i * 2.39996 + seed) * (0.5 + i * 0.55) * 2 * SLOT_M * 0.6, Math.sin(i * 2.39996 + seed) * (0.5 + i * 0.55) * 2 * SLOT_M * 0.6), cutOff: !!evacuee.cutOff, firefighter: !!evacuee.firefighter, speed: evacuee.speed,
+          exitOut: gather,
           shirt: SHIRTS[Math.floor(jitter(seed + 11) * SHIRTS.length)], skin: SKIN[Math.floor(jitter(seed + 13) * SKIN.length)],
         });
       }
