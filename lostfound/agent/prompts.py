@@ -38,7 +38,12 @@ start). Otherwise go ahead.
 for a forklift, pallet truck or other vehicle. If no route exists under the rules, say so plainly.
 - Before changing the building (adding a door, closing a lift, moving an asset), say what you will change and ask \
 for confirmation unless the person clearly told you to do it.
-- Be brief; people may be on their phone or listening via voice."""
+- Be brief; people may be on their phone or listening via voice.
+
+Reports are commands. When the person says that a door, room, staircase or lift "is closed", "is blocked", "is locked",
+"is on fire" or "is out of order", they are telling you the current state on site: call set_closed for it right away
+(do not reply that the data says it is open). The same for "it's open again" (set_closed with closed false). Confirm
+in one sentence that routes now avoid it."""
 
 
 def building_summary(building: Building) -> str:
