@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type Ref } from 'react';
 import type { Building } from '@/lib/buildings/types';
-import { hazardMeta, type ImpactRoom, type PlaybookAction, type Relation } from '@/lib/hazards/types';
+import { hazardMeta, type ImpactRoom, type PlaybookAction, type Relation, type SimulateResponse } from '@/lib/hazards/types';
 import { evacuationProgress, keyRoom, type HazardView } from './use-hazard';
 
 const RELATION_LABEL: Record<Relation, string> = {
@@ -12,13 +12,15 @@ type Tab = 'overview' | 'affected' | 'response';
 const TITLE: Record<string, string> = { fire: 'Fire', water: 'Water leak', electrical: 'Power fault' };
 
 /** Side panel for a simulation or a live incident: timeline, what is hit, evacuation and the response. */
-export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom, onShowModel, onClose, onResolve }: {
+export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom, onShowFloor, onClose, onResolve }: {
   building: Building;
   view: HazardView;
   panelRef?: Ref<HTMLElement>;
   onStartResponse(): void;
   /** Back to the whole-building view of the hazard. */
   onShowModel(): void;
+  /** Show one floor of the building (the panel links floors that are affected). */
+  onShowFloor(floorId: string): void;
   onRoom(spaceId: string): void;
   onClose(): void;
   onResolve?(): void;
@@ -28,11 +30,8 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
   const floorName = building.floors.find(f => f.id === origin?.floor_id)?.name;
   const data = view.data;
   const [tab, setTab] = useState<Tab>('overview');
-  const key = data ? keyRoom(data) : undefined;
   const reached = useMemo(() => (data?.impact.rooms ?? []).filter(r => r.arrival_min <= view.t + 1e-6), [data, view.t]);
-  const people = useMemo(() => sum(dedupe(reached).map(r => r.people)), [reached]);
   const assets = useMemo(() => (data?.impact.assets_at_risk ?? []).filter(a => a.arrival_min <= view.t + 1e-6), [data, view.t]);
-  const powerOut = reached.filter(r => r.kind === 'electrical').length;
   const progress = data?.evacuation ? evacuationProgress(data, view.t) : undefined;
 
   return (
@@ -58,15 +57,6 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
       {!data && !view.error && <p className="hazard-loading">Working out what this means for the building…</p>}
 
       {data && <>
-        <dl className="hazard-figures">
-          <div><dt>Spaces</dt><dd>{dedupe(reached).length}</dd></div>
-          <div><dt>People</dt><dd>{people}</dd></div>
-          <div><dt>{view.hazard === 'electrical' ? 'No power' : 'Critical assets'}</dt><dd>{view.hazard === 'electrical' ? powerOut : assets.length}</dd></div>
-        </dl>
-        {data.impact.cascades.filter(c => c.at_min <= view.t).slice(0, 1).map(c => (
-          <p key={c.circuit} className="hazard-cascade">{c.reason}: power cut on that circuit at +{Math.round(c.at_min)} min.</p>
-        ))}
-
         <nav className="hazard-tabs" role="tablist">
           {(['overview', 'affected', 'response'] as Tab[]).map(t => (
             <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
@@ -75,8 +65,7 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
 
         <div className="hazard-body">
           {tab === 'overview' && (
-            <Overview view={view} originName={origin?.name ?? ''} keyName={key?.name} keyRelation={key?.relation} reached={dedupe(reached).length} people={people} assets={assets.length}
-              actions={data.playbook} progress={progress} onShowModel={onShowModel} onDetails={() => setTab('response')} />
+            <Overview view={view} data={data} reached={reached} progress={progress} onShowFloor={onShowFloor} onRoom={onRoom} onDetails={() => setTab('response')} />
           )}
           {tab === 'affected' && <Rooms rooms={reached} onRoom={onRoom} />}
           {tab === 'affected' && assets.length > 0 && <h3 className="hazard-subhead">Critical assets</h3>}
@@ -144,61 +133,89 @@ function Rooms({ rooms, onRoom }: { rooms: ImpactRoom[]; onRoom(spaceId: string)
 
 const TAB_LABEL: Record<Tab, string> = { overview: 'Overview', affected: 'Affected', response: 'Response' };
 
-function clockTime(at: number) {
-  return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
 
-/** The response as numbered steps, like a checklist: report → affected spaces → responders → (evacuation). */
-function Overview({ view, originName, keyName, keyRelation, reached, actions, progress, onShowModel, onDetails }: {
-  view: HazardView; originName: string; keyName?: string; keyRelation?: Relation; reached: number; people: number; assets: number;
-  actions: PlaybookAction[]; progress?: ReturnType<typeof evacuationProgress>; onShowModel(): void; onDetails(): void;
+/**
+ * Overview: facts first, each saying what it counts and why, then the response, then clearing the rooms.
+ * Water (or fire) and the power cut it causes are counted separately, so the numbers add up.
+ */
+function Overview({ view, data, reached, progress, onShowFloor, onRoom, onDetails }: {
+  view: HazardView; data: SimulateResponse; reached: ImpactRoom[]; progress?: ReturnType<typeof evacuationProgress>;
+  onShowFloor(floorId: string): void; onRoom(spaceId: string): void; onDetails(): void;
 }) {
   const now = useNow(view.responseStartedAt);
   const elapsed = view.responseStartedAt ? (now - view.responseStartedAt) / 1000 : -1;
-  const calls = actions.filter(a => a.contact && (a.kind === 'call' || a.kind === 'notify'));
-  const unique = calls.filter((a, i) => calls.findIndex(b => b.contact!.name === a.contact!.name) === i).slice(0, 4);
   const live = view.mode === 'incident';
-  const started = view.incident?.createdAt ?? view.responseStartedAt;
+  const main = view.hazard;
+  const hit = dedupe(reached.filter(r => r.kind === main));
+  const dark = dedupe(reached.filter(r => r.kind === 'electrical'));
+  const darkOnly = dark.filter(r => !hit.some(h => h.space_id === r.space_id));
+  const floors = [...new Map(hit.map(r => [r.floor_id, { id: r.floor_id, name: r.floor, rooms: hit.filter(h => h.floor_id === r.floor_id).length }])).values()];
+  const cascade = data.impact.cascades.find(c => c.at_min <= view.t);
+  const equipment = data.impact.assets_at_risk.filter(a => a.arrival_min <= view.t && a.kind === main);
+  const key = keyRoom(data);
+  const keyFloor = key && data.impact.rooms.find(r => r.space_id === key.space_id)?.floor_id;
+  const calls = data.playbook.filter(a => a.contact && (a.kind === 'call' || a.kind === 'notify'));
+  const unique = calls.filter((a, i) => calls.findIndex(b => b.contact!.name === a.contact!.name) === i).slice(0, 4);
+  const confirmed = unique.filter(a => ['confirmed', 'done'].includes(statusOf(a, elapsed, live) ?? '')).length;
+  const noun = main === 'fire' ? 'Fire and smoke' : main === 'water' ? 'Water' : 'Power off';
+  const peopleInHit = hit.reduce((sum, r) => sum + r.people, 0);
+  const peopleDark = darkOnly.reduce((sum, r) => sum + r.people, 0);
   return (
-    <ol className="hazard-steps">
-      <li className="hazard-step is-done">
-        <span className="hazard-step-n">1</span>
-        <div><strong>{live ? 'Report received' : 'Scenario started'}</strong><p>{live ? `Room confirmed: ${originName}` : `${TITLE[view.hazard]} starts in ${originName}`}</p></div>
-        {started && <time>{clockTime(started)}</time>}
-      </li>
-      <li className="hazard-step">
-        <span className="hazard-step-n">2</span>
-        <div>
-          <strong>Review affected spaces</strong>
-          <p>{keyName ? `${originName}, and ${keyName}${keyRelation && keyRelation !== 'same floor' ? ` ${keyRelation === 'below' ? 'on the floor below' : keyRelation}` : ''}` : originName}{reached > 1 ? ` · ${reached - 1} more space${reached - 1 === 1 ? '' : 's'} by now` : ''}</p>
-        </div>
-        <button type="button" className="hazard-link" onClick={onShowModel}>Show on model →</button>
-      </li>
-      <li className="hazard-step">
-        <span className="hazard-step-n">3</span>
-        <div>
-          <strong>Notify responders</strong>
-          <div className="hazard-responders">
-            {unique.map(action => {
-              const status = statusOf(action, elapsed, live);
-              const tone = status === 'confirmed' || status === 'done' ? 'ok' : status ? 'busy' : 'idle';
-              return <span key={action.order} className={`hazard-responder is-${tone}`}><i />{action.contact!.name.split(' (')[0]}<em>{status ? `${live ? '' : 'Demo '}${STATUS_LABEL[status]?.toLowerCase() ?? status}` : 'Pending'}</em></span>;
-            })}
-          </div>
-        </div>
-      </li>
-      {progress && progress.total > 0 && (
-        <li className="hazard-step">
-          <span className="hazard-step-n">4</span>
+    <div className="hz-overview">
+      <section className="hz-section">
+        <header><h3>Situation</h3><span>{live ? 'predicted' : 'simulated'} · at +{fmt(view.t)}</span></header>
+        <dl className="hz-facts">
           <div>
-            <strong>{view.hazard === 'fire' ? 'Evacuate' : 'Clear the affected rooms'}</strong>
-            <p>{progress.out} of {progress.total} people safe{progress.trapped ? ` · ${progress.trapped} trapped` : ''} · all out by +{progress.lastOutMin.toFixed(1)} min</p>
-            <div className="hazard-drill-bar"><span style={{ width: `${(100 * progress.out) / Math.max(1, progress.total)}%` }} /></div>
+            <dt><i className={`hazard-dot hazard-dot--${main}`} />{noun}</dt>
+            <dd>
+              {hit.length} {hit.length === 1 ? 'space' : 'spaces'}
+              {floors.length > 0 && <span className="hz-floors">{floors.map(f => <button type="button" key={f.id} onClick={() => onShowFloor(f.id)}>{f.name} ({f.rooms})</button>)}</span>}
+            </dd>
           </div>
-        </li>
+          {main !== 'electrical' && (
+            <div>
+              <dt><i className="hazard-dot hazard-dot--electrical" />Power</dt>
+              <dd>{cascade ? <>{dark.length} spaces off since +{Math.round(cascade.at_min)} min<small>{cascade.reason.replace(/^Water reaches|^Fire reaches/, main === 'water' ? 'Water on' : 'Fire at')} in {data.impact.rooms.find(r => r.space_id === cascade.space_id)?.name}</small></> : <>On<small>{data.impact.cascades.length ? `Cut at +${Math.round(data.impact.cascades[0].at_min)} min if nothing is done` : 'No electrics in the path'}</small></>}</dd>
+            </div>
+          )}
+          <div>
+            <dt>People</dt>
+            <dd>{main === 'electrical' ? `${peopleInHit} without power` : `${peopleInHit} in affected rooms`}{main !== 'electrical' && peopleDark > 0 && <small>{peopleDark} more only without power</small>}</dd>
+          </div>
+          <div>
+            <dt>Equipment</dt>
+            <dd>{equipment.length ? <>{equipment.length} at risk<small>{[...new Set(equipment.map(a => `${a.type.replaceAll('_', ' ')} (${a.room})`))].slice(0, 2).join(' · ')}</small></> : 'None hit yet'}</dd>
+          </div>
+        </dl>
+        {key && (
+          <button type="button" className="hz-key" onClick={() => { if (keyFloor) onShowFloor(keyFloor); onRoom(key.space_id); }}>
+            <span>{key.arrival_min <= view.t ? 'Reached' : `Next, at +${Math.round(key.arrival_min)} min`}</span>
+            <strong>{key.name}</strong>
+            <em>{key.floor}{key.relation === 'below' ? ', directly below' : ''}{key.critical_assets.length ? ` · ${key.critical_assets.length} critical item${key.critical_assets.length > 1 ? 's' : ''}` : key.people ? ` · ${key.people} people` : ''}</em>
+          </button>
+        )}
+      </section>
+
+      <section className="hz-section">
+        <header><h3>Response</h3><span>{view.responseStartedAt ? `${confirmed} of ${unique.length} confirmed` : live ? 'not started' : 'calls simulated'}</span></header>
+        <ul className="hz-responders">
+          {unique.map(action => {
+            const status = statusOf(action, elapsed, live);
+            const tone = status === 'confirmed' || status === 'done' ? 'ok' : status ? 'busy' : 'idle';
+            return <li key={action.order} className={`is-${tone}`}><i /><span>{action.contact!.name.split(' (')[0]}</span><em>{status ? STATUS_LABEL[status] ?? status : 'Pending'}</em></li>;
+          })}
+        </ul>
+        <button type="button" className="hazard-link" onClick={onDetails}>All {data.playbook.length} steps →</button>
+      </section>
+
+      {progress && progress.total > 0 && (
+        <section className="hz-section">
+          <header><h3>{main === 'fire' ? 'Evacuation' : 'Clearing the affected rooms'}</h3><span>{progress.out} of {progress.total} out</span></header>
+          <div className="hazard-drill-bar"><span style={{ width: `${(100 * progress.out) / Math.max(1, progress.total)}%` }} /></div>
+          <p className="hz-note">{main === 'fire' ? 'Everyone in the building' : `Everyone from the ${main === 'water' ? 'rooms the water reaches' : 'rooms without power'}`}, out by +{progress.lastOutMin.toFixed(1)} min{progress.trapped ? ` · ${progress.trapped} trapped` : ''}{main === 'fire' ? ' · lifts off' : ''}</p>
+        </section>
       )}
-      {view.responseStartedAt && <li className="hazard-step-actions"><button type="button" className="hazard-link" onClick={onDetails}>All {actions.length} response steps →</button></li>}
-    </ol>
+    </div>
   );
 }
 
@@ -276,4 +293,3 @@ function dedupe(rooms: ImpactRoom[]) {
   for (const room of rooms) if (!seen.has(room.space_id)) seen.set(room.space_id, room);
   return [...seen.values()];
 }
-function sum(values: number[]) { return values.reduce((a, b) => a + b, 0); }

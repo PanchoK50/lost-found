@@ -269,18 +269,27 @@ button:disabled { cursor: default; }
    Colour carries meaning only: hazards (red fire, blue water, amber power) and orange for an answer on the map.
    ========================================================================== */
 :root {
-  --ink: #111827;
-  --text: #1f2937;
-  --muted: #6b7280;
-  --line: #e5e7eb;
-  --paper: #f3f4f6;
-  --blue: #1d4ed8;
-  --accent: #111827;
-  --accent-hover: #000000;
+  /* Siemens iX "classic light" values (siemens/ix theme): petrol primary, grey surfaces, semantic status colours. */
+  --ink: #1a232d;
+  --text: #1a232d;
+  --muted: #5c656e;
+  --line: #d9dcdf;
+  --paper: #eff0f1;
+  --surface-2: #e2e4e6;
+  --primary: #006e93;
+  --primary-hover: #005a78;
+  --primary-soft: #e0eef3;
+  --alarm: #d72332;
+  --warning: #ffbb00;
+  --success: #2c8500;
+  --info: #0041b2;
+  --blue: #006e93;
+  --accent: #006e93;
+  --accent-hover: #005a78;
   --glass: #ffffff;
-  --shadow: 0 1px 2px rgba(17, 24, 39, .06);
+  --shadow: 0 1px 2px rgba(0, 20, 40, .08);
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --radius: 6px;
+  --radius: 4px;
 }
 body { font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; }
 .brand { letter-spacing: 0; font-size: 15px; }

@@ -127,3 +127,99 @@
 .shell .hazard-playback .hazard-play { width: 30px; height: 30px; border-radius: var(--radius); background: var(--ink); font-size: 11px; }
 .shell .hazard-timeline input { accent-color: var(--ink); }
 .shell .readiness-finding { border-radius: 0; }
+
+/* ==========================================================================
+   Siemens iX / Desigo CC look: application header with event lamps, navigation with a selection bar,
+   petrol primary buttons, 4 px radii, flat grey canvas.
+   ========================================================================== */
+.shell { grid-template-rows: 48px minmax(0, 1fr); background: var(--paper); }
+.shell-top { padding: 0 12px 0 0; gap: 8px; box-shadow: 0 1px 0 var(--line); border-bottom: 0; }
+.shell-top .brand { gap: 0; height: 48px; margin-right: 4px; padding-right: 16px; border-right: 1px solid var(--line); font-size: 14px; }
+.shell-top .brand::before { content: ""; display: block; width: 48px; height: 48px; margin-right: 12px; background: var(--primary) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.6'%3E%3Cpath d='M4 20V9l8-5 8 5v11'/%3E%3Cpath d='M4 13h16M4 17h16M10 20v-4h4v4'/%3E%3C/svg%3E") center / 22px no-repeat; }
+.shell-top .brand { font-size: 0; }
+.shell-top .brand span { font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.shell-top .brand span::after { content: "Building operations"; display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+.shell-building { height: 32px; border-radius: var(--radius); border-color: transparent; font-weight: 600; }
+.shell-building:hover { background: var(--paper); }
+.shell-button { height: 32px; border-radius: var(--radius); border-color: var(--primary); color: var(--primary); }
+.shell-button:hover { background: var(--primary-soft); border-color: var(--primary); }
+.shell-button--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.shell-button--primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.shell-account { width: 32px; height: 32px; background: var(--surface-2); color: var(--ink); font-size: 11px; }
+
+/* Event lamps (Desigo CC summary bar): one per hazard, lit when there is an active incident */
+.shell-lamps { display: flex; gap: 4px; margin-right: 8px; }
+.shell-lamp { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; font-size: 12px; font-weight: 600; color: var(--muted); }
+.shell-lamp b { font-family: var(--mono); font-weight: 500; }
+.shell-lamp i { width: 8px; height: 8px; border-radius: 1px; background: var(--surface-2); }
+.shell-lamp.is-lit { color: #fff; }
+.shell-lamp--fire.is-lit { background: var(--alarm); border-color: var(--alarm); }
+.shell-lamp--water.is-lit { background: #1f6fd1; border-color: #1f6fd1; }
+.shell-lamp--electrical.is-lit { background: var(--warning); border-color: var(--warning); color: #1a232d; }
+.shell-lamp.is-lit i { background: currentColor; }
+
+/* Navigation: iX menu items with a petrol selection bar */
+.shell-side { gap: 18px; padding: 12px 0; background: #fff; border-right: 1px solid var(--line); }
+.shell-side h2 { margin: 0 16px 6px; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.shell-floors, .shell-list { gap: 0; }
+.shell-floors button, .shell-list button { min-height: 36px; padding: 0 16px; border-radius: 0; border-left: 3px solid transparent; }
+.shell-list button { padding: 7px 16px 7px 13px; }
+.shell-floors button { padding-left: 13px; }
+.shell-floors button:hover, .shell-list button:hover { background: var(--paper); }
+.shell-floors button.active, .shell-list button.active { background: var(--primary-soft); border-left-color: var(--primary); color: var(--ink); font-weight: 600; }
+.shell-segmented { margin: 0 16px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.shell-segmented button { height: 28px; border-radius: 2px; font-weight: 500; }
+.shell-segmented button[aria-pressed="true"] { background: var(--primary); color: #fff; box-shadow: none; }
+.shell-empty, .shell-hint { margin: 0 16px; }
+.shell-credit { margin-top: auto; padding: 12px 16px 0; font-size: 10px; line-height: 1.4; color: var(--muted); }
+.floor-hazard { margin-left: auto; min-width: 22px; padding: 0 5px; border-radius: 2px; font-family: var(--mono); font-size: 11px; line-height: 18px; text-align: center; color: #fff; }
+.floor-hazard--fire { background: var(--alarm); }
+.floor-hazard--water { background: #1f6fd1; }
+.floor-hazard--electrical { background: var(--warning); color: #1a232d; }
+.floor-hazard + .floor-badge { margin-left: 4px; }
+
+/* Panel */
+.shell-panel { background: #fff; }
+.shell .hazard-tabs button[aria-selected="true"] { color: var(--primary); border-bottom-color: var(--primary); }
+.shell .hazard-run { background: var(--primary); border-radius: var(--radius); }
+.shell .hazard-run:hover { background: var(--primary-hover); }
+.shell .hazard-secondary { border-color: var(--primary); color: var(--primary); border-radius: var(--radius); }
+.shell .hazard-link { color: var(--primary); }
+.shell .hazard-close { border-radius: var(--radius); }
+.shell-examples button { border-radius: var(--radius); }
+.shell-examples button:hover { border-color: var(--primary); color: var(--primary); }
+.shell-intro h1 { font-size: 18px; font-weight: 600; }
+
+/* Overview: facts with their source, then response, then clearing */
+.hz-overview { display: flex; flex-direction: column; }
+.hz-section { padding: 12px 16px 14px; border-bottom: 1px solid var(--line); }
+.hz-section > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.hz-section h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+.hz-section > header span { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.hz-facts { margin: 0; display: flex; flex-direction: column; }
+.hz-facts > div { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--paper); }
+.hz-facts > div:first-child { border-top: 0; }
+.hz-facts dt { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+.hz-facts dt .hazard-dot { width: 8px; height: 8px; border-radius: 1px; }
+.hz-facts dd { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+.hz-facts dd small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.hz-floors { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.hz-floors button { height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; font-size: 12px; font-weight: 500; color: var(--primary); }
+.hz-floors button:hover { border-color: var(--primary); }
+.hz-key { display: grid; width: 100%; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid #1f6fd1; border-radius: var(--radius); background: var(--paper); text-align: left; }
+.hz-key span { font-size: 11px; color: var(--muted); }
+.hz-key strong { font-size: 14px; color: var(--ink); }
+.hz-key em { font-style: normal; font-size: 12px; color: var(--muted); }
+.hz-key:hover { border-color: var(--primary); }
+.hz-responders { list-style: none; margin: 0 0 8px; padding: 0; }
+.hz-responders li { display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+.hz-responders i { width: 8px; height: 8px; border-radius: 1px; background: var(--surface-2); }
+.hz-responders .is-ok i { background: var(--success); }
+.hz-responders .is-busy i { background: var(--warning); }
+.hz-responders em { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.hz-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.hz-section .hazard-drill-bar { height: 4px; background: var(--paper); }
+.hz-section .hazard-drill-bar span { display: block; height: 100%; background: var(--success); }
+
+.shell .hazard-playback .hazard-play { background: var(--primary); }
+.shell .hazard-timeline input { accent-color: var(--primary); }

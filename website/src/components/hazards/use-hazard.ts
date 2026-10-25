@@ -84,25 +84,26 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
   const origin = building.spaces.find(s => s.id === view.spaceId);
   const data = view.data;
   const floorOf = new Map(building.spaces.map(s => [s.id, s.floor_id]));
-  const levels = new Map(building.floors.map(f => [f.id, f.level]));
   const hazards = data ? data.simulation.spaces.map(e => ({ spaceId: e.space_id, kind: e.kind, level: levelAt(e, view.t, data.simulation.ramp_min) })).filter(h => h.level > 0.02) : [];
   const key = data ? keyRoom(data) : undefined;
   const target = key && building.spaces.find(s => s.id === key.space_id);
-  // Floors drawn solid: where it starts, plus (water) the floor below it reaches. The rest of the building is glass.
   const originFloor = origin?.floor_id ?? building.floors[0].id;
-  const below = view.hazard === 'water' && data
-    ? [...new Set(data.simulation.spaces.filter(e => e.kind === 'water' && e.peak >= 0.3).map(e => floorOf.get(e.space_id)!))].filter(f => (levels.get(f) ?? 0) === (levels.get(originFloor) ?? 0) - 1)
-    : [];
-  const floorIds = [...new Set([originFloor, ...below, ...(target ? [target.floor_id] : [])])];
   const focus: SceneDirective['focus'] = focusRoom && floorOf.get(focusRoom)
     ? { mode: 'floor', floorId: floorOf.get(focusRoom)! }
+    : focusFloor === '__all__' ? { mode: 'building' }
     : focusFloor ? { mode: 'floor', floorId: focusFloor }
-    : { mode: 'xray', floorIds };
-  const hasLink = Boolean(origin && target && target.id !== origin.id);
+    : { mode: 'floor', floorId: originFloor };
+  // One floor at a time (as in ArcGIS Indoors or Desigo CC): an arrow only when both rooms are on the floor shown.
+  const shownFloor = focusRoom ? floorOf.get(focusRoom) : focusFloor && focusFloor !== '__all__' ? focusFloor : originFloor;
+  const hasLink = Boolean(origin && target && target.id !== origin.id && origin.floor_id === shownFloor && target.floor_id === shownFloor);
   // The arrow's label already names the origin; then the pin needs no label of its own.
-  const markers: SceneDirective['markers'] = origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: hasLink ? '' : origin.name, tone: 'primary' }] : [];
+  const markers: SceneDirective['markers'] = [
+    ...(origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: hasLink ? '' : `${origin.name} · origin`, tone: 'primary' as const }] : []),
+    // On another floor: label the key room there so it is clear why this floor matters.
+    ...(target && target.id !== origin?.id && target.floor_id === shownFloor && !hasLink ? [{ floorId: target.floor_id, position: centroid(target.polygon), label: target.name, tone: 'secondary' as const }] : []),
+  ];
   // The one consequence that matters most, as an arrow with a label: "Kitchen 3.14 → Server room 2.14".
-  const links: SceneDirective['links'] = origin && target && target.id !== origin.id
+  const links: SceneDirective['links'] = hasLink && origin && target
     ? [{ from: { floorId: origin.floor_id, position: centroid(origin.polygon) }, to: { floorId: target.floor_id, position: centroid(target.polygon) }, label: `${origin.name} → ${target.name}` }]
     : undefined;
   const routes: SceneDirective['routes'] = view.hazard === 'fire' && data?.evacuation && view.t >= 1
@@ -117,7 +118,7 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     // The whole building stays in view while the spread plays; a room tapped in the panel zooms to it.
     frameAll: !focusRoom,
     // X-ray: frame where it starts and the key room it reaches, with the building around them.
-    frameSpaces: !focusRoom && !focusFloor && origin ? [origin.id, ...(target ? [target.id] : [])] : undefined,
+    frameSpaces: undefined,
     hazards,
     markers,
     links,

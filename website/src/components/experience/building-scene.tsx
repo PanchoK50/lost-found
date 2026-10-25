@@ -309,7 +309,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
   }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
-  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.08} />;
+  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.35} />;
 }
 
 /** A room and a little of its surroundings, at least 9 m across so small rooms keep some context. */

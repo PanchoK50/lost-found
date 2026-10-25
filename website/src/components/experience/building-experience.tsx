@@ -38,7 +38,7 @@ import { ReportDamage } from '@/components/hazards/report-damage';
 import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
 import { playAlarm, useIncidents } from '@/lib/hazards/incidents';
-import { hazardMeta, type Incident } from '@/lib/hazards/types';
+import { hazardMeta, levelAt, type Incident } from '@/lib/hazards/types';
 
 /** Multiplayer (people, pins, pings, skills) is kept in the code but hidden from the interface: docs/UI_INVENTORY.md. */
 const SHOW_MULTIPLAYER = false;
@@ -116,6 +116,20 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, openSimulation]);
   // Start-screen entry points for the emergency side: a water leak on an upper floor, a fire in a busy room.
   const demoScenarios = useMemo(() => scenariosFor(building), [building]);
+  // While a scenario plays, each floor in the sidebar shows how many of its spaces are hit right now (a building section).
+  const hazardByFloor = useMemo(() => {
+    const out = new Map<string, { kind: 'fire' | 'water' | 'electrical'; count: number }>();
+    const view = hazard.view;
+    if (!view?.data) return out;
+    const floorOf = new Map(building.spaces.map(s => [s.id, s.floor_id]));
+    for (const entry of view.data.simulation.spaces) {
+      if (entry.kind !== view.hazard || levelAt(entry, view.t, view.data.simulation.ramp_min) < 0.15) continue;
+      const floorId = floorOf.get(entry.space_id);
+      if (!floorId) continue;
+      out.set(floorId, { kind: view.hazard, count: (out.get(floorId)?.count ?? 0) + 1 });
+    }
+    return out;
+  }, [hazard.view, building]);
   const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive]);
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
@@ -259,6 +273,16 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}<span aria-hidden>▾</span>
         </button>
         <span className="shell-spacer" />
+        <div className="shell-lamps" aria-label="Active incidents">
+          {(['fire', 'water', 'electrical'] as const).map(kind => {
+            const active = incidents.active.filter(i => i.hazard === kind);
+            return (
+              <button type="button" key={kind} className={`shell-lamp shell-lamp--${kind}${active.length ? ' is-lit' : ''}`} disabled={!active.length} onClick={() => active[0] && openIncident(active.at(-1)!)} aria-label={`${hazardMeta[kind].label}: ${active.length} active`}>
+                <i />{kind === 'fire' ? 'Fire' : kind === 'water' ? 'Water' : 'Power'}<b>{active.length}</b>
+              </button>
+            );
+          })}
+        </div>
         <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>
         <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>
         <button type="button" className="shell-account" onClick={() => setSheet('account')} aria-label={profile ? `Signed in as ${profile.name}. Switch account` : 'Sign in'}>{profile ? initials(profile.name) : 'Sign in'}</button>
@@ -270,9 +294,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         <section>
           <h2>Floors</h2>
           <nav className="shell-floors" ref={floorList} aria-label="Floors">
-            <button type="button" className={(hazard.view ? !hazardFloor && !hazardRoom : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardFloor(null); setHazardRoom(null); } else showOverview(); }}>Whole building</button>
+            <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }}>Whole building</button>
             {[...floors].reverse().map(floor => (
-              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
+              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} hazard={hazardByFloor.get(floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
             ))}
           </nav>
         </section>
@@ -312,18 +336,19 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           </ul>
           <p className="shell-hint">Or select any room on the model.</p>
         </section>
+        {/* Credit where the licence asks for it (CC BY, ODbL); public-domain (CC0) plans need none. */}
+        {building.building.license !== 'CC0-1.0' && <footer className="shell-credit">{building.building.attribution} · {building.building.license}</footer>}
       </aside>
 
       <section className="shell-main">
         <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} mapStyle={mapStyle} onSelectRoom={setSelectedRoom} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
-        <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
       </section>
 
       <aside className="shell-panel" aria-label="Assistant">
         {hazard.view && (
           <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onStartResponse={hazard.startResponse}
-            onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
+            onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onShowFloor={floorId => { setHazardRoom(null); setHazardFloor(floorId); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
             onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
         )}
         <section ref={transcript} className={`shell-chat${hazard.view ? ' shell-chat--compact' : ''}`} hidden={Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
@@ -498,6 +523,8 @@ function withoutAnswerLine(reply: string) {
   return reply.replace(/\n*^\s*Answer:.*$/gim, '').trim();
 }
 
+/** Sentinel for the hazard view's floor: the whole building instead of one floor. */
+const ALL_FLOORS = '__all__';
 const ZERO_INSETS: SceneInsets = { top: 0, left: 0, bottom: 0, right: 0 };
 const STYLE_KEY = 'lf-scene-style';
 const styleListeners = new Set<() => void>();
@@ -545,11 +572,12 @@ function withIncidents(counts: ReturnType<typeof floorCounts>, active: Incident[
 }
 
 /** A floor on the rail, with fixed badges for alerts (red) and people (blue) instead of chips floating in the model. */
-function FloorButton({ floor, active, counts, onClick }: { floor: Building['floors'][number]; active: boolean; counts: ReturnType<typeof floorCounts>; onClick(): void }) {
+function FloorButton({ floor, active, counts, hazard, onClick }: { floor: Building['floors'][number]; active: boolean; counts: ReturnType<typeof floorCounts>; hazard?: { kind: string; count: number }; onClick(): void }) {
   const label = counts.summary ? `${floor.name}: ${counts.summary}` : floor.name;
   return (
     <button type="button" className={`floor-button${active ? ' active' : ''}`} onClick={onClick} aria-label={label} title={label} aria-pressed={active}>
       <span className="floor-button-short">{floorShort(floor.level)}</span><span className="floor-button-name">{floor.name}</span>
+      {hazard && <span className={`floor-hazard floor-hazard--${hazard.kind}`} title={`${hazard.count} spaces affected`}>{hazard.count}</span>}
       {counts.alerts > 0 && <span className="floor-badge floor-badge--alert">{counts.alerts}</span>}
       {counts.people > 0 && <span className="floor-badge floor-badge--people">{counts.people}</span>}
     </button>
