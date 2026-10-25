@@ -132,6 +132,17 @@ def test_catalog_finds_buildings_by_name():
     assert loaded.id == N8
 
 
+def test_catalog_search_is_ambiguous_for_partial_names():
+    """Partial building names match several buildings; cross_route must ask instead of guessing."""
+    directories = {
+        "proc-factory-dev-003": Path("data/dev") / "proc-factory-dev-003",
+        "proc-factory-dev-007": Path("data/dev") / "proc-factory-dev-007",
+    }
+    catalog = Catalog(directories)
+    matches = catalog.search("Fertigung Ost")
+    assert len(matches) >= 2 and len({m["name"] for m in matches}) >= 2  # the tool turns this into a question
+
+
 def test_demo_campus_file_exists():
     assert (CAMPUS_DIR / "stammgelaende.json").exists()
     assert (CAMPUS_DIR / "building-geo.json").exists()

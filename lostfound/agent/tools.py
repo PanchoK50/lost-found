@@ -542,6 +542,13 @@ class Toolbox:
         if not matches:
             raise MapError(f"No building called '{building}'. Ask which building they mean.")
         other = matches[0]
+        if len({match["name"] for match in matches}) > 1:
+            # 'Fertigung Ost' matches several buildings: never guess silently — the agent asks which one.
+            return {
+                "need_clarify_building": building,
+                "candidates": matches[:4],
+                "what_to_ask": f"'{building}' matches several buildings: {', '.join(m['name'] for m in matches[:4])}. Ask which one they mean, then call cross_route with the full name.",
+            }
         other_building = self.catalog.load(other["id"])
         other_resolver = Resolver(other_building)
         destination_id = self._resolve_elsewhere(other_building, other_resolver, destination)
