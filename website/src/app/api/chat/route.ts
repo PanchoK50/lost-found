@@ -64,7 +64,9 @@ export async function POST(request: Request) {
       return Response.json(await withRoutePoints(entry.building, { ...demo, source: 'demo', reply: `${demo.reply}\n\n(The AI agent reached today's budget, so this is the simple offline answer.)` }));
     }
     const location = typeof body.location === 'string' && entry.building.spaces.some(s => s.id === body.location) ? body.location : undefined;
-    const selection = body.selection && ['asset', 'opening', 'space'].includes(body.selection.kind) && typeof body.selection.id === 'string' ? body.selection : undefined;
+    const selection = body.selection && ['asset', 'opening', 'space'].includes(body.selection.kind) && typeof body.selection.id === 'string'
+      ? { kind: body.selection.kind, id: body.selection.id, view_right: Array.isArray(body.selection.view_right) && body.selection.view_right.length === 2 ? body.selection.view_right.map(Number) as [number, number] : undefined }
+      : undefined;
     const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location, selection);
     if (agent.ok) {
       resolved = markBroken(entry.building, agent.response, input.world);

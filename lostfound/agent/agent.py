@@ -202,14 +202,14 @@ def selection_note(building, selection: dict | None) -> str:
         asset = building.assets[item]
         return (f"[Selected on the map: {asset['name']} ({asset['type'].replace('_', ' ')}, asset id {item}) in "
                 f"{building.label(asset['space_id'])}. 'This', 'it' and 'that {asset['type'].replace('_', ' ')}' mean this object; "
-                "use its asset id with the tools (e.g. move_asset, find, nearest).]\n")
+                "use its asset id with the tools (move_object to shift it by metres, left/right as on the person's screen; move_asset to another room).]\n")
     if kind == "opening" and item in building.openings:
         opening = building.openings[item]
         sides = " and ".join(building.label(s) if s in building.spaces else "outside" for s in opening["space_ids"])
         state = "closed" if item in building.closed else "open"
         return (f"[Selected on the map: the {opening['kind']} {item} between {sides}, {opening['width_m']:.2f} m wide, "
                 f"{'step-free' if opening['step_free'] else 'with a step'}, currently {state}. 'This door' and 'it' mean this "
-                f"opening; use its id {item} with set_closed or set_door_width.]\n")
+                f"opening; use its id {item} with set_closed, set_door_width or move_door (left/right are as the person sees the screen).]\n")
     if kind == "space" and item in building.spaces:
         return f"[Selected on the map: {building.label(item)} (space id {item}). 'This room' and 'here' mean this space.]\n"
     return ""
@@ -276,6 +276,8 @@ class ChatSession:
             else "[The person has not set their location. If you need a start, ask for their room, or tell them to tap a room "
             "on the map and choose \"I'm here\".]\n"
         )
+        view = selection.get("view_right") if isinstance(selection, dict) else None
+        self.toolbox.view_right = tuple(view) if isinstance(view, (list, tuple)) and len(view) == 2 else None
         self.messages.append({"role": "user", "content": where + selection_note(self.building, selection) + text + (f"\n\n{hints}" if hints else "")})
         self.toolbox.reset_turn()
         reply = self.loop.run(self.system, self.messages, self.toolbox, outcome)

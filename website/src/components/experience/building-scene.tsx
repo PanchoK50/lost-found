@@ -354,6 +354,12 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
   }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
+  // The screen's "right" on the plan (x east, y north), so "move it to the left" means what the person sees.
+  useFrame(({ camera }) => {
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const length = Math.hypot(right.x, right.z) || 1;
+    (window as unknown as { __lfViewRight?: [number, number] }).__lfViewRight = [right.x / length, -right.z / length];
+  });
   // B-roll: a slow orbit, and the camera handed to a recording script on request.
   useEffect(() => {
     if (!BROLL.on) return;

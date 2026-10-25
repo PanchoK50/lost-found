@@ -11,6 +11,7 @@ type Edit =
   | { action: 'rename_room'; space_id: string; ref?: string; name: string }
   | { action: 'set_room_type'; space_id: string; room_type: string }
   | { action: 'set_door_width'; opening_id: string; width_m: number }
+  | { action: 'move_door'; opening_id: string; position: [number, number] }
   | { action: 'rescale'; factor: number };
 
 export async function loadEdits(buildingId: string): Promise<Edit[]> {
@@ -42,6 +43,7 @@ export function applyEdits(base: Building, edits: Edit[]): { building: Building;
       case 'rename_room': { const s = spaces.get(edit.space_id); if (s) Object.assign(s, { ref: edit.ref ?? s.ref, name: edit.name }); break; }
       case 'set_room_type': { const s = spaces.get(edit.space_id); if (s) s.room_type = edit.room_type; break; }
       case 'set_door_width': { const o = building.openings.find(x => x.id === edit.opening_id); if (o) o.width_m = edit.width_m; break; }
+      case 'move_door': { const o = building.openings.find(x => x.id === edit.opening_id); if (o) o.position = edit.position; break; }
       case 'rescale': {
         const f = edit.factor, scale = (p: [number, number]): [number, number] => [round(p[0] * f), round(p[1] * f)];
         for (const s of building.spaces) s.polygon = s.polygon.map(scale);
