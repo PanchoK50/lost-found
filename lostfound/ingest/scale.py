@@ -86,6 +86,33 @@ def estimate(assets: list[dict]) -> tuple[float | None, float]:
     return refined, best_score / len(rectangles)
 
 
+# Without furniture: plans have a typical room size, which depends on the kind of building, and the kind can be
+# told from the drawing alone (median over the train buildings of each building's median ground-floor 'room'):
+# - a drawn hall at least FACTORY_HALL_RATIO times the median room: a factory with production halls (21.8 m²);
+# - any other drawn hall (lobbies, as in campus buildings): 30.0 m²;
+# - no halls (homes, small offices): 12.2 m².
+FACTORY_HALL_RATIO = 5.0
+TYPICAL_ROOM_M2 = {"factory": 21.8, "hall": 30.0, "plain": 12.2}
+LAST_RESORT_POINTS_PER_METRE = 10.0
+
+
+def estimate_from_rooms(drawings: list) -> float | None:
+    """Points per metre that make the plans' median room the typical size for that kind of building (for plans
+    with no furniture, where nothing else gives the scale)."""
+    from shapely.geometry import Polygon
+
+    def areas(kind: str) -> list[float]:
+        found = [Polygon(space["points"]).area for drawing in drawings for space in drawing.spaces if space["type"] == kind]
+        return [area for area in found if area > 0]
+
+    rooms, halls = areas("room"), areas("hall")
+    if not rooms:
+        return None
+    median = statistics.median(rooms)
+    kind = "plain" if not halls else "factory" if max(halls) >= FACTORY_HALL_RATIO * median else "hall"
+    return math.sqrt(median / TYPICAL_ROOM_M2[kind])
+
+
 RASTER_PIXEL_TOLERANCE = 1.2   # a drawn side is accurate to about one pixel
 RASTER_MIN_EXAMPLES = 40       # only common furniture sizes: rare ones match anything at some scale
 RASTER_MIN_LONG_PX = 6

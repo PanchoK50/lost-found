@@ -11,7 +11,8 @@ type Edit =
   | { action: 'rename_room'; space_id: string; ref?: string; name: string }
   | { action: 'set_room_type'; space_id: string; room_type: string }
   | { action: 'set_door_width'; opening_id: string; width_m: number }
-  | { action: 'rescale'; factor: number };
+  | { action: 'rescale'; factor: number }
+  | { action: 'set_floor_height'; floor_id: string; height_m: number };
 
 export async function loadEdits(buildingId: string): Promise<Edit[]> {
   const db = supabaseAdmin();
@@ -42,6 +43,7 @@ export function applyEdits(base: Building, edits: Edit[]): { building: Building;
       case 'rename_room': { const s = spaces.get(edit.space_id); if (s) Object.assign(s, { ref: edit.ref ?? s.ref, name: edit.name }); break; }
       case 'set_room_type': { const s = spaces.get(edit.space_id); if (s) s.room_type = edit.room_type; break; }
       case 'set_door_width': { const o = building.openings.find(x => x.id === edit.opening_id); if (o) o.width_m = edit.width_m; break; }
+      case 'set_floor_height': setFloorHeight(building, edit.floor_id, edit.height_m); break;
       case 'rescale': {
         const f = edit.factor, scale = (p: [number, number]): [number, number] => [round(p[0] * f), round(p[1] * f)];
         for (const s of building.spaces) s.polygon = s.polygon.map(scale);
@@ -56,4 +58,21 @@ export function applyEdits(base: Building, edits: Edit[]): { building: Building;
     }
   }
   return { building, closed: [...closed] };
+}
+
+/** Mirrors set_floor_height in lostfound/core/edits.py: floors above move with a floor they sat directly on top of
+ * (a factory hall reaching through the floor above moves nothing); a basement grows downwards. */
+function setFloorHeight(building: Building, floorId: string, height: number) {
+  const floors = [...building.floors].sort((a, b) => a.level - b.level);
+  const index = floors.findIndex(f => f.id === floorId);
+  if (index < 0) return;
+  const target = floors[index], old = target.height_m, next = Math.round(height * 1000) / 1000, delta = next - old;
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+  target.height_m = next;
+  if (target.level >= 0) {
+    const above = floors[index + 1];
+    if (above && Math.abs(above.elevation_m - target.elevation_m - old) <= 0.01) for (const f of floors.slice(index + 1)) f.elevation_m = round(f.elevation_m + delta);
+  } else {
+    for (const f of floors.slice(0, index + 1)) f.elevation_m = round(f.elevation_m - delta);
+  }
 }

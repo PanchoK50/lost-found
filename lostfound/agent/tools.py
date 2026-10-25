@@ -203,6 +203,12 @@ EDIT_TOOLS = [
         "input_schema": _schema({"room": PLACE, "real_area_m2": {"type": "number", "description": "0 if unknown"}, "real_width_m": {"type": "number", "description": "0 if unknown; the room's longer side"}}),
     },
     {
+        "name": "set_floor_height",
+        "description": "Set the storey height of one floor, or of every floor with floor 'all' (plans don't show heights). "
+        "Floors above move up or down with it. Saved for everyone.",
+        "input_schema": _schema({"floor": _string("Floor as written, a floor id, or 'all'."), "height_m": {"type": "number", "description": "Storey height in metres, e.g. 3.0."}}),
+    },
+    {
         "name": "move_asset",
         "description": "Record that a thing (machine, furniture, equipment) is now in another room (edits the building).",
         "input_schema": _schema({"asset": _string("Asset name or id, e.g. 'Press 3' or 'Desk 2.03-B'."), "to_room": PLACE}),
@@ -790,6 +796,19 @@ class Toolbox:
                 raise MapError("There is no door between those two rooms.")
         self.building.openings[opening_id]["width_m"] = float(width_m)
         return self._record({"action": "set_door_width", "opening_id": opening_id, "width_m": float(width_m)})
+
+    def tool_set_floor_height(self, floor: str, height_m: float) -> dict:
+        if not 2.0 <= height_m <= 20.0:
+            raise MapError("A storey height should be between 2 and 20 m.")
+        every = floor.strip().lower() in ("all", "every floor", "all floors", "")
+        floor_ids = [f["id"] for f in sorted(self.building.floors.values(), key=lambda f: f["level"])] if every else [self._floor(floor)]
+        edits = [{"action": "set_floor_height", "floor_id": floor_id, "height_m": float(height_m)} for floor_id in floor_ids]
+        data, _ = apply_edits(self.building.data, edits)
+        self._rebuild(data)
+        for edit in edits:
+            self._record(edit)
+        heights = {self.building.floor_name(f["id"]): f"{f['height_m']:g} m at {f['elevation_m']:g} m" for f in self.building.floors.values()}
+        return {"action": "set_floor_height", "floors": heights}
 
     def tool_rescale_building(self, room: str, real_area_m2: float, real_width_m: float) -> dict:
         space_id = self._space(room)

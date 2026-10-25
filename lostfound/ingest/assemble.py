@@ -12,14 +12,13 @@ from pathlib import Path
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
-from lostfound.ingest import infer, svg
+from lostfound.ingest import infer, storeys, straighten, svg
 from lostfound.ingest import scale as scale_module
 
 LABEL_CHAR_WIDTH_PT = 1.7  # labels are centred on the room; the SVG anchor is the text start
 LABEL_BASELINE_PT = 1.6
 LABEL_MAX_DISTANCE_M = 3.0
 DOOR_SNAP_M = 0.6
-DEFAULT_STOREY_HEIGHT_M = 3.0
 REGISTRATION_TOLERANCE_M = 0.6
 # Default room type per space type when nothing better is known (rooms are refined by lostfound.ingest.label).
 DEFAULT_ROOM_TYPE = {
@@ -106,7 +105,7 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
 
     estimates = {d.level: (scale_module.estimate_raster(d.assets) if getattr(d, "raster", False) else scale_module.estimate(d.assets)) for d in drawings}
     known = [value for value, _ in estimates.values() if value]
-    fallback = statistics.median(known) if known else None
+    fallback = statistics.median(known) if known else scale_module.estimate_from_rooms(drawings)
     floors, spaces, openings, assets = [], [], [], []
     per_floor_spaces: dict[int, list[dict]] = {}
     per_floor_shift: dict[int, tuple[float, float]] = {}
@@ -114,8 +113,9 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
     for drawing in drawings:
         points_per_metre, confidence = estimates[drawing.level]
         if not points_per_metre:
-            points_per_metre, confidence = fallback or 10.0, 0.0
-            report["assumptions"].append(f"level {drawing.level}: no furniture to infer scale; used {points_per_metre:.3f} pt/m")
+            points_per_metre, confidence = fallback or scale_module.LAST_RESORT_POINTS_PER_METRE, 0.0
+            basis = "other floors' furniture" if known else "typical room sizes" if fallback else "a fixed guess"
+            report["assumptions"].append(f"level {drawing.level}: no furniture to infer scale; used {points_per_metre:.3f} pt/m from {basis}")
         report["scales"][drawing.level] = {"points_per_metre": round(points_per_metre, 4), "confidence": round(confidence, 2), "raster": getattr(drawing, "raster", False)}
         floor_id = f"{building_id}-F{drawing.level}"
         floors.append(
@@ -123,8 +123,8 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
                 "id": floor_id,
                 "level": drawing.level,
                 "name": drawing.title.split(" — ", 1)[1] if " — " in drawing.title else floor_name(drawing.level),
-                "elevation_m": round(drawing.level * DEFAULT_STOREY_HEIGHT_M, 2),
-                "height_m": DEFAULT_STOREY_HEIGHT_M,
+                "elevation_m": 0.0,  # set by storeys.apply once the room types are known
+                "height_m": 0.0,
             }
         )
         floor_spaces = []
@@ -141,6 +141,12 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
                     "synthetic": False,
                     **({"label_px": drawn["anchor_px"]} if "anchor_px" in drawn else {}),
                 }
+            )
+        if getattr(drawing, "raster", False):
+            # Image traces follow the pixels; walls become straight lines on the floor's grid, neighbours sharing
+            # one wall line. SVG geometry is exact and stays as drawn.
+            report.setdefault("straighten", {})[drawing.level] = straighten.straighten_floor(
+                floor_spaces, pixel_m=1 / points_per_metre
             )
         _assign_labels(drawing, floor_spaces, points_per_metre)
         per_floor_spaces[drawing.level] = floor_spaces
@@ -198,7 +204,7 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
                 "no stairs or lifts drawn: linked overlapping corridors between floors as stairs (please confirm)"
             )
     report["assumptions"].append("asset types inferred from footprint sizes; room types predicted from contents and size")
-    report["assumptions"].append(f"door widths from priors (default {DEFAULT_DOOR_WIDTH_M} m); storey height {DEFAULT_STOREY_HEIGHT_M} m")
+    report["assumptions"].append(f"door widths from priors (default {DEFAULT_DOOR_WIDTH_M} m)")
     title = next((d.title for d in drawings if d.title), "")
     building = {
         "building": {
@@ -218,6 +224,11 @@ def assemble(directory: Path, building_id: str | None = None, name: str | None =
         "ingest_report": report,
     }
     infer.label_building(building)
+    report["storeys"] = storeys.apply(building)
+    report["assumptions"].append(
+        f"storey heights not on the plan: {report['storeys']['storey_height_m']} m per floor "
+        f"(ground floor {report['storeys']['ground_floor_height_m']} m), standard for a {report['storeys']['style']} building"
+    )
     for space in spaces:
         space["name"] = f"{space['room_type'].replace('_', ' ').capitalize()} {space['ref']}".strip()
     names: Counter = Counter()

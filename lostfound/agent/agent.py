@@ -189,7 +189,7 @@ def import_checks(building: Building) -> list[dict]:
         f"{lines}\n"
         "When the person wants to check the import (or asks what is uncertain), go through them one at a time, most "
         "important first (scale, missing stairs/links, then rooms): ask one short question, then fix the answer with "
-        "rename_room, set_room_type, set_door_width or rescale_building and confirm in one line. Changes are saved for everyone."
+        "rename_room, set_room_type, set_door_width, rescale_building or set_floor_height and confirm in one line. Changes are saved for everyone."
     )}]
 
 

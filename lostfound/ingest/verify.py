@@ -6,7 +6,7 @@ Layers (free, deterministic; a Claude vision critic for flagged rooms can sit on
 - L1 confidence: low room-type probability, room area implausible for its type, door widths with no prior,
   weak scale or registration evidence.
 Each issue: {"field", "id", "severity", "message", "question"} where field is one of
-room_type | ref | door | connector | registration | scale | topology."""
+room_type | ref | door | connector | registration | scale | storey | topology."""
 
 import networkx as nx
 from shapely.geometry import Polygon
@@ -102,6 +102,13 @@ def verify(building: dict) -> list[dict]:
         if registration.get("matched_cores", 0) < 1:
             add("registration", f"level {level}", "high", f"level {level} could not be aligned via stairs/lifts",
                 f"Which stair on level {level} sits above/below which stair on level {registration['to_level']}?")
+    storeys = report.get("storeys")
+    if storeys:
+        ground = storeys["ground_floor_height_m"]
+        extra = f", ground floor {ground:g} m" if ground != storeys["storey_height_m"] else ""
+        add("storey", "floors", "medium",
+            f"storey heights are not on the plan: assumed {storeys['storey_height_m']:g} m per floor{extra} ({storeys['style']} building)",
+            f"The plans don't show storey heights. I assumed {storeys['storey_height_m']:g} m per floor{extra}. Is that right?")
     raster_levels = [level for level, scale in report.get("scales", {}).items() if scale.get("raster")]
     if raster_levels:
         biggest = max((sp for sp in spaces.values() if sp["type"] in ("room", "hall")), key=lambda sp: Polygon(sp["polygon"]).area, default=None)
