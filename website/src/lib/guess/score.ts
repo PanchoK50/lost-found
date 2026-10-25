@@ -1,6 +1,6 @@
-import type { Building, Space } from '@/lib/buildings/types';
+import type { Building } from '@/lib/buildings/types';
 import type { WalkGraph } from '@/lib/buildings/walk';
-import { representativePoint } from '@/lib/buildings/graph';
+import type { SpotPick } from './spots';
 
 /** Points per round; a game of five rounds tops out at 25,000 (docs/GEOGUESSR.md §4). */
 export const MAX_POINTS = 5000;
@@ -25,18 +25,25 @@ export interface GuessDistance {
   walked: boolean;
 }
 
-/** Walking distance from the guessed room to the answer, from the same model as the benchmark's route check. */
-export function guessDistance(graph: WalkGraph, building: Building, guess: Space, answer: Space): GuessDistance {
-  if (guess.id === answer.id) return { metres: 0, walked: true };
-  const walked = graph.distancesFrom(guess.id).get(answer.id);
-  if (walked !== undefined) return { metres: walked, walked: true };
-  const z = (s: Space) => building.floors.find(f => f.id === s.floor_id)?.elevation_m ?? 0;
-  const [ax, ay] = representativePoint(guess.polygon), [bx, by] = representativePoint(answer.polygon);
-  return { metres: Math.hypot(ax - bx, ay - by, z(guess) - z(answer)) * UNREACHABLE_FACTOR, walked: false };
+/** Closer than this counts as standing on the spot (a phone photo is never pinned to the centimetre). */
+export const BULLSEYE_M = 1.5;
+
+/**
+ * Distance from the tapped point to where the photo was taken. Same space: straight across the room.
+ * Otherwise the walk between the two spaces (the benchmark's walking model), never less than the straight
+ * 3D line between the two points. Unreachable: 1.5× the straight line.
+ */
+export function spotDistance(graph: WalkGraph, building: Building, guess: SpotPick, answer: SpotPick): GuessDistance {
+  const z = (floorId: string) => building.floors.find(f => f.id === floorId)?.elevation_m ?? 0;
+  const straight = Math.hypot(guess.position[0] - answer.position[0], guess.position[1] - answer.position[1], z(guess.floorId) - z(answer.floorId));
+  if (guess.spaceId === answer.spaceId) return { metres: straight, walked: true };
+  const walked = graph.distancesFrom(guess.spaceId).get(answer.spaceId);
+  if (walked !== undefined) return { metres: Math.max(walked, straight), walked: true };
+  return { metres: straight * UNREACHABLE_FACTOR, walked: false };
 }
 
 export function points(metres: number, scale: number): number {
-  return metres <= 0 ? MAX_POINTS : Math.round(MAX_POINTS * Math.exp(-metres / scale));
+  return metres <= BULLSEYE_M ? MAX_POINTS : Math.round(MAX_POINTS * Math.exp(-metres / scale));
 }
 
 export function emojiFor(score: number): string {
@@ -52,7 +59,7 @@ export interface VerdictInput {
   /** Floor names of the guess and the answer. */
   guessFloor: string;
   answerFloor: string;
-  cluesBought: boolean;
+  cluesBought?: boolean;
   /** Varies the line between rounds without randomness. */
   round: number;
 }
@@ -61,7 +68,7 @@ const pick = (lines: string[], round: number) => lines[round % lines.length];
 
 /** The building comments on your guess, in the first person (§5). */
 export function verdict({ points: score, metres, guessFloor, answerFloor, cluesBought, round }: VerdictInput): string {
-  if (metres <= 0) return pick(['You know me better than my caretaker.', 'Bullseye. Have you been sleeping here?', 'Exactly here. I\'m flattered.'], round);
+  if (metres <= BULLSEYE_M) return pick(['You know me better than my caretaker.', 'Bullseye. Have you been sleeping here?', 'Exactly here. I\'m flattered.'], round);
   if (cluesBought) return 'Cheating is allowed. But I\'ll remember.';
   if (guessFloor !== answerFloor) return `Cold. Very cold. You're on ${guessFloor}, I meant ${answerFloor}.`;
   if (metres > 100) return 'That\'s not even the same wing.';
