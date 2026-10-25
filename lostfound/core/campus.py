@@ -33,7 +33,6 @@ WALK_M_PER_S = 1.3
 # Choosing an exit: basement or upper-floor exits mean stairs to reach the street; a small penalty makes
 # the ground-floor entrance win when it is close. The penalty only affects the choice, never the reported length.
 NON_GROUND_EXIT_PENALTY_M = 8.0
-TOO_FAR_TO_WALK_M = 1500.0
 
 
 # ---------- placement sources ----------

@@ -95,6 +95,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
     for (const floor of model.floors) bound.set(floor.floor.id, (point: [number, number]) => model.toWorld(point, floor.floor.id));
     return bound;
   }, [model]);
+  const sceneSpan = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
   const hazards = useMemo(() => {
@@ -161,7 +162,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
     <div className="scene-root">
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
-        <fog attach="fog" args={[palette.background, 400, 1400]} />
+        <fog attach="fog" args={[palette.background, Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
         {/* Bright, soft studio light so the model reads white, like Synera's renders. */}
         <ambientLight intensity={0.55} />
         <hemisphereLight args={['#ffffff', '#e8edf4', 1.7]} />
@@ -325,7 +326,9 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
   }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
-  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.35} />;
+  // A campus can span kilometres (far pairs route too): let the camera reach as far as the scene does.
+  const span = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
+  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.max(1500, span * 4)} maxPolarAngle={Math.PI / 2 - 0.35} />;
 }
 
 /** A room and a little of its surroundings, at least 9 m across so small rooms keep some context. */

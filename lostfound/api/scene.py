@@ -186,12 +186,16 @@ def cross_route(site, result: dict) -> dict:
             markers.append({"floorId": exit_opening["floor_id"], "position": exit_opening["position"], "label": f"Exit · {building_a.data['building']['name']}", "tone": "muted"})
             markers.append({"floorId": entry_opening["floor_id"], "position": entry_opening["position"], "label": f"Entrance · {building_b.data['building']['name']}", "tone": "muted"})
     source_note = {"assumed": " · distance as you said", "measured": " · real distance (OSM)"}.get(result["distance_source"], "")
+    metres = result["length_m"]
+    distance = f"{metres / 1000:.1f} km" if metres >= 1000 else f"{metres:.0f} m"
+    minutes = result["minutes"]
+    time = f"about {minutes // 60} h {minutes % 60} min" if minutes >= 90 else f"about {minutes} min"
     return {
         "kind": "route",
         "answer": {
             "title": f"{start['name']} → {destination['name']}",
-            "value": f"{result['length_m']:.0f} m",
-            "detail": f"{start['building_name']} → {destination['building_name']} · about {result['minutes']} min{source_note}",
+            "value": distance,
+            "detail": f"{start['building_name']} → {destination['building_name']} · {time}{source_note}",
         },
         "scene": {
             "focus": {"mode": "campus", "members": site.placement()},

@@ -111,6 +111,18 @@ def test_assumed_placement_from_conversation(buildings):
     assert result["distance_source"] == "assumed"
 
 
+def test_far_pair_routes_with_real_distance(buildings):
+    """No distance limit: N3 to the Garching institute (~29 km) routes with its real length."""
+    institute = Building.load(Path("data/dev") / "osm-way27326387")
+    placement = geo_placement(N3, institute.id)
+    assert placement is not None and placement["distance_m"] > 25_000
+    site = Campus([CampusMember(buildings[N3], (0, 0), "here"), CampusMember(institute, tuple(placement["offset"]), "measured")])
+    result = site.cross_route((N3, _room(buildings[N3], "-F0")), (institute.id, _room(institute, "-F0")))
+    assert result["length_m"] > 25_000  # the real kilometres, not a capped or refused route
+    assert result["legs"][1]["kind"] == "outdoor"
+    assert result["distance_source"] == "measured"
+
+
 def test_catalog_finds_buildings_by_name():
     catalog = Catalog({N3: Path("data/dev") / N3, N8: Path("data/test") / N8})
     assert catalog.search("N8")[0]["id"] == N8

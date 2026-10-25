@@ -525,17 +525,15 @@ class Toolbox:
     # ---------- other buildings (chat) ----------
 
     def _placement_for(self, other_id: str) -> dict | None:
-        """Where the other building is, relative to this one: curated campus, learned in chat, or measured."""
+        """Where the other building is, relative to this one: curated campus, learned in chat, or measured.
+        Every pair routes — far buildings too (with their real distance); nothing is cut off."""
         curated = campus.curated_placement(self.building.id, other_id)
         if curated is not None:
             return curated
         learned = self.placements.get(other_id)
         if learned is not None:
             return learned
-        geo = campus.geo_placement(self.building.id, other_id)
-        if geo is not None and geo["distance_m"] > campus.TOO_FAR_TO_WALK_M:
-            return {**geo, "too_far": True}
-        return geo
+        return campus.geo_placement(self.building.id, other_id)
 
     def tool_cross_route(self, start: str, destination: str, building: str, step_free: bool = False) -> dict:
         if self.catalog is None:
@@ -562,13 +560,6 @@ class Toolbox:
                     f"{self.building.data['building']['name']} (metres), and which way? Then remember it with "
                     "set_building_placement and call cross_route again."
                 ),
-            }
-        if placement.get("too_far"):
-            return {
-                "too_far": True,
-                "building": other,
-                "distance_m": placement["distance_m"],
-                "note": f"{other['name']} is {placement['distance_m'] / 1000:.1f} km away (real distance, from OpenStreetMap) — not a walk. Say so; offer the indoor parts if useful.",
             }
         start_id = self._space(start)
         site = campus.Campus(

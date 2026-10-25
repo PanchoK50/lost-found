@@ -92,7 +92,7 @@ def other_buildings_block(building: Building, catalog) -> list[dict]:
         "Other buildings of the catalogue can be routed to as well: call cross_route with the building name. "
         "When it returns need_distance, ask the person one short question (roughly how far, and which way), "
         "remember it with set_building_placement, then call cross_route again — never invent a distance. "
-        "When it returns too_far, say the real distance and that it is not a walk."
+        "Every pair routes, far ones too: state the real distance (km when long) and let the person decide."
     )
     return [{"type": "text", "text": "\n".join(text)}]
 
