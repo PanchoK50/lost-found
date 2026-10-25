@@ -56,8 +56,8 @@ interface Props {
   myRoom?: string;
   /** No hover or tap tips with room names, e.g. for the GeoGuessr game (docs/GEOGUESSR.md §6). */
   hideLabels?: boolean;
-  /** A room of the shown floor was tapped. */
-  onSelect?(spaceId: string): void;
+  /** A room of the shown floor was tapped, with the exact point on it (building metres). */
+  onSelect?(spaceId: string, point: FloorPoint): void;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -98,7 +98,13 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     if (el) elements.current.set(key, el); else elements.current.delete(key);
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
-  const select = useCallback((id: string) => { setSelected({ id, directive: directiveKey }); onSelect?.(id); }, [directiveKey, onSelect]);
+  const select = useCallback((id: string, world: THREE.Vector3) => {
+    setSelected({ id, directive: directiveKey });
+    const space = model.spaces.get(id)?.space;
+    // Back from world to building coordinates: toWorld([0, 0]) is (−cx, cy).
+    const [ox, oz] = model.toWorld([0, 0]);
+    if (space) onSelect?.(id, { floorId: space.floor_id, position: [world.x - ox, oz - world.z] });
+  }, [directiveKey, onSelect, model]);
   // Phones get a lighter GPU budget: lower pixel ratio and smaller shadow maps.
   const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
 
@@ -278,7 +284,7 @@ interface FloorViewProps {
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
   /** A tap on a room of the shown floor. */
-  onSelect(spaceId: string): void;
+  onSelect(spaceId: string, world: THREE.Vector3): void;
 }
 
 function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, onInspect, onSelect }: FloorViewProps) {
@@ -317,7 +323,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
   const plain = model.spaces.filter(m => !tones.has(m.space.id));
   const tap = (id: string) => (event: ThreeEvent<MouseEvent>) => {
     if (overview) { event.stopPropagation(); onPick(model.floor.id); return; }
-    if (pose.interactive) { event.stopPropagation(); onSelect(id); }
+    if (pose.interactive) { event.stopPropagation(); onSelect(id, event.point); }
   };
   const hover = (id: string | null) => (event: ThreeEvent<PointerEvent>) => {
     if (!pose.interactive || overview || event.pointerType !== 'mouse') return;
