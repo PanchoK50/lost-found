@@ -103,6 +103,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const floorList = useRef<HTMLDivElement>(null);
   const latestQuestion = useRef<HTMLParagraphElement>(null);
   const started = messages.length > 0;
+  // The start block ("Ask me anything", suggestions) gives way once someone explores a floor, so the map gets the screen.
+  const intro = !started && directive.focus.mode === 'building';
   const floors = [...building.floors].sort((a, b) => a.level - b.level);
   const focusedFloor = directive.focus.mode === 'floor' ? directive.focus.floorId : undefined;
   // On phones the sheet shows only the latest exchange until expanded.
@@ -128,7 +130,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     [header, transcript, dock].forEach(ref => ref.current && observer.observe(ref.current));
     window.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
-  }, [wide, started]);
+  }, [wide, started, intro]);
   useEffect(() => {
     const list = floorList.current;
     if (!list) return;
@@ -320,19 +322,19 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         )}
 
         <section className="dock" ref={dock}>
-          {!started && <div className="hero">
+          {intro && <div className="hero">
             <AgentAvatar size="lg" />
             <p className="eyebrow">{building.building.name} · {building.floors.length} floors · {building.spaces.length} spaces</p>
             <h1>Ask me anything.</h1>
           </div>}
-          {!started && importIntro && (
+          {intro && importIntro && (
             <div className="import-intro">
               <strong>Built from your plans.</strong>
               <span>{importIntro.checks ? `${importIntro.checks} thing${importIntro.checks === 1 ? '' : 's'} to check, e.g. “${importIntro.first}”` : 'Nothing to check: ask me anything.'}</span>
               {importIntro.checks > 0 && <button type="button" className="button button--primary" onClick={() => void ask('Let’s check what you were unsure about in this building, one question at a time.')}>Check it with me</button>}
             </div>
           )}
-          {!started && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
+          {intro && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
           {profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
           {world && profile && mentionQuery(draft) !== undefined
             ? <MentionPicker players={world.players.filter(p => p.id !== profile.id)} draft={draft} onPick={text => { setDraft(text); input.current?.focus(); }} />
