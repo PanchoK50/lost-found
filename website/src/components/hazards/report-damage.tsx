@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import { hazardMeta, type Assessment, type HazardKind, type Incident } from '@/lib/hazards/types';
 import { authHeader } from '@/lib/supabase/browser';
-import { Sheet } from '@/components/world/sheet';
+import { SidePanel } from '@/components/world/side-panel';
 import { SpaceSelect } from '@/components/world/space-select';
 
 /** Downscale a photo to at most `max` px on the long side, as a JPEG data URL. */
@@ -70,7 +70,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
   }
 
   return (
-    <Sheet title="Report damage" onClose={onClose}>
+    <SidePanel title="Report incident" onClose={onClose}>
       <div className="report-damage">
         <label className="report-photo">
           {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL, nothing to optimise */}
@@ -111,6 +111,6 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
         {error && <p className="hazard-error">{error}</p>}
         <button type="button" className="button button--danger" onClick={raise} disabled={!hazard || !place}>Raise the alarm</button>
       </div>
-    </Sheet>
+    </SidePanel>
   );
 }

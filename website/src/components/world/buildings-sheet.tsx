@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authHeader } from '@/lib/supabase/browser';
 import { Sheet } from './sheet';
+import { SidePanel } from './side-panel';
 
 export interface BuildingRow { id: string; name: string; source: string; split: string | null; floors: number; spaces: number }
 
@@ -86,11 +87,7 @@ export function AddBuildingPanel({ onClose }: { onClose(): void }) {
   const fields = result ? Object.entries(result.issues.by_field).map(([field, n]) => `${n} ${field.replace('_', ' ')}`).join(', ') : '';
 
   return (
-    <section className="add-panel" aria-label="Add a building">
-      <div className="chat-head">
-        <span>Add a building</span>
-        <button type="button" className="chat-new" onClick={onClose}>Close</button>
-      </div>
+    <SidePanel title="Add a building" onClose={onClose}>
       <div className="buildings-upload buildings-upload--solo">
         <p className="sheet-hint"><strong>Best: upload a <code>building.json</code>.</strong> It is imported exactly as it is, with nothing to guess.</p>
         <p className="sheet-hint">No JSON? Upload one plan per floor, named <code>floor_0</code>, <code>floor_1</code>, … (basements <code>floor_-1</code>), or select all files of a building folder. Prefer SVG over PNG: images are traced and their scale and room numbers estimated, so they need more checking. Rooms, doors, stairs, room numbers and room types are read from the plans. Anything uncertain is checked with you in the chat.</p>
@@ -109,6 +106,6 @@ export function AddBuildingPanel({ onClose }: { onClose(): void }) {
           </div>
         )}
       </div>
-    </section>
+    </SidePanel>
   );
 }

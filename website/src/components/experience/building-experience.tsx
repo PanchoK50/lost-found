@@ -463,7 +463,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency && !brigade ? ' shell--emergency' : ''}${brigade ? ' shell--brigade' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
-        <button type="button" className="shell-add-building" onClick={() => setAdding(open => !open)} aria-label="Add a building" aria-pressed={adding} title="Add a building">+</button>
+        <button type="button" className="shell-add-building" onClick={() => { if (sheet === 'damage') setSheet(undefined); setAdding(open => !open); }} aria-label="Add a building" aria-pressed={adding} title="Add a building">+</button>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another`}>
           {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}<span aria-hidden>▾</span>
         </button>
@@ -497,7 +497,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           </div>
         </details>}
         {!brigade && <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>}
-        {!brigade && <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>}
+        {!brigade && <button type="button" className="shell-button shell-button--primary" onClick={() => { setAdding(false); setSheet(open => (open === 'damage' ? undefined : 'damage')); }}>Report incident</button>}
         <button type="button" className="shell-account" onClick={() => setSheet('account')} aria-label={profile ? `Signed in as ${profile.name}. Switch account` : 'Sign in'}>{profile ? initials(profile.name) : 'Sign in'}</button>
         {SHOW_MULTIPLAYER && <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
           location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />}
@@ -536,8 +536,14 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         {!broll && <VoiceAgent actions={voiceActions} />}
       </section>
 
-      <aside className={`shell-panel${adding ? ' shell-panel--adding' : ''}`} aria-label="Assistant">
-        {adding && <AddBuildingPanel onClose={() => setAdding(false)} />}
+      <aside className={`shell-panel${adding || sheet === 'damage' ? ' shell-panel--task' : ''}`} aria-label="Assistant">
+        {adding && sheet !== 'damage' && <AddBuildingPanel onClose={() => setAdding(false)} />}
+        {sheet === 'damage' && <ReportDamage building={building} myRoom={selectedRoom ?? myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
+          incidents.raise(incident);
+          closeSheet();
+          playAlarm();
+          openIncident(incident);
+        }} />}
         {brigade && hazard.view && (
           <BrigadePanel briefing={brigadeData.briefing} people={brigadeData.people} routes={brigadeData.routes} tab={brigadeTab} onTab={setBrigadeTab}
             onRoom={spaceId => setHazardRoom(spaceId)} onRescue={spaceId => { setRescueTarget(spaceId); setBrigadeTab('routes'); }} />
@@ -690,12 +696,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           <time>now</time>
         </button>
       )}
-      {sheet === 'damage' && <ReportDamage building={building} myRoom={selectedRoom ?? myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
-        incidents.raise(incident);
-        closeSheet();
-        playAlarm();
-        openIncident(incident);
-      }} />}
       {sheet === 'readiness' && <ReadinessSheet building={building} onClose={closeSheet} onShow={finding => {
         closeSheet();
         hazard.close();
