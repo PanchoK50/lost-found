@@ -6,7 +6,7 @@ stays for everyone. Plan-import corrections use the same mechanism (rename, room
 
 Actions: close / reopen {element_id}; add_door {opening}; move_asset {asset_id, to_space_id, position};
 move_door {opening_id, position}; rename_room {space_id, ref, name}; set_room_type {space_id, room_type}; set_door_width {opening_id, width_m};
-rescale {factor}."""
+rescale {factor}; set_floor_height {floor_id, height_m}."""
 
 import copy
 
@@ -58,6 +58,8 @@ def apply_edit(building: dict, edit: dict, closed: set[str]) -> None:
                     opening["width_m"] = float(edit["width_m"])
         case "rescale":
             _rescale(building, float(edit["factor"]))
+        case "set_floor_height":
+            set_floor_height(building, edit["floor_id"], float(edit["height_m"]))
 
 
 def _rescale(building: dict, factor: float) -> None:
@@ -74,3 +76,24 @@ def _rescale(building: dict, factor: float) -> None:
         if footprint:
             footprint["width_m"] = round(footprint["width_m"] * factor, 3)
             footprint["depth_m"] = round(footprint["depth_m"] * factor, 3)
+
+
+def set_floor_height(building: dict, floor_id: str, height_m: float) -> None:
+    """Set one floor's height. Floors above move with it when they sat directly on top of it (a factory hall that
+    reaches through the floor above moves nothing); a basement grows downwards, taking the floors below with it."""
+    floors = sorted(building["floors"], key=lambda floor: floor["level"])
+    index = next((i for i, floor in enumerate(floors) if floor["id"] == floor_id), None)
+    if index is None:
+        return
+    target = floors[index]
+    old, new = float(target["height_m"]), round(float(height_m), 3)
+    target["height_m"] = new
+    delta = new - old
+    if target["level"] >= 0:
+        above = floors[index + 1] if index + 1 < len(floors) else None
+        if above is not None and abs(above["elevation_m"] - target["elevation_m"] - old) <= 0.01:
+            for floor in floors[index + 1:]:
+                floor["elevation_m"] = round(floor["elevation_m"] + delta, 3)
+    else:
+        for floor in floors[: index + 1]:
+            floor["elevation_m"] = round(floor["elevation_m"] - delta, 3)
