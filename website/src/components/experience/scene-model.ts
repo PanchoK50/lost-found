@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { Asset, Building, Floor, Point, Space } from '@/lib/buildings/types';
+import type { Asset, Building, Floor, Opening, Point, Space } from '@/lib/buildings/types';
 import { bounds, polygonArea, polygonCentroid, storeyHeights } from '@/lib/buildings/geometry';
 import type { FloorPoint, SceneFocus } from '@/lib/chat/contract';
 
@@ -14,6 +14,7 @@ export interface FloorModel {
   storey: number;
   spaces: SpaceModel[];
   assets: Asset[];
+  openings: Opening[];
   /** Merged unit-height outline of every space, scaled with the blocks. */
   edges: THREE.BufferGeometry;
   box: { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -48,6 +49,7 @@ export function buildModel(building: Building): BuildingModel {
       storey: heights.get(floor.id) ?? 3,
       spaces: floorSpaces,
       assets: building.assets.filter(asset => asset.floor_id === floor.id),
+      openings: building.openings.filter(opening => opening.floor_id === floor.id),
       edges,
       box: { minX: b.minX, maxX: b.maxX, minZ: b.minY, maxZ: b.maxY },
     };
@@ -89,7 +91,8 @@ export function layoutFloors(model: BuildingModel, focus: SceneFocus): Map<strin
       const isTarget = f.floor.id === focus.floorId;
       poses.set(f.floor.id, {
         y: elevation(f.floor) + (above ? 40 + (f.floor.level - level) * 6 : 0),
-        opacity: isTarget ? 1 : above ? 0 : 0.14,
+        // One floor at a time: the others are hidden, so walls and furniture below don't show through.
+        opacity: isTarget ? 1 : 0,
         flat: isTarget ? 1 : 0,
         interactive: isTarget,
       });

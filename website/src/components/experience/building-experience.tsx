@@ -158,12 +158,22 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   useEffect(() => {
     // Esc: first back to the whole building, then (pressed again) back to the start screen.
     const onKey = (event: KeyboardEvent) => {
+      // Arrow up/down (or Page up/down) step one floor at a time, unless the user is typing.
+      const step = { ArrowUp: 1, PageUp: 1, ArrowDown: -1, PageDown: -1 }[event.key];
+      const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
+      if (step && !typing && floors.length) {
+        event.preventDefault();
+        const current = floors.findIndex(f => f.id === focusedFloor);
+        const next = current < 0 ? (step > 0 ? 0 : floors.length - 1) : Math.min(floors.length - 1, Math.max(0, current + step));
+        focusFloor(floors[next].id);
+        return;
+      }
       if (event.key !== 'Escape') return;
       if (directive.focus.mode !== 'building') showOverview(); else startOver();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showOverview, startOver, directive.focus.mode]);
+  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor]);
 
   async function ask(text: string, skillId?: string) {
     const message = text.trim();

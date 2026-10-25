@@ -10,6 +10,7 @@ import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
 import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
 import type { WorldState } from '@/lib/world/types';
 import { worldAnchors } from '@/components/world/world-anchors';
+import { DetailedAssets, Doors, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
 /**
  * Synera-style model: white, studio-lit blocks on a cool light ground. Orange marks the answer,
@@ -95,8 +96,25 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
   const select = useCallback((id: string) => setSelected({ id, directive: directiveKey }), [directiveKey]);
+  // Esc first leaves a zoomed-in room (back to its floor) before the page's own Esc handling.
+  useEffect(() => {
+    if (!picked) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopImmediatePropagation();
+      setSelected(null);
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [picked]);
   // Phones get a lighter GPU budget: lower pixel ratio and smaller shadow maps.
   const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
+  // Like a map/satellite switch: plain blocks or the detailed model with walls, floors and furniture. Remembered per browser.
+  const [style, setStyle] = useState<SceneStyle>(() => (localStorage.getItem(STYLE_KEY) === 'detailed' ? 'detailed' : 'blocks'));
+  const chooseStyle = (next: SceneStyle) => { setStyle(next); localStorage.setItem(STYLE_KEY, next); };
+  const detailed = style === 'detailed';
+  const textures = useTextures(detailed);
+  const models = useAssetModels(useMemo(() => building.assets.map(asset => asset.type), [building]), detailed);
 
   return (
     <div className="scene-root">
@@ -107,9 +125,9 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         <ambientLight intensity={0.55} />
         <hemisphereLight args={['#ffffff', '#e8edf4', 1.7]} />
         <directionalLight position={[60, 120, 40]} intensity={1.25} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
-        <CameraRig model={model} poses={poses} directive={directive} insets={insets} />
+        <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
@@ -124,10 +142,19 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
       <div className="scene-anchors">
         {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
+      <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
+        {(['blocks', 'detailed'] as const).map(option => (
+          <button type="button" key={option} className={`scene-style-option scene-style-option--${option}`} aria-pressed={style === option} onClick={() => chooseStyle(option)}>
+            <span className="scene-style-preview" aria-hidden />
+            {option === 'blocks' ? 'Blocks' : 'Detailed'}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
+const STYLE_KEY = 'lf-scene-style';
 const FLOOR_TAG_GAP_PX = 30;
 const EDGE_MARGIN_PX = 14;
 const TAIL_PX = 12;
@@ -221,18 +248,19 @@ function Projector({ anchors, elements, topInset, paths }: { anchors: Anchor[]; 
   return null;
 }
 
-function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; poses: Map<string, FloorPose>; directive: SceneDirective; insets: SceneInsets }) {
+/** `room`: a tapped room; the camera flies in close enough to see what is inside, and back out when it is cleared. */
+function CameraRig({ model, poses, directive, insets, room }: { model: BuildingModel; poses: Map<string, FloorPose>; directive: SceneDirective; insets: SceneInsets; room?: string | null }) {
   const controls = useRef<CameraControls>(null);
   const { size, camera } = useThree();
   // Frame the answer: the spaces it names or counts and its reference room, not the background candidates.
   const frame = useMemo(() => (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId), [directive.highlights]);
   const routePoints = useMemo(() => [...(directive.routes ?? []).flatMap(r => r.points ?? []), ...(directive.links ?? []).flatMap(l => [l.from, l.to])], [directive.routes, directive.links]);
-  const focusKey = JSON.stringify([directive.focus, frame, routePoints.length]);
+  const focusKey = JSON.stringify([directive.focus, frame, routePoints.length, room]);
   const first = useRef(true);
   useEffect(() => {
     const c = controls.current;
     if (!c || !(camera instanceof THREE.PerspectiveCamera)) return;
-    const box = focusBox(model, poses, directive.focus, frame, routePoints);
+    const box = (room && roomBox(model, poses, room)) || focusBox(model, poses, directive.focus, frame, routePoints);
     const centre = box.getCenter(new THREE.Vector3());
     const extent = box.getSize(new THREE.Vector3());
     const radius = Math.max(4, 0.5 * Math.hypot(extent.x, extent.z, directive.focus.mode === 'floor' ? 0 : extent.y));
@@ -241,8 +269,8 @@ function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; 
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.68 : 0.9);
-    const polar = directive.focus.mode === 'floor' ? 0.62 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.56 : 0.72);
+    const polar = room ? 0.7 : directive.focus.mode === 'floor' ? 0.62 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
     const smooth = !first.current;
@@ -256,11 +284,22 @@ function CameraRig({ model, poses, directive, insets }: { model: BuildingModel; 
   return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.08} />;
 }
 
+/** A room and a little of its surroundings, at least 9 m across so small rooms keep some context. */
+function roomBox(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: string) {
+  const m = model.spaces.get(spaceId);
+  if (!m) return null;
+  m.geometry.computeBoundingBox();
+  const b = m.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, poses.get(m.space.floor_id)?.y ?? 0, 0));
+  const c = b.getCenter(new THREE.Vector3());
+  const half = Math.max(b.max.x - b.min.x, b.max.z - b.min.z, 9) / 2 + 1;
+  return new THREE.Box3(new THREE.Vector3(c.x - half, b.min.y, c.z - half), new THREE.Vector3(c.x + half, b.min.y + 1, c.z + half));
+}
+
 function damp(current: number, target: number, delta: number, lambda = 4) {
   return THREE.MathUtils.damp(current, target, lambda, delta);
 }
 
-type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial };
+type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset' | 'wall', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial; floors: Record<FloorTexture, THREE.MeshStandardMaterial> };
 
 interface FloorViewProps {
   model: FloorModel;
@@ -270,6 +309,9 @@ interface FloorViewProps {
   /** Assets whose boxes turn orange (the answer to "where is …"). */
   litAssets: Set<string>;
   overview: boolean;
+  style: SceneStyle;
+  textures: ReturnType<typeof useTextures>;
+  models: ReturnType<typeof useAssetModels>;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
@@ -277,9 +319,14 @@ interface FloorViewProps {
   onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, onInspect, onSelect }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, onPick, onInspect, onSelect }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
+  const walls = useRef<THREE.Mesh>(null);
+  const doors = useRef<THREE.Group>(null);
+  const furniture = useRef<THREE.Group>(null);
+  const edges = useRef<THREE.LineSegments>(null);
+  const detailed = style === 'detailed';
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
   const state = useRef({ opacity: pose.opacity, flat: pose.flat, y: pose.y });
   const materials = useMemo((): FloorMaterials => {
@@ -287,10 +334,24 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
     return {
       room: surface(palette.room), hall: surface(palette.hall), corridor: surface(palette.corridor), core: surface(palette.core),
       primary: surface(palette.primary), secondary: surface(palette.secondary), muted: surface(palette.muted), asset: surface(palette.asset),
+      wall: Object.assign(surface('#ffffff'), { vertexColors: true }),
       edge: new THREE.LineBasicMaterial({ color: palette.edge, transparent: true }),
+      floors: Object.fromEntries(FLOOR_TEXTURES.map(name => [name, surface('#ffffff')])) as Record<FloorTexture, THREE.MeshStandardMaterial>,
     };
   }, []);
-  useEffect(() => () => Object.values(materials).forEach(m => m.dispose()), [materials]);
+  useEffect(() => () => { const { floors, ...rest } = materials; [...Object.values(rest), ...Object.values(floors)].forEach(m => m.dispose()); }, [materials]);
+  // Textures arrive in the background; plain surfaces until then.
+  useEffect(() => {
+    const assign = (material: THREE.MeshStandardMaterial, texture: THREE.Texture | undefined) => {
+      if (material.map === (texture ?? null)) return;
+      material.map = texture ?? null;
+      material.needsUpdate = true;
+    };
+    for (const name of FLOOR_TEXTURES) assign(materials.floors[name], textures.get(name));
+    assign(materials.wall, textures.get('plaster'));
+  }, [materials, textures]);
+  const detail = useMemo(() => buildFloorDetail(model, toWorld), [model, toWorld]);
+  useEffect(() => () => detail.walls.dispose(), [detail]);
   const assets = useMemo(() => buildAssets(model, toWorld), [model, toWorld]);
   useEffect(() => { if (assets) colorAssets(assets, model, litAssets); }, [assets, model, litAssets]);
 
@@ -302,10 +363,27 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
     if (!group.current || !blocks.current) return;
     group.current.position.y = s.y;
     group.current.visible = s.opacity > 0.01;
-    blocks.current.scale.y = blockHeight(model.storey, s.flat);
+    // Detailed: rooms are thin slabs (highlights a little thicker) with walls standing on them.
+    const top = detailed ? SLAB : blockHeight(model.storey, s.flat);
+    blocks.current.scale.y = top;
     for (const tone of ['primary', 'secondary', 'muted'] as const) {
       const g = raised.current[tone];
-      if (g) g.scale.y = blockHeight(model.storey, s.flat, lift[tone]);
+      if (g) g.scale.y = detailed ? SLAB + 0.03 + lift[tone] * 0.05 : blockHeight(model.storey, s.flat, lift[tone]);
+    }
+    if (walls.current) {
+      walls.current.visible = detailed;
+      walls.current.position.y = SLAB;
+      walls.current.scale.y = wallHeight(model.storey, s.flat);
+    }
+    if (edges.current) edges.current.visible = !detailed;
+    if (doors.current) {
+      // Blocks: doors only on an opened floor (on the block tops); detailed: wherever the floor is shown.
+      doors.current.visible = s.opacity > 0.5 && (detailed || s.flat > 0.3);
+      doors.current.position.y = detailed ? SLAB + 0.03 + lift.primary * 0.05 : top + 0.01;
+    }
+    if (furniture.current) {
+      furniture.current.visible = detailed && s.opacity > 0.5;
+      furniture.current.position.y = SLAB;
     }
     applyFade(materials, assets, s, overview, blockHeight(model.storey, s.flat, lift.secondary) + 0.02);
   });
@@ -325,10 +403,13 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
     <group ref={group} position-y={pose.y}>
       <group ref={blocks} scale-y={blockHeight(model.storey, pose.flat)}>
         {plain.map(m => (
-          <mesh key={m.space.id} geometry={m.geometry} material={materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
+          <mesh key={m.space.id} geometry={m.geometry} material={detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
         ))}
-        <lineSegments geometry={model.edges} material={materials.edge} renderOrder={1} />
+        <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
+      <mesh ref={walls} geometry={detail.walls} material={materials.wall} visible={detailed} castShadow receiveShadow raycast={() => null} />
+      <group ref={doors}><Doors doors={detail.doors} /></group>
+      {detailed && <group ref={furniture}><DetailedAssets floor={model} toWorld={toWorld} models={models} litAssets={litAssets} /></group>}
       {(['primary', 'secondary', 'muted'] as const).map(tone => (
         <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
           {model.spaces.filter(m => tones.get(m.space.id) === tone).map(m => (
@@ -338,7 +419,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
           ))}
         </group>
       ))}
-      {assets && <primitive object={assets} />}
+      {assets && !detailed && <primitive object={assets} />}
     </group>
   );
 }
@@ -346,9 +427,9 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, onPick, o
 /** Per-frame fade of a floor's shared materials (three.js objects are mutated imperatively). */
 function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null, s: { opacity: number; flat: number }, overview: boolean, assetBase: number) {
   const ghost = s.opacity < 0.6;
-  for (const key of ['room', 'hall', 'corridor', 'core', 'primary', 'secondary', 'muted'] as const) {
-    materials[key].opacity = s.opacity * (overview ? 0.94 : 1);
-    materials[key].depthWrite = !ghost;
+  for (const material of [...(['room', 'hall', 'corridor', 'core', 'primary', 'secondary', 'muted', 'wall'] as const).map(key => materials[key]), ...Object.values(materials.floors)]) {
+    material.opacity = s.opacity * (overview ? 0.94 : 1);
+    material.depthWrite = !ghost;
   }
   materials.edge.opacity = Math.min(1, s.opacity * 1.6) * 0.85;
   materials.asset.opacity = s.opacity * s.flat;
@@ -357,6 +438,12 @@ function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null
     // Items stand on top of the room blocks (plain, muted or light blue); only raised orange rooms rise above them.
     assets.position.y = assetBase;
   }
+}
+
+/** Detailed style: the room's floor finish (carpet, epoxy, tiles…) where there is one. */
+function floorMaterial(materials: FloorMaterials, space: Building['spaces'][number]) {
+  const texture = floorTexture(space);
+  return texture ? materials.floors[texture] : materials[surfaceFor(space.type)];
 }
 
 function surfaceFor(type: string): 'room' | 'hall' | 'corridor' | 'core' {
@@ -473,9 +560,16 @@ function hoverAnchor(
   const pose = poses.get(f.floor.id)!;
   const actions = onRoute || onSetLocation;
   const here = myRoom === spaceId;
+  // What is inside, for a tapped room: "4 desks · 2 office chairs · …".
+  const counts = new Map<string, number>();
+  if (actions) for (const asset of f.assets) if (asset.space_id === spaceId) counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
+  const contents = [...counts].sort((a, b) => b[1] - a[1]);
+  const shown = contents.slice(0, 5).map(([type, n]) => `${n} ${type.replaceAll('_', ' ')}${n > 1 && !/(s|sh|ch|x)$/.test(type) ? 's' : n > 1 ? 'es' : ''}`);
+  if (contents.length > 5) shown.push(`+${contents.length - 5} more`);
   return [{ key: `hv-${spaceId}`, placement: 'above', priority: 4, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: (
     <div className={`scene-tip${actions ? ' scene-tip--actions' : ''}`}>
       <strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span>
+      {shown.length > 0 && <span className="scene-tip-contents">{shown.join(' · ')}</span>}
       {onRoute && !here && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}
       {onSetLocation && (here
         ? <span className="scene-tip-here">📍 You are here</span>
