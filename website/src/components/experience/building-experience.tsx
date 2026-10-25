@@ -393,6 +393,12 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           onFixed={() => liveIncident && incidents.update(liveIncident.id, { fixedAt: Date.now() })}
           onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
         )}
+        {started && !hazard.view && (
+          <div className="chat-head">
+            <span>Conversation</span>
+            <button type="button" className="chat-new" onClick={startOver}>＋ New chat</button>
+          </div>
+        )}
         <section ref={transcript} className={`shell-chat${hazard.view ? ' shell-chat--compact' : ''}`} hidden={Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
           {!started && !hazard.view && (
             <div className="shell-intro">

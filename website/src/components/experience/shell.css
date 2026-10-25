@@ -55,6 +55,11 @@
 /* Assistant panel: incident or simulation on top, conversation below, question bar at the bottom */
 .shell-panel { grid-area: panel; display: flex; flex-direction: column; min-height: 0; background: #fff; border-left: 1px solid var(--line); }
 .shell .hazard-panel { position: static; inset: auto; flex: 1 1 auto; width: auto; min-height: 0; max-height: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
+/* Conversation header: shows once a chat exists, with the way back to a fresh one */
+.chat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px 8px; border-bottom: 1px solid var(--line); }
+.chat-head > span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.chat-new { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 600; cursor: pointer; }
+.chat-new:hover { background: var(--paper); border-color: var(--ink); }
 .shell-chat { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px; }
 .shell-chat--compact { flex: 0 1 auto; max-height: 30%; }
 .shell-chat .transcript-scroll { overflow: visible; max-height: none; padding: 0; }
