@@ -5,8 +5,8 @@ import { applyEdits, loadEdits } from '@/lib/buildings/edits';
 
 export default async function Home({ searchParams }: PageProps<'/'>) {
   const { building, campus, check, ask, view } = await searchParams;
-  // The fire brigade edition (default view) opens on its demo building unless another one is asked for.
-  const brigadeDefault = view !== 'ops' && typeof building !== 'string' && typeof campus !== 'string' ? 'proc-campus-test-005' : undefined;
+  // The fire brigade simulation (?view=brigade) opens on its demo building unless another one is asked for.
+  const brigadeDefault = view === 'brigade' && typeof building !== 'string' && typeof campus !== 'string' ? 'proc-campus-test-005' : undefined;
   const site = getCampus(typeof campus === 'string' ? campus : undefined);
   // ?campus=<id> opens the campus view; its first member is the building in the foreground.
   const primary = site?.members[0]?.buildingId;

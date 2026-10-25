@@ -221,10 +221,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     else if (view === 'xray') setHazardFloor('__xray__');
     else if (view && building.floors.some(f => f.id === view)) setHazardFloor(view);
   }, [hazard.view, building]);
-  // ---------- Fire brigade edition (default; ?view=ops for the operations platform) ----------
+  // ---------- Fire brigade simulation (?view=brigade; started from the Simulate menu) ----------
   const search = useSyncExternalStore(noSubscribe, () => window.location.search, () => '');
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  const brigade = params.get('view') !== 'ops' && !broll ? true : params.get('view') === 'brigade';
+  // Emergency mode only exists when an incident is reported (or a sensor fires) or a simulation is started.
+  const brigade = params.get('view') === 'brigade';
   const tNow = Number(params.get('t') ?? 4) || 0;
   const eta = Number(params.get('eta') ?? 8) || 8;
   const brigadeOrigin = useMemo(() => {
@@ -458,6 +459,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         </button>
         <span className="shell-spacer" />
         {brigade && <span className="brigade-tag">FIRE BRIGADE · SIMULATED</span>}
+        {brigade && <button type="button" className="shell-button" onClick={() => router.push(`/?building=${encodeURIComponent(building.building.id)}`)}>End simulation</button>}
         {!brigade && <div className="shell-lamps" aria-label="Active incidents">
           {(['fire', 'water', 'electrical'] as const).map(kind => {
             const active = incidents.active.filter(i => i.hazard === kind && !i.fixedAt);
@@ -471,6 +473,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         {!brigade && <details className="simulate-menu" ref={simulateMenu}>
           <summary className="shell-button">Simulate</summary>
           <div className="simulate-list" role="menu">
+            {demoScenarios.filter(sc => sc.hazard === 'fire').map(scenario => (
+              <button type="button" role="menuitem" key="brigade" onClick={() => { simulateMenu.current?.removeAttribute('open'); router.push(`/?view=brigade&building=${encodeURIComponent(building.building.id)}&alarm=fire:${encodeURIComponent(building.spaces.some(sp => sp.id === 'proc-campus-test-005-F3-S025') ? 'proc-campus-test-005-F3-S025' : scenario.spaceId)}&t=4&eta=8`); }}>
+                <i className="hazard-dot hazard-dot--fire" /><span><strong>Fire brigade drill</strong><em>Alarm, spread, people, crew routes</em></span>
+              </button>
+            ))}
             {demoScenarios.map(scenario => (
               <button type="button" role="menuitem" key={scenario.hazard} onClick={() => { simulateMenu.current?.removeAttribute('open'); setHazardRoom(null); setHazardFloor(null); void hazard.open(scenario.spaceId, scenario.hazard); }}>
                 <i className={`hazard-dot hazard-dot--${scenario.hazard}`} /><span><strong>{scenario.hazard === 'fire' ? 'Fire' : 'Water leak'}</strong><em>{building.spaces.find(sp => sp.id === scenario.spaceId)?.name}</em></span>
