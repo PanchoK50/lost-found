@@ -492,3 +492,21 @@
 .shell--emergency .model-toolbar-gap { background: #263142; }
 
 .incident-toast { top: 110px; }
+
+/* Live voice agent: floating bubble, bottom centre of the model */
+.voice-agent { position: absolute; z-index: 4; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.experience--hazard .voice-agent { bottom: 92px; }
+.voice-agent > * { pointer-events: auto; }
+.voice-line { max-width: min(560px, 70vw); margin: 0; padding: 10px 14px; border-radius: 16px; background: rgba(255, 255, 255, .97); box-shadow: 0 6px 22px rgba(0, 0, 0, .14); font-size: 14px; line-height: 1.45; color: #0d0d0d; }
+.voice-line strong { font-weight: 600; margin-right: 4px; }
+.voice-line--error { color: #b42318; }
+.voice-controls { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 999px; background: #0d0d0d; color: #fff; box-shadow: 0 8px 26px rgba(0, 0, 0, .28); }
+.voice-start { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 20px 0 8px; border: 0; border-radius: 999px; background: none; color: #fff; font-size: 14px; font-weight: 500; }
+.voice-mic { width: 30px; height: 30px; border-radius: 50%; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d0d0d' stroke-width='2' stroke-linecap='round'%3E%3Crect x='9' y='3' width='6' height='11' rx='3'/%3E%3Cpath d='M5 11a7 7 0 0 0 14 0M12 18v3'/%3E%3C/svg%3E") center / 16px no-repeat; }
+.voice-orb { display: flex; align-items: center; gap: 3px; width: 44px; height: 44px; justify-content: center; border-radius: 50%; background: linear-gradient(135deg, #7c5cff, #22d3ee); }
+.voice-orb i { width: 4px; height: 12px; border-radius: 2px; background: #fff; animation: voice-bar 1s ease-in-out infinite; }
+.voice-orb i:nth-child(2) { animation-delay: .15s; } .voice-orb i:nth-child(3) { animation-delay: .3s; }
+.is-speaking .voice-orb i { animation-duration: .5s; }
+@keyframes voice-bar { 50% { height: 22px; } }
+.voice-state { min-width: 86px; font-size: 13px; color: #d7d7d7; }
+.voice-end { height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: #ff3b4e; color: #fff; font-size: 13px; font-weight: 600; }

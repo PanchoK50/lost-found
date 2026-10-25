@@ -34,6 +34,7 @@ import { settingsFor } from '@/lib/world/profile';
 import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
 import { HazardPanel, HazardPlayback } from '@/components/hazards/hazard-panel';
+import { VoiceAgent, type VoiceActions } from '@/components/voice/voice-agent';
 import { ReportDamage } from '@/components/hazards/report-damage';
 import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
@@ -148,6 +149,41 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, []);
   const contextChip = chatContext ? describeContext(building, chatContext) : null;
   const lastAnswerTitle = messages.findLast(m => m.response?.answer)?.response?.answer?.title;
+  // The live voice agent drives the same actions as the UI (components/voice/voice-agent.tsx).
+  const voiceActions: VoiceActions = {
+    ask: question => ask(question),
+    simulate: (kind, room) => {
+      const hazardKind = /fire|feuer|smoke/i.test(kind) ? 'fire' : /water|leak|wasser|flood/i.test(kind) ? 'water' : /power|electric|strom/i.test(kind) ? 'electrical' : null;
+      const space = findSpace(building, room);
+      if (!hazardKind) return 'Say fire, water or power.';
+      if (!space) return `I couldn't find a room called "${room}". Ask the building which rooms there are.`;
+      setHazardRoom(null); setHazardFloor(null);
+      void hazard.open(space.id, hazardKind);
+      return `Started a ${hazardKind === 'electrical' ? 'power fault' : hazardKind} simulation in ${space.name}. The map shows the spread${hazardKind === 'fire' ? ', the evacuation and the fire brigade route' : ''}.`;
+    },
+    showFloor: floor => {
+      const target = findFloor(building, floor);
+      if (!target) return `There is no floor "${floor}" in this building.`;
+      if (hazard.view) { setHazardRoom(null); setHazardFloor(target === 'all' ? ALL_FLOORS : target); }
+      else if (target === 'all') showOverview(); else focusFloor(target);
+      return target === 'all' ? 'Showing the whole building.' : `Showing ${building.floors.find(f => f.id === target)?.name}.`;
+    },
+    reportIncident: (kind, room) => {
+      const hazardKind = /fire|feuer|smoke/i.test(kind) ? 'fire' : /water|leak|wasser|flood/i.test(kind) ? 'water' : 'electrical';
+      const space = findSpace(building, room);
+      if (!space) return `I couldn't find a room called "${room}".`;
+      const incident: Incident = { id: crypto.randomUUID(), buildingId: building.building.id, hazard: hazardKind, spaceId: space.id, severity: 2, source: 'report',
+        title: `${hazardMeta[hazardKind].label} reported`, description: 'Reported by voice', reporter: profile?.name, createdAt: Date.now(), status: 'active' };
+      incidents.raise(incident); playAlarm(); openIncident(incident);
+      return `Alarm raised: ${hazardMeta[hazardKind].label.toLowerCase()} in ${space.name}.`;
+    },
+    callFireBrigade: () => {
+      if (!hazard.view) return 'There is no open incident or simulation. Start one first.';
+      hazard.startResponse();
+      return hazard.view.mode === 'incident' ? 'Calling the fire brigade and the other contacts now.' : 'Running the response drill: the calls are simulated.';
+    },
+    clearMap: () => clearAnswer(),
+  };
   // An answer card: show its scene; for a move, fly back to what was moved, in its new place, and select it again.
   const showAnswer = (response: ChatResponse) => {
     const edit = (response.edits ?? []).map(e => e as { action?: string; asset_id?: string; opening_id?: string }).find(e => e.action === 'move_door' || e.action === 'move_asset');
@@ -328,9 +364,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     return () => window.removeEventListener('keydown', onKey);
   }, [showOverview, startOver, directive, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents, clearAnswer]);
 
-  async function ask(text: string, skillId?: string) {
+  /** Send a question to the building agent; resolves to its reply (the voice agent reads it back). */
+  async function ask(text: string, skillId?: string): Promise<string> {
     const message = text.trim();
-    if (!message || busy) return;
+    if (!message || busy) return busy ? 'I am still working on the previous question.' : '';
     const history = messages.map(({ role, content }) => ({ role, content }));
     setMessages(current => [...current, { id: nextId.current++, role: 'user', content: message }]);
     setDraft('');
@@ -350,8 +387,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
       setDirective(chatContext ? keepSelectionInView(response, building, chatContext) : response.scene);
       setActiveStep(undefined);
+      return withoutAnswerLine(response.reply);
     } catch (error) {
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: error instanceof Error ? error.message : 'Something went wrong.', error: true }]);
+      return error instanceof Error ? error.message : 'Something went wrong.';
     } finally {
       setBusy(false);
       if (wide) input.current?.focus();
@@ -443,6 +482,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         </div>
         {building.building.license !== 'CC0-1.0' && <footer className="model-credit">{building.building.attribution} · {building.building.license}</footer>}
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
+        {!broll && <VoiceAgent actions={voiceActions} />}
       </section>
 
       <aside className="shell-panel" aria-label="Assistant">
@@ -710,6 +750,26 @@ function keepSelectionInView(response: ChatResponse, building: Building, context
   const ownView = Boolean(scene.routes?.length) || (scene.focus.mode === 'floor' && scene.focus.floorId !== floorId && !response.edits?.length);
   if (ownView) return scene;
   return { ...scene, focus: { mode: 'floor', floorId, around: position } };
+}
+
+/** A room by spoken name: exact name, then the room number ("3.25", "N2301"), then a word match. */
+function findSpace(building: Building, text: string) {
+  const q = text.trim().toLowerCase();
+  const spaces = building.spaces.filter(sp => sp.type !== 'stair' && sp.type !== 'lift');
+  const number = q.match(/[a-z]?-?\d+(\.\d+)?[a-z]?/i)?.[0];
+  return spaces.find(sp => sp.name.toLowerCase() === q)
+    ?? (number ? spaces.find(sp => sp.name.toLowerCase().endsWith(` ${number}`) || sp.name.toLowerCase().split(' ').includes(number)) : undefined)
+    ?? spaces.find(sp => sp.name.toLowerCase().includes(q) || q.includes(sp.name.toLowerCase()));
+}
+
+/** A floor by spoken name: "3", "floor 3", "ground floor", "basement", "whole building". */
+function findFloor(building: Building, text: string): string | 'all' | undefined {
+  const q = text.trim().toLowerCase();
+  if (/whole|building|all|overview/.test(q)) return 'all';
+  if (/ground|erdgeschoss|^g$|^eg$/.test(q)) return building.floors.find(f => f.level === 0)?.id;
+  if (/basement|keller|^b\d?$|underground/.test(q)) return building.floors.find(f => f.level === (Number(q.match(/\d+/)?.[0] ?? 1) * -1))?.id ?? building.floors.find(f => f.level < 0)?.id;
+  const n = q.match(/-?\d+/)?.[0];
+  return n !== undefined ? building.floors.find(f => f.level === Number(n))?.id : building.floors.find(f => f.name.toLowerCase() === q)?.id;
 }
 
 /** The chat chip for a selection: what it is, where, and the edits that make sense for it. */
