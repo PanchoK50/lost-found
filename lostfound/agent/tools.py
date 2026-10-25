@@ -21,7 +21,7 @@ from lostfound.agent.format import answer_line
 from lostfound.api import scene
 from lostfound.core import campus, directions, geometry, skills
 from lostfound.core.edits import apply_edits
-from lostfound.core.building import Building, MapError, NoRouteError
+from lostfound.core.building import DOOR_PREFIX, OUTSIDE, Building, MapError, NoRouteError
 from lostfound.core.resolve import Resolver
 
 REPO = Path(__file__).resolve().parents[2]
@@ -282,6 +282,9 @@ PYTHON_TOOL = {
     "shared-wall neighbours also include halls. Never re-implement geometry the library already has.",
     "input_schema": _schema({"code": _string("Python code; print() what you need.")}),
 }
+
+
+EXIT_WORDS = re.compile(r"\b(exit|exits|way out|outside|out of the building|entrance|entrances)\b", re.IGNORECASE)
 
 
 # Benchmark kind -> typed tool that answers it (for leave-one-kind-out evals).
@@ -560,6 +563,8 @@ class Toolbox:
         with self.building.temporarily_closed(*closed_ids):
             # The same rules as the route computed below, so the nearest target is one that route can reach.
             distances = self.building.route_distances(start_id, step_free)
+        if EXIT_WORDS.search(what):
+            return self._nearest_exit(start_id, distances, step_free, closed_ids)
         targets: dict[str, str] = {}  # space id -> what was found there
         try:
             room_type = self.resolver.room_type(what)
@@ -582,6 +587,21 @@ class Toolbox:
         best = min(reachable, key=lambda space_id: distances[space_id])
         result = self.tool_route(start_id, best, [], step_free, closed_ids)
         return {"found": targets[best], "in": self.building.label(best), "distance_m": round(distances[best], 1), **result}
+
+    def _nearest_exit(self, start_id: str, distances: dict, step_free: bool, closed_ids: list[str]) -> dict:
+        """Walk out of the building: the route-model distance to the nearest entrance door itself (README), not just
+        to the room behind it."""
+        exits = [node for node in self.building.entrance_nodes() if node in distances]
+        if not exits:
+            reason = f"No way out of the building from {self.building.label(start_id)} under the rules."
+            return self._no_route({"kind": "route", "stops": [start_id], "step_free": step_free, "closed": closed_ids}, reason)
+        best = min(exits, key=lambda node: distances[node])
+        opening = self.building.openings[best.removeprefix(DOOR_PREFIX)]
+        inside = next(space for space in opening["space_ids"] if space != OUTSIDE)
+        if self.chat:
+            self.tool_route(start_id, inside, [], step_free, closed_ids)
+        result = {"length_m": round(distances[best], 2), "exit_from": self.building.label(inside), "exit_opening": opening["id"]}
+        return self._answer("route", result, record={"kind": "route", "stops": [start_id, inside], **result})
 
     def tool_find_assets(self, asset_type, floor) -> dict:
         result = skills.locate(self.building, self.resolver.asset_type(asset_type))

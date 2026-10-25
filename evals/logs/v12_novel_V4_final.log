@@ -1,0 +1,60 @@
+[V4] proc-campus-dev-009-N-room_count-2 room_count                 OK  $  0.00
+[V4] resplan-1465-N-room_count-1        room_count                 OK  $  0.00
+[V4] proc-factory-dev-007-N-room_count-3 room_count                 OK  $  0.01
+[V4] osm-way27326387-N-average_area-1   average_area               OK  $  0.01
+[V4] swiss-2211-N-average_area-2        average_area               OK  $  0.02
+[V4] proc-factory-dev-011-N-smallest_room-2 smallest_room              OK  $  0.03
+[V4] proc-campus-dev-001-N-average_area-3 average_area               OK  $  0.04
+[V4] resplan-1677-N-smallest_room-3     smallest_room              OK  $  0.05
+[V4] proc-factory-dev-012-N-building_area_total-1 building_area_total        OK  $  0.06
+[V4] osm-way27326387-N-building_area_total-2 building_area_total        OK  $  0.07
+[V4] proc-campus-dev-006-N-smallest_room-1 smallest_room              OK  $  0.09
+[V4] osm-way27917482-N-water_two_floors_down-1 water_two_floors_down      OK  $  0.10
+[V4] proc-campus-dev-001-N-water_two_floors_down-2 water_two_floors_down      OK  $  0.12
+[V4] osm-way360544293-N-water_below_count-2 water_below_count          OK  $  0.13
+[V4] swiss-203-N-building_area_total-3  building_area_total        OK  $  0.15
+[V4] osm-way22744230-N-water_two_floors_down-3 water_two_floors_down      OK  $  0.16
+[V4] osm-way27326387-N-water_below_count-3 water_below_count          OK  $  0.17
+[V4] osm-way27917482-N-water_below_count-1 water_below_count          OK  $  0.20
+[V4] osm-way27917482-N-area_above-1     area_above                 OK  $  0.22
+[V4] swiss-2211-N-exit_distance-1       exit_distance              OK  $  0.22
+[V4] proc-campus-dev-013-N-exit_distance-2 exit_distance              OK  $  0.23
+[V4] swiss-450-N-exit_distance-3        exit_distance              OK  $  0.24
+[V4] proc-campus-dev-002-N-area_above-3 area_above                 OK  $  0.25
+[V4] osm-way27326387-N-area_above-2     area_above                 OK  $  0.27
+[V4] swiss-3254-N-longest_shared_wall-1 longest_shared_wall        OK  $  0.27
+[V4] swiss-2211-N-longest_shared_wall-3 longest_shared_wall        OK  $  0.28
+[V4] resplan-16154-N-longest_shared_wall-2 longest_shared_wall        OK  $  0.29
+[V4] osm-way22744230-N-farthest_from_exit-3 farthest_from_exit         OK  $  0.30
+[V4] proc-factory-dev-010-N-nearest_of_type-1 nearest_of_type            OK  $  0.31
+[V4] resplan-1465-N-farthest_from_exit-2 farthest_from_exit         OK  $  0.32
+[V4] proc-campus-dev-013-N-nearest_of_type-2 nearest_of_type            OK  $  0.33
+[V4] resplan-3832-N-nearest_of_type-3   nearest_of_type            OK  $  0.34
+[V4] proc-factory-dev-007-N-floor_with_most-1 floor_with_most            OK  $  0.34
+[V4] resplan-3832-N-room_perimeter-1    room_perimeter             OK  $  0.35
+[V4] swiss-203-N-room_perimeter-2       room_perimeter             OK  $  0.36
+[V4] proc-factory-dev-003-N-room_perimeter-3 room_perimeter             OK  $  0.37
+[V4] proc-campus-dev-001-N-floor_with_most-2 floor_with_most            OK  $  0.37
+[V4] proc-factory-dev-012-N-floor_with_most-3 floor_with_most            OK  $  0.37
+[V4] osm-way360544293-N-farthest_from_exit-1 farthest_from_exit         OK  $  0.39
+[V4] resplan-8269-N-closed_door_count-1 closed_door_count          OK  $  0.42
+[V4] resplan-3832-N-closed_door_count-3 closed_door_count          OK  $  0.46
+[V4] swiss-2325-N-closed_door_count-2   closed_door_count          OK  $  0.50
+
+kind                         correct / total
+  area_above                    3 / 3
+  average_area                  3 / 3
+  building_area_total           3 / 3
+  closed_door_count             3 / 3
+  exit_distance                 3 / 3
+  farthest_from_exit            3 / 3
+  floor_with_most               3 / 3
+  longest_shared_wall           3 / 3
+  nearest_of_type               3 / 3
+  room_count                    3 / 3
+  room_perimeter                3 / 3
+  smallest_room                 3 / 3
+  water_below_count             3 / 3
+  water_two_floors_down         3 / 3
+  all                          42 / 42  (100.0%)   cost $0.50
+results: evals/results/v12_novel-dev__V4_final.jsonl
