@@ -240,6 +240,25 @@ const MODEL_YAW_FIXES: Record<string, number> = { lecture_seating_row: Math.PI }
 const modelCache = new Map<string, Promise<AssetModel | null>>();
 let loaderPromise: Promise<import('three/examples/jsm/loaders/GLTFLoader.js').GLTFLoader> | undefined;
 
+/**
+ * The generated GLBs are quantized (int16 positions, int8 normals, marked normalized). Baking the node
+ * transform into those raw int arrays truncates every value back to int16, so the model stays centred on
+ * its own middle — half of every rack ends up below the floor slab. Read the dequantized values out into
+ * float buffers first; only then do matrixWorld and the base translation behave.
+ */
+function dequantizedGeometry(geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) {
+  const out = new THREE.BufferGeometry();
+  for (const name of Object.keys(geometry.attributes)) {
+    const attr = geometry.attributes[name];
+    const floats = new Float32Array(attr.count * attr.itemSize);
+    for (let i = 0; i < attr.count; i++) for (let c = 0; c < attr.itemSize; c++) floats[i * attr.itemSize + c] = attr.getComponent(i, c);
+    out.setAttribute(name, new THREE.Float32BufferAttribute(floats, attr.itemSize));
+  }
+  out.setIndex(geometry.getIndex());
+  out.applyMatrix4(matrix);
+  return out;
+}
+
 function loadModel(type: string): Promise<AssetModel | null> {
   let promise = modelCache.get(type);
   if (promise) return promise;
@@ -254,7 +273,7 @@ function loadModel(type: string): Promise<AssetModel | null> {
     gltf.scene.traverse(object => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;
-      const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+      const geometry = dequantizedGeometry(mesh.geometry, mesh.matrixWorld);
       const material = ((Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial).clone();
       // Matte like the rest of the scene; the generator bakes metalness and dark shading into the colours.
       material.metalness = 0;
