@@ -95,11 +95,12 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
   const focus: SceneDirective['focus'] = focusRoom && floorOf.get(focusRoom)
     ? { mode: 'floor', floorId: floorOf.get(focusRoom)! }
     : focusFloor === '__all__' ? { mode: 'building' }
+    : focusFloor === '__xray__' ? { mode: 'xray', floorIds: [...new Set([originFloor, ...(target ? [target.floor_id] : [])])] }
     : focusFloor ? { mode: 'floor', floorId: focusFloor }
     : { mode: 'floor', floorId: originFloor };
   // One floor at a time (as in ArcGIS Indoors or Desigo CC): an arrow only when both rooms are on the floor shown.
-  const shownFloor = focusRoom ? floorOf.get(focusRoom) : focusFloor && focusFloor !== '__all__' ? focusFloor : originFloor;
-  const hasLink = Boolean(origin && target && target.id !== origin.id && origin.floor_id === shownFloor && target.floor_id === shownFloor);
+  const shownFloor = focusRoom ? floorOf.get(focusRoom) : focusFloor && !focusFloor.startsWith('__') ? focusFloor : originFloor;
+  const hasLink = Boolean(origin && target && target.id !== origin.id && (focusFloor === '__xray__' || (origin.floor_id === shownFloor && target.floor_id === shownFloor)));
   // The arrow's label already names the origin; then the pin needs no label of its own.
   const markers: SceneDirective['markers'] = [
     ...(origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: hasLink ? '' : `${origin.name} · origin`, tone: 'primary' as const }] : []),

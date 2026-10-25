@@ -276,3 +276,7 @@
   .incident-toast { top: 56px; }
   .shell .room-card { left: 8px !important; right: 8px; top: 8px !important; width: auto; }
 }
+
+/* B-roll for the pitch video: the model alone, full frame. */
+.shell.shell--broll { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "main"; }
+.shell--broll .shell-top, .shell--broll .shell-side, .shell--broll .shell-panel, .shell--broll .hazard-playback, .shell--broll .incident-toast, .shell--broll .sheet, .shell--broll .sheet-backdrop { display: none !important; }

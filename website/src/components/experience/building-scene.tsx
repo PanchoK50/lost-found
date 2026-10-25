@@ -164,13 +164,13 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         )}
         <Projector anchors={projected} elements={elements} topInset={insets.top} paths={routePaths} />
       </Canvas>
-      <div className="scene-anchors" key={directiveKey}>
+      <div className="scene-anchors" key={directiveKey} hidden={!BROLL.labels}>
         {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className="scene-anchor">{anchor.content}</div>)}
       </div>
-      <div className="scene-anchors">
+      <div className="scene-anchors" hidden={!BROLL.labels}>
         {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
-      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + (mapStyle ? 12 : 84) }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
+      {picked && !BROLL.on && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + (mapStyle ? 12 : 84) }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
       {!mapStyle && <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
         {(['blocks', 'detailed'] as const).map(option => (
           <button type="button" key={option} className="scene-style-option" aria-pressed={style === option} onClick={() => chooseStyle(option)}>
@@ -183,6 +183,17 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
 }
 
 const STYLE_KEY = 'lf-scene-style';
+
+/**
+ * B-roll mode for the pitch video (?broll=1): only the model, no UI. `labels=0` hides labels on the model,
+ * `orbit=<degrees per second>` turns the camera slowly. A recording script can take the camera over through
+ * window.__lfScene (CameraControls plus room positions) after setting window.__lfScene.lock = true.
+ */
+const BROLL = (() => {
+  if (typeof window === 'undefined') return { on: false, labels: true, orbit: 0 };
+  const params = new URLSearchParams(window.location.search);
+  return { on: params.get('broll') === '1', labels: params.get('labels') !== '0', orbit: Number(params.get('orbit') ?? 0) || 0 };
+})();
 const FLOOR_TAG_GAP_PX = 30;
 const EDGE_MARGIN_PX = 14;
 const TAIL_PX = 12;
@@ -288,6 +299,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   useEffect(() => {
     const c = controls.current;
     if (!c || !(camera instanceof THREE.PerspectiveCamera)) return;
+    if ((window as unknown as { __lfScene?: { lock?: boolean } }).__lfScene?.lock) return;
     const box = (room && roomBox(model, poses, room)) || focusBox(model, poses, directive.focus, frame, routePoints);
     const centre = box.getCenter(new THREE.Vector3());
     const extent = box.getSize(new THREE.Vector3());
@@ -311,6 +323,24 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
   }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
+  // B-roll: a slow orbit, and the camera handed to a recording script on request.
+  useEffect(() => {
+    if (!BROLL.on) return;
+    const w = window as unknown as { __lfScene?: Record<string, unknown> };
+    w.__lfScene = {
+      lock: false,
+      get controls() { return controls.current; },
+      /** World position of a space's centre at its floor's current height. */
+      room(spaceId: string) {
+        const m = model.spaces.get(spaceId);
+        if (!m) return null;
+        return [m.centre[0], poses.get(m.space.floor_id)?.y ?? 0, m.centre[1]];
+      },
+    };
+  }, [model, poses]);
+  useFrame((_, delta) => {
+    if (BROLL.on && BROLL.orbit && controls.current) controls.current.rotate(THREE.MathUtils.degToRad(BROLL.orbit) * delta, 0, false);
+  });
   return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.35} />;
 }
 

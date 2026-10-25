@@ -110,6 +110,17 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [arrived, building.building.id, clearArrived]);
   // Deep link for demos and the video: ?simulate=water:<space id> (or fire:, electrical:) opens that simulation.
   const openSimulation = hazard.open;
+  // B-roll (?broll=1): only the model. ?view=building | xray | <floor id> picks the hazard view.
+  const broll = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get('broll') === '1', () => false);
+  const viewHandled = useRef(false);
+  useEffect(() => {
+    if (viewHandled.current || !hazard.view) return;
+    viewHandled.current = true;
+    const view = new URLSearchParams(window.location.search).get('view');
+    if (view === 'building') setHazardFloor(ALL_FLOORS);
+    else if (view === 'xray') setHazardFloor('__xray__');
+    else if (view && building.floors.some(f => f.id === view)) setHazardFloor(view);
+  }, [hazard.view, building]);
   const simulateHandled = useRef(false);
   useEffect(() => {
     if (simulateHandled.current) return;
@@ -305,7 +316,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}`}>
+    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
@@ -585,6 +596,7 @@ function withoutAnswerLine(reply: string) {
 
 /** Sentinel for the hazard view's floor: the whole building instead of one floor. */
 const ALL_FLOORS = '__all__';
+const noSubscribe = () => () => {};
 const ZERO_INSETS: SceneInsets = { top: 0, left: 0, bottom: 0, right: 0 };
 const STYLE_KEY = 'lf-scene-style';
 const styleListeners = new Set<() => void>();
