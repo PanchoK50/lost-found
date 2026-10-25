@@ -12,14 +12,14 @@ import type { WorldState } from '@/lib/world/types';
 import { hazardMeta, type HazardKind } from '@/lib/hazards/types';
 import { worldAnchors } from '@/components/world/world-anchors';
 import { People } from './scene-people';
-import { DetailedAssets, Doors, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
+import { DetailedAssets, Doors, type PickObject, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
 /**
- * Synera-style model: white, studio-lit blocks on a cool light ground. Orange marks the answer,
+ * Archviz-model look: white, studio-lit model on a warm paper ground. Orange marks the answer,
  * light blue the reference room; routes use Synera's blue → violet → pink → coral path gradient.
  */
 const palette = {
-  background: '#f4f5f7',
+  background: '#edeae3',
   room: '#ffffff',
   hall: '#fafbfc',
   corridor: '#eceff4',
@@ -66,6 +66,10 @@ interface Props {
   mapStyle?: SceneStyle;
   /** The room currently selected on the model (or null), e.g. to prefill a report. */
   onSelectRoom?(spaceId: string | null): void;
+  /** An object (furniture, machine) or a door picked on the model: it becomes the chat's context. */
+  onSelectObject?(kind: 'asset' | 'opening', id: string): void;
+  /** The object selected as chat context, highlighted on the model. */
+  selectedObject?: { kind: 'asset' | 'opening' | 'space'; id: string } | null;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -81,7 +85,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom }: Props) {
+export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject }: Props) {
   const model = useMemo(() => {
     const members = [...(site?.values() ?? [])];
     const placed = members.length > 1 || (members.length === 1 && members[0].building.building.id !== building.building.id)
@@ -105,7 +109,8 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
   }, [directive.hazards]);
   const overview = directive.focus.mode === 'building' || directive.focus.mode === 'campus';
   // Hazard levels change every frame while a simulation plays: they must not reset labels, routes or the tapped room.
-  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined, minute: undefined, evacuees: undefined }), [directive]);
+  // Lit objects (e.g. the chat's selection) don't make a new answer either: the tapped room and camera stay.
+  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined, minute: undefined, evacuees: undefined, assets: undefined }), [directive]);
   const [hovered, setHovered] = useState<string | null>(null);
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
@@ -163,15 +168,17 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
         <fog attach="fog" args={[palette.background, Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
-        {/* Bright, soft studio light so the model reads white, like Synera's renders. */}
-        <ambientLight intensity={0.55} />
-        <hemisphereLight args={['#ffffff', '#e8edf4', 1.7]} />
-        <directionalLight position={[60, 120, 40]} intensity={1.25} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
+        {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
+        <ambientLight intensity={0.3} />
+        <hemisphereLight args={['#fff6ea', '#dfe3ea', 0.95]} />
+        <directionalLight position={[80, 130, 55]} intensity={1.6} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
+            onPickObject={onSelectObject ? (kind, id) => onSelectObject(kind, id) : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
         <Ground y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} />
+        <Podium model={model} />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
         {directive.focus.mode === 'floor' && directive.focus.around && (
@@ -179,13 +186,13 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
         )}
         <Projector anchors={projected} elements={elements} topInset={insets.top} paths={routePaths} />
       </Canvas>
-      <div className="scene-anchors" key={directiveKey}>
+      <div className="scene-anchors" key={directiveKey} hidden={!BROLL.labels}>
         {anchors.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className="scene-anchor">{anchor.content}</div>)}
       </div>
-      <div className="scene-anchors">
+      <div className="scene-anchors" hidden={!BROLL.labels}>
         {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
-      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + (mapStyle ? 12 : 84) }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
+      {picked && !BROLL.on && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + (mapStyle ? 12 : 84) }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
       {!mapStyle && <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
         {(['blocks', 'detailed'] as const).map(option => (
           <button type="button" key={option} className="scene-style-option" aria-pressed={style === option} onClick={() => chooseStyle(option)}>
@@ -198,6 +205,19 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
 }
 
 const STYLE_KEY = 'lf-scene-style';
+
+/**
+ * B-roll mode for the pitch video (?broll=1): only the model, no UI. `labels=0` hides labels on the model,
+ * `orbit=<degrees per second>` turns the camera slowly. A recording script can take the camera over through
+ * window.__lfScene (CameraControls plus room positions) after setting window.__lfScene.lock = true.
+ */
+const BROLL = (() => {
+  if (typeof window === 'undefined') return { on: false, labels: true, orbit: 0 };
+  const params = new URLSearchParams(window.location.search);
+  // Local only: a tool for recording the submission video, not a feature of the hosted app.
+  const on = params.get('broll') === '1' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  return { on, labels: !on || params.get('labels') !== '0', orbit: on ? Number(params.get('orbit') ?? 0) || 0 : 0 };
+})();
 const FLOOR_TAG_GAP_PX = 30;
 const EDGE_MARGIN_PX = 14;
 const TAIL_PX = 12;
@@ -304,6 +324,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   useEffect(() => {
     const c = controls.current;
     if (!c || !(camera instanceof THREE.PerspectiveCamera)) return;
+    if ((window as unknown as { __lfScene?: { lock?: boolean } }).__lfScene?.lock) return;
     const box = (room && roomBox(model, poses, room)) || focusBox(model, poses, directive.focus, frame, routePoints);
     const centre = box.getCenter(new THREE.Vector3());
     const extent = box.getSize(new THREE.Vector3());
@@ -314,8 +335,9 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' || directive.focus.mode === 'campus' ? 1 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
-    const polar = room ? 0.32 : directive.focus.mode === 'floor' ? 0.5 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.95;
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' || directive.focus.mode === 'campus' ? 0.8 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
+    // A lower angle, like an archviz dollhouse render, shows the cut walls and interiors better.
+    const polar = room ? 0.4 : directive.focus.mode === 'floor' ? 0.75 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.78;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
     const smooth = !first.current;
@@ -326,6 +348,24 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     c.setFocalOffset(-((insets.left - right) / 2) * worldPerPx, ((insets.bottom - insets.top) / 2) * worldPerPx, 0, smooth);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only when the focus or the free area changes
   }, [focusKey, insets.top, insets.left, insets.bottom, insets.right, size.width, size.height]);
+  // B-roll: a slow orbit, and the camera handed to a recording script on request.
+  useEffect(() => {
+    if (!BROLL.on) return;
+    const w = window as unknown as { __lfScene?: Record<string, unknown> };
+    w.__lfScene = {
+      lock: false,
+      get controls() { return controls.current; },
+      /** World position of a space's centre at its floor's current height. */
+      room(spaceId: string) {
+        const m = model.spaces.get(spaceId);
+        if (!m) return null;
+        return [m.centre[0], poses.get(m.space.floor_id)?.y ?? 0, m.centre[1]];
+      },
+    };
+  }, [model, poses]);
+  useFrame((_, delta) => {
+    if (BROLL.on && BROLL.orbit && controls.current) controls.current.rotate(THREE.MathUtils.degToRad(BROLL.orbit) * delta, 0, false);
+  });
   // A campus can span kilometres (far pairs route too): let the camera reach as far as the scene does.
   const span = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
   return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.max(1500, span * 4)} maxPolarAngle={Math.PI / 2 - 0.35} />;
@@ -349,6 +389,9 @@ function damp(current: number, target: number, delta: number, lambda = 4) {
 
 type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset' | 'wall', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial; floors: Record<FloorTexture, THREE.MeshStandardMaterial> };
 
+/** Base colours multiplied onto the floor textures, so materials read like an archviz plan (warm wood, grey carpet, cool tiles). */
+const FLOOR_TINTS: Record<FloorTexture, string> = { epoxy: '#e9e6e1', carpet: '#e2e5ea', parquet: '#f2e6d4', tiles: '#eaedef', terrazzo: '#e9e7e2' };
+
 interface FloorViewProps {
   model: FloorModel;
   toWorld: BuildingModel['toWorld'];
@@ -362,6 +405,8 @@ interface FloorViewProps {
   models: ReturnType<typeof useAssetModels>;
   /** Spaces on fire, flooded or without power, with their level right now. */
   hazards: Map<string, { kind: HazardKind; level: number }[]>;
+  onPickObject?(kind: 'asset' | 'opening', id: string): void;
+  selectedDoor?: string | null;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
@@ -369,7 +414,7 @@ interface FloorViewProps {
   onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect, onPickObject, selectedDoor }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
@@ -378,6 +423,8 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const hazardLayer = useRef<THREE.Group>(null);
   const edges = useRef<THREE.LineSegments>(null);
   const detailed = style === 'detailed';
+  // Objects and doors can be picked on the floor that is opened, not in the whole-building overview.
+  const pickObject: PickObject | undefined = onPickObject && pose.interactive && !overview ? (kind, id) => onPickObject(kind, id) : undefined;
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
   const state = useRef({ opacity: pose.opacity, flat: pose.flat, y: pose.y });
   const materials = useMemo((): FloorMaterials => {
@@ -387,7 +434,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       primary: surface(palette.primary), secondary: surface(palette.secondary), muted: surface(palette.muted), asset: surface(palette.asset),
       wall: Object.assign(surface('#ffffff'), { vertexColors: true }),
       edge: new THREE.LineBasicMaterial({ color: palette.edge, transparent: true }),
-      floors: Object.fromEntries(FLOOR_TEXTURES.map(name => [name, surface('#ffffff')])) as Record<FloorTexture, THREE.MeshStandardMaterial>,
+      floors: Object.fromEntries(FLOOR_TEXTURES.map(name => [name, surface(FLOOR_TINTS[name])])) as Record<FloorTexture, THREE.MeshStandardMaterial>,
     };
   }, []);
   useEffect(() => () => { const { floors, ...rest } = materials; [...Object.values(rest), ...Object.values(floors)].forEach(m => m.dispose()); }, [materials]);
@@ -464,13 +511,13 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
       <mesh ref={walls} geometry={detail.walls} material={materials.wall} visible={detailed} castShadow receiveShadow raycast={() => null} />
-      <group ref={doors}><Doors doors={detail.doors} /></group>
+      <group ref={doors}><Doors doors={detail.doors} selected={selectedDoor} onPick={pickObject} /></group>
       <group ref={hazardLayer}>
         {model.spaces.flatMap(m => (hazards.get(m.space.id) ?? []).map(h => (
           <mesh key={`${m.space.id}-${h.kind}`} geometry={m.geometry} material={hazardMaterial(h.kind, h.level)} renderOrder={3} raycast={() => null} scale-y={h.kind === 'electrical' ? 1.02 : 1} />
         )))}
       </group>
-      {detailed && <group ref={furniture}><DetailedAssets floor={model} toWorld={toWorld} models={models} litAssets={litAssets} /></group>}
+      {detailed && <group ref={furniture}><DetailedAssets floor={model} toWorld={toWorld} models={models} litAssets={litAssets} onPick={pickObject} /></group>}
       {(['primary', 'secondary', 'muted'] as const).map(tone => (
         <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
           {model.spaces.filter(m => tones.get(m.space.id) === tone).map(m => (
@@ -480,7 +527,12 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
           ))}
         </group>
       ))}
-      {assets && !detailed && <primitive object={assets} />}
+      {assets && !detailed && (
+        <primitive object={assets}
+          onClick={pickObject ? (event: ThreeEvent<MouseEvent>) => { if (event.instanceId == null) return; event.stopPropagation(); pickObject('asset', model.assets[event.instanceId].id, event); } : undefined}
+          onPointerOver={pickObject ? () => { document.body.style.cursor = 'pointer'; } : undefined}
+          onPointerOut={pickObject ? () => { document.body.style.cursor = ''; } : undefined} />
+      )}
     </group>
   );
 }
@@ -494,7 +546,7 @@ function hazardMaterial(kind: HazardKind, level: number) {
   let material = hazardMaterials.get(key);
   if (!material) {
     // A power cut is a light wash, so water and fire stay readable where they overlap.
-    const [base, range] = kind === 'electrical' ? [0.08, 0.22] : [0.35, 0.55];
+    const [base, range] = kind === 'electrical' ? [0.18, 0.34] : [0.35, 0.55];
     material = new THREE.MeshBasicMaterial({ color: hazardMeta[kind].color, transparent: true, opacity: base + range * (step / HAZARD_STEPS), depthWrite: false, toneMapped: false });
     hazardMaterials.set(key, material);
   }
@@ -546,7 +598,7 @@ function buildAssets(model: FloorModel, toWorld: BuildingModel['toWorld']) {
     mesh.setMatrixAt(i, matrix);
   });
   mesh.castShadow = true;
-  mesh.raycast = () => {};
+
   colorAssets(mesh, model, new Set());
   return mesh;
 }
@@ -563,7 +615,20 @@ function Ground({ y }: { y: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position-y={y} receiveShadow>
       <planeGeometry args={[3000, 3000]} />
-      <shadowMaterial transparent opacity={0.08} />
+      <meshStandardMaterial color="#dcd7cd" roughness={1} />
+    </mesh>
+  );
+}
+
+/** Base plate under the building, like a plinth under a scale model; its top sits just under the slab tops. */
+function Podium({ model }: { model: BuildingModel }) {
+  const base = (model.floors[0]?.floor.elevation_m ?? 0) - 0.02;
+  const width = model.box.maxX - model.box.minX + 6, depth = model.box.maxZ - model.box.minZ + 6;
+  const cx = (model.box.minX + model.box.maxX) / 2, cz = (model.box.minZ + model.box.maxZ) / 2;
+  return (
+    <mesh position={[cx, base + 0.04, cz]} castShadow receiveShadow>
+      <boxGeometry args={[width, 0.12, depth]} />
+      <meshStandardMaterial color="#f1eee7" roughness={0.95} />
     </mesh>
   );
 }

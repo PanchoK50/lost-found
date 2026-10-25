@@ -162,7 +162,7 @@ class BuildingQA:
             outcome.notes["appended_answer_line"] = True
         outcome.reply = reply
         outcome.notes["resolutions"] = toolbox.resolutions[-4:]
-        outcome.notes["result"] = toolbox.last_result
+        outcome.notes["result"] = toolbox.result_for(committed_answer(reply))
         return outcome
 
 
@@ -191,6 +191,28 @@ def import_checks(building: Building) -> list[dict]:
         "important first (scale, missing stairs/links, then rooms): ask one short question, then fix the answer with "
         "rename_room, set_room_type, set_door_width or rescale_building and confirm in one line. Changes are saved for everyone."
     )}]
+
+
+def selection_note(building, selection: dict | None) -> str:
+    """What the person selected on the model (shown as a chip in the chat), so "this", "it" and "that door" resolve."""
+    if not isinstance(selection, dict):
+        return ""
+    kind, item = selection.get("kind"), str(selection.get("id") or "")
+    if kind == "asset" and item in building.assets:
+        asset = building.assets[item]
+        return (f"[Selected on the map: {asset['name']} ({asset['type'].replace('_', ' ')}, asset id {item}) in "
+                f"{building.label(asset['space_id'])}. 'This', 'it' and 'that {asset['type'].replace('_', ' ')}' mean this object; "
+                "use its asset id with the tools (e.g. move_asset, find, nearest).]\n")
+    if kind == "opening" and item in building.openings:
+        opening = building.openings[item]
+        sides = " and ".join(building.label(s) if s in building.spaces else "outside" for s in opening["space_ids"])
+        state = "closed" if item in building.closed else "open"
+        return (f"[Selected on the map: the {opening['kind']} {item} between {sides}, {opening['width_m']:.2f} m wide, "
+                f"{'step-free' if opening['step_free'] else 'with a step'}, currently {state}. 'This door' and 'it' mean this "
+                f"opening; use its id {item} with set_closed or set_door_width.]\n")
+    if kind == "space" and item in building.spaces:
+        return f"[Selected on the map: {building.label(item)} (space id {item}). 'This room' and 'here' mean this space.]\n"
+    return ""
 
 
 class ChatSession:
@@ -244,7 +266,7 @@ class ChatSession:
         self.world_closed = valid
         b.closed = agent_closed | valid
 
-    def ask(self, text: str, location: str | None = None) -> dict:
+    def ask(self, text: str, location: str | None = None, selection: dict | None = None) -> dict:
         outcome = Outcome(reply="", path="chat")
         hints = mention_hints(self.building, text)
         where = (
@@ -254,7 +276,7 @@ class ChatSession:
             else "[The person has not set their location. If you need a start, ask for their room, or tell them to tap a room "
             "on the map and choose \"I'm here\".]\n"
         )
-        self.messages.append({"role": "user", "content": where + text + (f"\n\n{hints}" if hints else "")})
+        self.messages.append({"role": "user", "content": where + selection_note(self.building, selection) + text + (f"\n\n{hints}" if hints else "")})
         self.toolbox.reset_turn()
         reply = self.loop.run(self.system, self.messages, self.toolbox, outcome)
         self.usage.update(outcome.usage)

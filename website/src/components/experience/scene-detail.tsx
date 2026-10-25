@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import type { ThreeEvent } from '@react-three/fiber';
 import type { Asset, Opening, Point, Space } from '@/lib/buildings/types';
 import type { BuildingModel, FloorModel } from './scene-model';
 
@@ -11,7 +12,8 @@ export type SceneStyle = 'blocks' | 'detailed';
 /** Detailed style: floors become thin slabs with walls on top; walls drop from storey height to a cut when a floor is opened. */
 export const SLAB = 0.12;
 export function wallHeight(storey: number, flat: number) {
-  const full = storey * 0.92, cut = 2.1;
+  // Cut at ~1.2 m, like an archviz dollhouse plan: interiors read from above, low furniture stays inside.
+  const full = storey * 0.92, cut = 1.25;
   return full + (cut - full) * flat;
 }
 
@@ -69,9 +71,10 @@ export function useTextures(enabled: boolean) {
 
 // ---------- walls and doors ----------
 
-const WALL_THICKNESS = 0.24;
-/** Wall tops are drawn dark so the plan reads like a crisp architectural drawing; sides stay light. */
-const WALL_TOP = new THREE.Color('#5b6577').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
+/** One uniform wall thickness, a touch slimmer than a real plan cut so the drawing stays light. */
+const WALL_THICKNESS = 0.2;
+/** Wall tops are a soft grey, like cut foam-board, so the plan reads without heavy black lines; sides stay light. */
+const WALL_TOP = new THREE.Color('#a3adbc').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
 const WALL_UV_HEIGHT = 2.5;
 const OUTDOOR_WALL_FACTOR = 0.35;
 
@@ -82,7 +85,8 @@ export interface FloorDetail {
   doors: DoorMarker[];
 }
 
-export const doorColors = { entrance: '#2f8f5b', door: '#4b6fae', opening: '#9fb4d6', step: '#e2a23a' };
+/** Door thresholds on the slab: green for entrances, amber where there is a step; faded so they whisper rather than dominate the plan. */
+export const doorColors = { entrance: '#43906c', door: '#7d97c4', opening: '#c3d0e4', step: '#dfb46f' };
 
 class Builder {
   positions: number[] = [];
@@ -145,13 +149,13 @@ function solidIntervals(length: number, gaps: [number, number][]): [number, numb
   return result.filter(([s, e]) => e - s > 0.04);
 }
 
-function addWallBox(builder: Builder, a: [number, number], b: [number, number], height: number) {
+function addWallBox(builder: Builder, a: [number, number], b: [number, number], y0: number, y1: number, thickness: number) {
   const dx = b[0] - a[0], dz = b[1] - a[1];
   const length = Math.hypot(dx, dz);
-  const nx = (-dz / length) * (WALL_THICKNESS / 2), nz = (dx / length) * (WALL_THICKNESS / 2);
+  const nx = (-dz / length) * (thickness / 2), nz = (dx / length) * (thickness / 2);
   const c = [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]];
-  const lo = (i: number) => [c[i][0], 0, c[i][1]];
-  const hi = (i: number) => [c[i][0], height, c[i][1]];
+  const lo = (i: number) => [c[i][0], y0, c[i][1]];
+  const hi = (i: number) => [c[i][0], y1, c[i][1]];
   builder.quad(hi(0), hi(1), hi(2), hi(3), [0, 1, 0]);
   builder.quad(lo(0), lo(1), hi(1), hi(0), [nx, 0, nz]);
   builder.quad(lo(2), lo(3), hi(3), hi(2), [-nx, 0, -nz]);
@@ -167,9 +171,17 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
   const seen = new Set<string>();
   const angle = new Map<string, number>();
   const key = (p: Point) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`;
+  // Facade edges (exactly one indoor space on either side) get full height even next to outdoor ground.
+  const edgeSpaces = new Map<string, Space[]>();
   for (const { space } of floor.spaces) {
     const ring = cleanRing(space.polygon);
-    const height = space.type === 'outdoor' ? OUTDOOR_WALL_FACTOR : 1;
+    for (let i = 0; i < ring.length; i++) {
+      const edge = [key(ring[i]), key(ring[(i + 1) % ring.length])].sort().join('|');
+      edgeSpaces.set(edge, [...(edgeSpaces.get(edge) ?? []), space]);
+    }
+  }
+  for (const { space } of floor.spaces) {
+    const ring = cleanRing(space.polygon);
     const doors = bySpace.get(space.id) ?? [];
     for (let i = 0; i < ring.length; i++) {
       const p = ring[i], q = ring[(i + 1) % ring.length];
@@ -180,6 +192,8 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
       const length = Math.hypot(dx, dy);
       if (length < 0.05) continue;
       const ux = dx / length, uy = dy / length;
+      const neighbours = edgeSpaces.get(edge) ?? [space];
+      const height = neighbours.some(s => s.type !== 'outdoor') ? 1 : OUTDOOR_WALL_FACTOR;
       const gaps: [number, number][] = [];
       for (const door of doors) {
         const rx = door.position[0] - p[0], ry = door.position[1] - p[1];
@@ -191,7 +205,7 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
         }
       }
       for (const [s, e] of solidIntervals(length, gaps)) {
-        addWallBox(walls, toWorld([p[0] + ux * s, p[1] + uy * s]), toWorld([p[0] + ux * e, p[1] + uy * e]), height);
+        addWallBox(walls, toWorld([p[0] + ux * s, p[1] + uy * s]), toWorld([p[0] + ux * e, p[1] + uy * e]), 0, height, WALL_THICKNESS);
       }
     }
   }
@@ -204,7 +218,15 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
 }
 
 /** Door thresholds: a coloured strip across the wall, green for entrances, amber where there is a step. */
-export function Doors({ doors }: { doors: DoorMarker[] }) {
+/** Pick handler for objects on the model: an asset or an opening (door) by id. */
+export type PickObject = (kind: 'asset' | 'opening', id: string, event: ThreeEvent<MouseEvent>) => void;
+const selectedColor = new THREE.Color('#f26a1b');
+const pointer = (on: boolean) => () => { document.body.style.cursor = on ? 'pointer' : ''; };
+// Explicit functions: switching a mesh's raycast back from "off" needs the real method, not undefined.
+const instancedRaycast = THREE.InstancedMesh.prototype.raycast;
+const noRaycast = () => null;
+
+export function Doors({ doors, selected, onPick }: { doors: DoorMarker[]; selected?: string | null; onPick?: PickObject }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -213,17 +235,21 @@ export function Doors({ doors }: { doors: DoorMarker[] }) {
     doors.forEach((door, i) => {
       matrix.compose(new THREE.Vector3(door.x, 0.02, door.z), rotation.setFromAxisAngle(up, door.angle), new THREE.Vector3(Math.max(door.width, 0.6), 1, 1));
       mesh.setMatrixAt(i, matrix);
-      mesh.setColorAt(i, color.set(door.color));
+      mesh.setColorAt(i, door.id === selected ? selectedColor : color.set(door.color));
     });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [doors]);
+  }, [doors, selected]);
   if (!doors.length) return null;
   return (
-    <instancedMesh key={doors.length} ref={ref} args={[undefined, undefined, doors.length]} raycast={() => null} renderOrder={3}>
-      <boxGeometry args={[1, 0.05, 0.4]} />
-      <meshBasicMaterial toneMapped={false} />
+    <instancedMesh key={doors.length} ref={ref} args={[undefined, undefined, doors.length]} renderOrder={3}
+      raycast={onPick ? instancedRaycast : noRaycast}
+      onClick={onPick ? event => { if (event.instanceId == null) return; event.stopPropagation(); onPick('opening', doors[event.instanceId].id, event); } : undefined}
+      onPointerOver={onPick ? pointer(true) : undefined} onPointerOut={onPick ? pointer(false) : undefined}>
+      {/* A little taller than it looks, so a door is easy to click. */}
+      <boxGeometry args={[1, 0.12, 0.45]} />
+      <meshBasicMaterial toneMapped={false} transparent opacity={0.45} depthWrite={false} />
     </instancedMesh>
   );
 }
@@ -232,7 +258,22 @@ export function Doors({ doors }: { doors: DoorMarker[] }) {
 
 type AssetModel = { parts: { geometry: THREE.BufferGeometry; material: THREE.Material }[]; size: THREE.Vector3 };
 
-const MODEL_BRIGHTNESS = 1.6;
+const MODEL_BRIGHTNESS = 1.25;
+/** Soft per-type tints, multiplied onto the model's colours, so rooms read more colourful like an archviz plan. */
+const MODEL_TINTS: Record<string, string> = {
+  office_chair: '#dde3ee', chair: '#dfe4ee', dining_chair: '#dfe4ee', outdoor_chair: '#dfe4ee',
+  sofa: '#d9e2f2', armchair: '#d9e2f2', plant: '#d9e9d6',
+  filing_cabinet: '#e4e8ee', locker: '#e4e8ee', tool_cabinet: '#e2e6ec',
+  shelf: '#e8e4da', bookshelf: '#e8e4da', wardrobe: '#e6e3dc', pallet_rack: '#e7e3d9', high_bay_rack: '#e7e3d9', rack: '#e7e3d9',
+  fridge: '#edf0f3', whiteboard: '#f2f4f6', vending_machine: '#dfe7ee', display_screen: '#f2f4f6',
+};
+const tintCache = new Map<string, THREE.Color>();
+/** Instance colour for a model type: its soft tint, or plain white. */
+function modelTint(type: string) {
+  let color = tintCache.get(type);
+  if (!color) { color = new THREE.Color(MODEL_TINTS[type] ?? '#ffffff'); tintCache.set(type, color); }
+  return color;
+}
 /** The generated models face the opposite way to the dataset's footprint rotation (all share one camera angle). */
 const MODEL_YAW_OFFSET = Math.PI;
 const MODEL_YAW_FIXES: Record<string, number> = { lecture_seating_row: Math.PI };
@@ -338,10 +379,10 @@ function modelMatrix(asset: Asset, storey: number, toWorld: BuildingModel['toWor
   return matrix.compose(new THREE.Vector3(x, base, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(scale, scale, scale));
 }
 
-const boxGrey = new THREE.Color('#c9d0db'), modelWhite = new THREE.Color('#ffffff'), lit = new THREE.Color('#f26a1b');
+const boxGrey = new THREE.Color('#c9d0db'), lit = new THREE.Color('#f26a1b');
 
 /** A floor's furniture as 3D models where one exists, boxes otherwise; the answer's items turn orange. */
-export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: FloorModel; toWorld: BuildingModel['toWorld']; models: Map<string, AssetModel>; litAssets: Set<string> }) {
+export function DetailedAssets({ floor, toWorld, models, litAssets, onPick }: { floor: FloorModel; toWorld: BuildingModel['toWorld']; models: Map<string, AssetModel>; litAssets: Set<string>; onPick?: PickObject }) {
   const byType = useMemo(() => {
     const groups = new Map<string, Asset[]>();
     for (const asset of floor.assets) if (models.has(asset.type)) groups.set(asset.type, [...(groups.get(asset.type) ?? []), asset]);
@@ -350,7 +391,7 @@ export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: F
   const boxes = useMemo(() => floor.assets.filter(asset => !models.has(asset.type)), [floor.assets, models]);
   return <>
     {boxes.length > 0 && (
-      <Instances assets={boxes} litAssets={litAssets} base={boxGrey} matrixFor={(asset, m) => boxMatrix(asset, floor.storey, toWorld, m)}>
+      <Instances assets={boxes} litAssets={litAssets} onPick={onPick} base={boxGrey} matrixFor={(asset, m) => boxMatrix(asset, floor.storey, toWorld, m)}>
         <boxGeometry />
         <meshStandardMaterial roughness={0.8} />
       </Instances>
@@ -358,15 +399,16 @@ export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: F
     {[...byType].flatMap(([type, items]) => {
       const model = models.get(type)!;
       return model.parts.map((part, i) => (
-        <Instances key={`${type}-${i}`} assets={items} litAssets={litAssets} base={modelWhite} geometry={part.geometry} material={part.material} matrixFor={(asset, m) => modelMatrix(asset, floor.storey, toWorld, model.size, m)} />
+        <Instances key={`${type}-${i}`} assets={items} litAssets={litAssets} onPick={onPick} base={modelTint(type)} geometry={part.geometry} material={part.material} matrixFor={(asset, m) => modelMatrix(asset, floor.storey, toWorld, model.size, m)} />
       ));
     })}
   </>;
 }
 
-function Instances({ assets, litAssets, base, matrixFor, geometry, material, children }: {
+function Instances({ assets, litAssets, onPick, base, matrixFor, geometry, material, children }: {
   assets: Asset[];
   litAssets: Set<string>;
+  onPick?: PickObject;
   base: THREE.Color;
   matrixFor: (asset: Asset, matrix: THREE.Matrix4) => THREE.Matrix4;
   geometry?: THREE.BufferGeometry;
@@ -387,7 +429,10 @@ function Instances({ assets, litAssets, base, matrixFor, geometry, material, chi
     mesh.computeBoundingSphere();
   });
   return (
-    <instancedMesh key={assets.length} ref={ref} args={[geometry, material, assets.length]} castShadow receiveShadow raycast={() => null}>
+    <instancedMesh key={assets.length} ref={ref} args={[geometry, material, assets.length]} castShadow receiveShadow
+      raycast={onPick ? instancedRaycast : noRaycast}
+      onClick={onPick ? event => { if (event.instanceId == null) return; event.stopPropagation(); onPick('asset', assets[event.instanceId].id, event); } : undefined}
+      onPointerOver={onPick ? pointer(true) : undefined} onPointerOut={onPick ? pointer(false) : undefined}>
       {children}
     </instancedMesh>
   );

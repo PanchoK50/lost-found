@@ -8,7 +8,7 @@ from lostfound.core.building import Building
 from lostfound.hazards import evacuation, impact, playbooks, readiness, spread
 from lostfound.hazards.model import sensors
 
-DEV = sorted(Path("data/dev").iterdir())[:6]
+DEV = sorted(path for path in Path("data/dev").iterdir() if (path / "building.json").exists())[:6]
 
 
 @pytest.fixture(scope="module", params=[d.name for d in DEV])

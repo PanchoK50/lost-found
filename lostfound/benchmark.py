@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from lostfound.agent.agent import AgentConfig, BuildingQA
+from lostfound.env import require_api_key
 from lostfound.evals.variants import MODELS
 
 
@@ -58,6 +59,7 @@ def main() -> None:
     questions = load_questions(arguments.directory)
     if not questions:
         sys.exit(f"No questions found under {arguments.directory}")
+    require_api_key()
     qa = BuildingQA(AgentConfig(design=arguments.design, model=MODELS.get(arguments.model, arguments.model), effort=arguments.effort))
     started = time.monotonic()
 

@@ -33,6 +33,8 @@ export interface ChatRequest {
   skillId?: string;
   /** The room the player picked as "I'm here" (no GPS indoors). */
   location?: string;
+  /** What is selected on the model and shown as a chip in the chat: "this", "it", "this door" refer to it. */
+  selection?: { kind: 'asset' | 'opening' | 'space'; id: string };
 }
 
 /** A world change the agent suggests. Shown as a preview card; nothing is written until the user taps Confirm (U8). */

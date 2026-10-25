@@ -6,7 +6,7 @@ import math
 
 import networkx as nx
 
-from lostfound.core.building import DOOR_PREFIX, Building, MapError
+from lostfound.core.building import DOOR_PREFIX, Building
 
 TURN_DEGREES = 35
 LANDMARK_CATEGORIES = ("machine", "equipment", "fixture", "furniture")
@@ -20,18 +20,12 @@ def route_details(
     step_free: bool = False,
     via: list[str] | None = None,
     min_width: float | None = None,
+    forklift: bool = False,
+    bays: bool | None = None,
 ) -> dict:
+    """Raises NoRouteError (a MapError) when a leg has no route under the rules. `bays` as in Building.route_graph."""
     stops = [start, *(via or []), destination]
-    graph = building.graph(step_free, min_width)
-    nodes: list[str] = []
-    length = 0.0
-    for leg_start, leg_end in itertools.pairwise(stops):
-        try:
-            leg_length, leg_nodes = nx.single_source_dijkstra(graph, leg_start, leg_end, weight="weight")
-        except (nx.NetworkXNoPath, nx.NodeNotFound) as error:
-            raise MapError(f"No route from {building.label(leg_start)} to {building.label(leg_end)}.") from error
-        length += leg_length
-        nodes += leg_nodes if not nodes else leg_nodes[1:]
+    length, nodes, graph = building.route_nodes(stops, step_free, min_width, forklift, bays)
     return {
         "length_m": round(length, 2),
         "space_path": building.spaces_passed(graph, nodes),
@@ -41,6 +35,7 @@ def route_details(
         "steps": _steps(building, graph, nodes),
         "highlights": building.spaces_passed(graph, nodes),
         "step_free": step_free,
+        "forklift": forklift,
     }
 
 
