@@ -84,7 +84,7 @@ export interface FloorDetail {
   doors: DoorMarker[];
 }
 
-/** Door thresholds on the slab: green for entrances, amber where there is a step; kept pale so they don't dominate the plan. */
+/** Door thresholds on the slab: green for entrances, amber where there is a step; faded so they whisper rather than dominate the plan. */
 export const doorColors = { entrance: '#43906c', door: '#7d97c4', opening: '#c3d0e4', step: '#dfb46f' };
 
 class Builder {
@@ -235,8 +235,8 @@ export function Doors({ doors }: { doors: DoorMarker[] }) {
   if (!doors.length) return null;
   return (
     <instancedMesh key={doors.length} ref={ref} args={[undefined, undefined, doors.length]} raycast={() => null} renderOrder={3}>
-      <boxGeometry args={[1, 0.035, 0.32]} />
-      <meshBasicMaterial toneMapped={false} />
+      <boxGeometry args={[1, 0.03, 0.3]} />
+      <meshBasicMaterial toneMapped={false} transparent opacity={0.45} depthWrite={false} />
     </instancedMesh>
   );
 }
