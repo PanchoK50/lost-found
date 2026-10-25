@@ -111,7 +111,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   // Deep link for demos and the video: ?simulate=water:<space id> (or fire:, electrical:) opens that simulation.
   const openSimulation = hazard.open;
   // B-roll (?broll=1): only the model. ?view=building | xray | <floor id> picks the hazard view.
-  const broll = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get('broll') === '1', () => false);
+  // B-roll is local only (recording the submission video), never on the hosted app.
+  const broll = useSyncExternalStore(noSubscribe, () => new URLSearchParams(window.location.search).get('broll') === '1' && ['localhost', '127.0.0.1'].includes(window.location.hostname), () => false);
   const viewHandled = useRef(false);
   useEffect(() => {
     if (viewHandled.current || !hazard.view) return;

@@ -192,7 +192,9 @@ const STYLE_KEY = 'lf-scene-style';
 const BROLL = (() => {
   if (typeof window === 'undefined') return { on: false, labels: true, orbit: 0 };
   const params = new URLSearchParams(window.location.search);
-  return { on: params.get('broll') === '1', labels: params.get('labels') !== '0', orbit: Number(params.get('orbit') ?? 0) || 0 };
+  // Local only: a tool for recording the submission video, not a feature of the hosted app.
+  const on = params.get('broll') === '1' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  return { on, labels: !on || params.get('labels') !== '0', orbit: on ? Number(params.get('orbit') ?? 0) || 0 : 0 };
 })();
 const FLOOR_TAG_GAP_PX = 30;
 const EDGE_MARGIN_PX = 14;
