@@ -18,7 +18,7 @@ import itertools
 import json
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import networkx as nx

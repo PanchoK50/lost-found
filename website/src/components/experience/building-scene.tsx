@@ -170,7 +170,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
-        <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
+        <Ground y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
         {directive.focus.mode === 'floor' && directive.focus.around && (

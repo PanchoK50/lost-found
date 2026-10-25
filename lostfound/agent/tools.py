@@ -228,7 +228,8 @@ CROSS_TOOLS = [
     },
 ]
 
-PYTHON_TOOL = {    "name": "run_python",
+PYTHON_TOOL = {
+    "name": "run_python",
     "description": textwrap.dedent(
         """\
         Run Python against this building with our verified library and print the result (stdout is returned).
@@ -595,6 +596,7 @@ class Toolbox:
                 return resolution.best
         except MapError:
             pass
+        text = re.sub(r"\s+in\s+\S+\s*$", "", text.strip(), flags=re.IGNORECASE)  # '… room in N8'
         superlative = re.search(r"\b(largest|biggest)\s+(.+?)(?:\s+on\s+(.+))?$", text, re.IGNORECASE)
         if not superlative:
             return None
