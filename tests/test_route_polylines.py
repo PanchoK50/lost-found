@@ -5,11 +5,12 @@ import random
 from pathlib import Path
 
 import pytest
+from shapely.errors import ShapelyError
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from lostfound.core import directions
-from lostfound.core.building import Building, NoRouteError
+from lostfound.core.building import DOOR_PREFIX, Building, NoRouteError
 from lostfound.hazards import evacuation, spread
 from starter_agent.building_map import walking_lengths, walking_path
 
@@ -84,3 +85,27 @@ def test_evacuation_walkers_never_cut_through_walls(directory):
         runs = [{"floor_id": floor_id, "points": [point for _, *point in group]}
                 for floor_id, group in itertools.groupby(walker["path"], key=lambda point: point[0])]
         assert not _through_walls(building, runs), walker["space_id"]
+
+
+def test_a_failing_drawing_never_changes_the_route_answer(monkeypatch):
+    building = Building.load(DEV[0])
+    rooms = sorted(s for s, space in building.spaces.items() if space["type"] in ("room", "hall"))
+    start, end = rooms[0], rooms[-1]
+    expected = directions.route_details(building, start, end)
+
+    def broken(*_):
+        raise ShapelyError("broken geometry")
+
+    directions._corners.cache_clear()
+    monkeypatch.setattr(directions, "walking_path", broken)
+    details = directions.route_details(building, start, end)
+    directions._corners.cache_clear()
+    assert {k: v for k, v in details.items() if k != "polylines"} == {k: v for k, v in expected.items() if k != "polylines"}
+    # The fallback draws the straight line through the route's anchors and doors, as before (without repeating a point).
+    straight: list[tuple[str, list[float]]] = []
+    for node in details["nodes"]:
+        node = node if node in building.spaces else DOOR_PREFIX + node
+        here = (directions._floor_of(building, node), [round(c, 3) for c in directions._point(building, node)])
+        if not straight or straight[-1] != here:
+            straight.append(here)
+    assert [(run["floor_id"], point) for run in details["polylines"] for point in run["points"]] == straight

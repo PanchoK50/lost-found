@@ -6,6 +6,7 @@ import itertools
 import math
 
 import networkx as nx
+from shapely.errors import ShapelyError
 
 from lostfound.core.building import DOOR_PREFIX, Building
 from starter_agent.building_map import door_landing, outline, walking_path
@@ -76,12 +77,23 @@ def _polylines(building: Building, nodes: list[str], graph: nx.MultiGraph | None
         if floor_id is None or point is None:
             continue
         if index:
-            space_id = _walked_space(building, graph, nodes[index - 1], node)
-            if space_id is not None:
-                for corner in _walk_points(building, space_id, nodes[index - 1], node):
-                    add(building.spaces[space_id]["floor_id"], corner)
+            for corner_floor, corner in _between(building, graph, nodes[index - 1], node):
+                add(corner_floor, corner)
         add(floor_id, point)
     return runs
+
+
+def _between(building: Building, graph: nx.MultiGraph | None, first: str, second: str) -> list[tuple[str, tuple]]:
+    """The points drawn between two consecutive route nodes, with their floor. The drawing must never break a
+    route answer (the benchmark keeps only its nodes and length): when the geometry fails, the straight line."""
+    try:
+        space_id = _walked_space(building, graph, first, second)
+        if space_id is None:
+            return []
+        floor_id = building.spaces[space_id]["floor_id"]
+        return [(floor_id, point) for point in _walk_points(building, space_id, first, second)]
+    except (KeyError, IndexError, ValueError, TypeError, ShapelyError):
+        return []
 
 
 def _walked_space(building: Building, graph: nx.MultiGraph | None, first: str, second: str) -> str | None:
