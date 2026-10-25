@@ -512,7 +512,7 @@ function hazardMaterial(kind: HazardKind, level: number) {
   let material = hazardMaterials.get(key);
   if (!material) {
     // A power cut is a light wash, so water and fire stay readable where they overlap.
-    const [base, range] = kind === 'electrical' ? [0.08, 0.22] : [0.35, 0.55];
+    const [base, range] = kind === 'electrical' ? [0.18, 0.34] : [0.35, 0.55];
     material = new THREE.MeshBasicMaterial({ color: hazardMeta[kind].color, transparent: true, opacity: base + range * (step / HAZARD_STEPS), depthWrite: false, toneMapped: false });
     hazardMaterials.set(key, material);
   }
