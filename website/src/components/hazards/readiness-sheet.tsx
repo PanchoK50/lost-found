@@ -5,7 +5,6 @@ import type { Building } from '@/lib/buildings/types';
 import type { Readiness, ReadinessFinding } from '@/lib/hazards/types';
 import { Sheet } from '@/components/world/sheet';
 
-const CATEGORY_ICON: Record<string, string> = { fire: '🔥', water: '💧', electrical: '⚡', safety: '❤️' };
 
 /** Building readiness: weak spots to fix before anything happens; each finding shows its rooms on the map. */
 export function ReadinessSheet({ building, onShow, onClose }: { building: Building; onShow(finding: ReadinessFinding): void; onClose(): void }) {
@@ -29,7 +28,6 @@ export function ReadinessSheet({ building, onShow, onClose }: { building: Buildi
           <ul className="hazard-list">
             {report.findings.map(finding => (
               <li key={finding.id}><button type="button" className={`readiness-finding readiness-finding--${finding.severity}`} onClick={() => onShow(finding)} disabled={!finding.space_ids.length}>
-                <span aria-hidden>{CATEGORY_ICON[finding.category] ?? '•'}</span>
                 <div><strong>{finding.title}</strong><span>{finding.detail}</span><em>{finding.rule}</em></div>
               </button></li>
             ))}

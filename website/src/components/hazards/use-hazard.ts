@@ -98,14 +98,15 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     ? { mode: 'floor', floorId: floorOf.get(focusRoom)! }
     : focusFloor ? { mode: 'floor', floorId: focusFloor }
     : { mode: 'xray', floorIds };
-  const icon = view.hazard === 'fire' ? '🔥' : view.hazard === 'water' ? '💧' : '⚡';
-  const markers: SceneDirective['markers'] = origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: `${icon} ${origin.name}`, tone: 'primary' }] : [];
+  const hasLink = Boolean(origin && target && target.id !== origin.id);
+  // The arrow's label already names the origin; then the pin needs no label of its own.
+  const markers: SceneDirective['markers'] = origin ? [{ floorId: origin.floor_id, position: centroid(origin.polygon), label: hasLink ? '' : origin.name, tone: 'primary' }] : [];
   // The one consequence that matters most, as an arrow with a label: "Kitchen 3.14 → Server room 2.14".
   const links: SceneDirective['links'] = origin && target && target.id !== origin.id
     ? [{ from: { floorId: origin.floor_id, position: centroid(origin.polygon) }, to: { floorId: target.floor_id, position: centroid(target.polygon) }, label: `${origin.name} → ${target.name}` }]
     : undefined;
   const routes: SceneDirective['routes'] = view.hazard === 'fire' && data?.evacuation && view.t >= 1
-    ? data.evacuation.routes.slice(0, 6).map(route => ({ spacePath: route.space_path, points: route.polylines.flatMap(run => run.points.map(position => ({ floorId: run.floor_id, position }) as FloorPoint)), label: route.name }))
+    ? data.evacuation.routes.slice(0, 3).map(route => ({ spacePath: route.space_path, points: route.polylines.flatMap(run => run.points.map(position => ({ floorId: run.floor_id, position }) as FloorPoint)), label: route.name }))
     : undefined;
   const evacuees = data ? evacueesOf(data) : undefined;
   return {

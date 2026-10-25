@@ -8,7 +8,7 @@ import { evacuationProgress, keyRoom, type HazardView } from './use-hazard';
 const RELATION_LABEL: Record<Relation, string> = {
   origin: 'Where it started', below: 'Floor below', 'next door': 'Next door', above: 'Floor above', 'same floor': 'Same floor', 'other floor': 'Other floors',
 };
-type Tab = 'overview' | 'rooms' | 'assets' | 'evacuation' | 'response';
+type Tab = 'overview' | 'affected' | 'response';
 const TITLE: Record<string, string> = { fire: 'Fire', water: 'Water leak', electrical: 'Power fault' };
 
 /** Side panel for a simulation or a live incident: timeline, what is hit, evacuation and the response. */
@@ -38,7 +38,7 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
   return (
     <aside ref={panelRef} className={`hazard-panel hazard-panel--${view.hazard}${view.mode === 'incident' ? ' hazard-panel--live' : ''}`} aria-label={`${meta.label} in ${origin?.name}`}>
       <header className="hazard-head">
-        <span className="hazard-icon" aria-hidden>{meta.icon}</span>
+        <span className={`hazard-swatch hazard-swatch--${view.hazard}`} aria-hidden />
         <div>
           <h2>{TITLE[view.hazard]} / {origin?.name}</h2>
           <span className="hazard-place">{view.mode === 'incident' ? `Live incident${view.incident?.reporter ? ` · reported by ${view.incident.reporter}` : ''}` : 'Practice response · Calls simulated'}{floorName ? ` · ${floorName}` : ''}</span>
@@ -46,11 +46,11 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
         <button type="button" className="hazard-close" onClick={onClose} aria-label="Close">✕</button>
       </header>
 
-      {view.incident && (view.incident.photo || view.incident.description) && (
+      {view.incident && (view.incident.photo || (view.incident.description && view.incident.description !== 'Reported without details.')) && (
         <div className="hazard-report">
           {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL, nothing to optimise */}
           {view.incident.photo && <img src={view.incident.photo} alt="Reported damage" />}
-          <p>{view.incident.description}{view.incident.reporter ? <em> · reported by {view.incident.reporter}</em> : null}</p>
+          <p>{view.incident.description}</p>
         </div>
       )}
 
@@ -58,24 +58,17 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
       {!data && !view.error && <p className="hazard-loading">Working out what this means for the building…</p>}
 
       {data && <>
-        <div className="hazard-stats">
-          <Stat value={dedupe(reached).length} label="spaces hit" />
-          <Stat value={people} label="people at risk" />
-          <Stat value={assets.length} label="critical assets" />
-          {(powerOut > 0 || view.hazard === 'electrical') && <Stat value={powerOut} label="without power" />}
-        </div>
-        {progress && progress.total > 0 && (
-          <div className="hazard-drill" aria-live="polite">
-            <div className="hazard-drill-bar"><span style={{ width: `${(100 * progress.out) / progress.total}%` }} /></div>
-            <span>🏃 <strong>{progress.out}</strong> of {progress.total} people safe{progress.out >= progress.total - progress.trapped && progress.total - progress.trapped > 0 ? ` · all out by +${progress.lastOutMin.toFixed(1)} min` : ''}{progress.trapped ? ` · ${progress.trapped} trapped` : ''}</span>
-          </div>
-        )}
-        {data.impact.cascades.filter(c => c.at_min <= view.t).map(c => (
-          <p key={c.circuit} className="hazard-cascade">⚡ {c.reason}: power cut on that circuit (+{Math.round(c.at_min)} min).</p>
+        <dl className="hazard-figures">
+          <div><dt>Spaces</dt><dd>{dedupe(reached).length}</dd></div>
+          <div><dt>People</dt><dd>{people}</dd></div>
+          <div><dt>{view.hazard === 'electrical' ? 'No power' : 'Critical assets'}</dt><dd>{view.hazard === 'electrical' ? powerOut : assets.length}</dd></div>
+        </dl>
+        {data.impact.cascades.filter(c => c.at_min <= view.t).slice(0, 1).map(c => (
+          <p key={c.circuit} className="hazard-cascade">{c.reason}: power cut on that circuit at +{Math.round(c.at_min)} min.</p>
         ))}
 
         <nav className="hazard-tabs" role="tablist">
-          {(['overview', 'rooms', 'assets', ...(data.evacuation?.walkers.length ? ['evacuation' as const] : []), 'response'] as Tab[]).map(t => (
+          {(['overview', 'affected', 'response'] as Tab[]).map(t => (
             <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{TAB_LABEL[t]}</button>
           ))}
         </nav>
@@ -83,10 +76,11 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
         <div className="hazard-body">
           {tab === 'overview' && (
             <Overview view={view} originName={origin?.name ?? ''} keyName={key?.name} keyRelation={key?.relation} reached={dedupe(reached).length} people={people} assets={assets.length}
-              actions={data.playbook} progress={progress} onShowModel={onShowModel} onStart={onStartResponse} onDetails={() => setTab('response')} />
+              actions={data.playbook} progress={progress} onShowModel={onShowModel} onDetails={() => setTab('response')} />
           )}
-          {tab === 'rooms' && <Rooms rooms={reached} onRoom={onRoom} />}
-          {tab === 'assets' && (assets.length ? (
+          {tab === 'affected' && <Rooms rooms={reached} onRoom={onRoom} />}
+          {tab === 'affected' && assets.length > 0 && <h3 className="hazard-subhead">Critical assets</h3>}
+          {tab === 'affected' && (assets.length ? (
             <ul className="hazard-list">
               {assets.map(a => (
                 <li key={`${a.asset_id}-${a.kind}`}><button type="button" onClick={() => onRoom(a.space_id)}>
@@ -94,8 +88,8 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
                 </button></li>
               ))}
             </ul>
-          ) : <p className="hazard-empty">No critical equipment hit yet.</p>)}
-          {tab === 'evacuation' && data.evacuation && (
+          ) : null)}
+          {tab === 'response' && data.evacuation && data.evacuation.walkers.length > 0 && (
             <div className="hazard-evac">
               <p><strong>{data.evacuation.people}</strong> people to get out · longest way {Math.round(data.evacuation.longest_m)} m · everyone out by <strong>+{data.evacuation.all_out_min.toFixed(1)} min</strong>{view.hazard === 'fire' ? ' · lifts off' : ''}.</p>
               {data.evacuation.exits.length > 1 && data.evacuation.exits[0].people > 0.7 * data.evacuation.people && (
@@ -115,13 +109,14 @@ export function HazardPanel({ building, view, panelRef, onStartResponse, onRoom,
         </div>
       </>}
 
-      {view.mode === 'incident' && onResolve && <footer className="hazard-foot"><button type="button" onClick={onResolve}>Mark as resolved</button></footer>}
+      {data && (
+        <footer className="hazard-foot">
+          {!view.responseStartedAt && <button type="button" className="hazard-run" onClick={onStartResponse}>{view.mode === 'incident' ? 'Start response' : 'Run response drill'}</button>}
+          {view.mode === 'incident' && onResolve && <button type="button" className="hazard-secondary" onClick={onResolve}>Mark as resolved</button>}
+        </footer>
+      )}
     </aside>
   );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return <div className="hazard-stat"><strong>{value}</strong><span>{label}</span></div>;
 }
 
 function Rooms({ rooms, onRoom }: { rooms: ImpactRoom[]; onRoom(spaceId: string): void }) {
@@ -147,16 +142,16 @@ function Rooms({ rooms, onRoom }: { rooms: ImpactRoom[]; onRoom(spaceId: string)
   </>;
 }
 
-const TAB_LABEL: Record<Tab, string> = { overview: 'Overview', rooms: 'Rooms', assets: 'Assets', evacuation: 'Evacuation', response: 'Response' };
+const TAB_LABEL: Record<Tab, string> = { overview: 'Overview', affected: 'Affected', response: 'Response' };
 
 function clockTime(at: number) {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 /** The response as numbered steps, like a checklist: report → affected spaces → responders → (evacuation). */
-function Overview({ view, originName, keyName, keyRelation, reached, people, assets, actions, progress, onShowModel, onStart, onDetails }: {
+function Overview({ view, originName, keyName, keyRelation, reached, actions, progress, onShowModel, onDetails }: {
   view: HazardView; originName: string; keyName?: string; keyRelation?: Relation; reached: number; people: number; assets: number;
-  actions: PlaybookAction[]; progress?: ReturnType<typeof evacuationProgress>; onShowModel(): void; onStart(): void; onDetails(): void;
+  actions: PlaybookAction[]; progress?: ReturnType<typeof evacuationProgress>; onShowModel(): void; onDetails(): void;
 }) {
   const now = useNow(view.responseStartedAt);
   const elapsed = view.responseStartedAt ? (now - view.responseStartedAt) / 1000 : -1;
@@ -175,7 +170,7 @@ function Overview({ view, originName, keyName, keyRelation, reached, people, ass
         <span className="hazard-step-n">2</span>
         <div>
           <strong>Review affected spaces</strong>
-          <p>{keyName ? `${originName} and ${keyName}${keyRelation && keyRelation !== 'same floor' ? ` (${keyRelation})` : ''}` : originName} · {reached} spaces · {people} people{assets ? ` · ${assets} critical assets` : ''}</p>
+          <p>{keyName ? `${originName}, and ${keyName}${keyRelation && keyRelation !== 'same floor' ? ` ${keyRelation === 'below' ? 'on the floor below' : keyRelation}` : ''}` : originName}{reached > 1 ? ` · ${reached - 1} more space${reached - 1 === 1 ? '' : 's'} by now` : ''}</p>
         </div>
         <button type="button" className="hazard-link" onClick={onShowModel}>Show on model →</button>
       </li>
@@ -183,7 +178,6 @@ function Overview({ view, originName, keyName, keyRelation, reached, people, ass
         <span className="hazard-step-n">3</span>
         <div>
           <strong>Notify responders</strong>
-          <p>{unique.map(a => a.contact!.name.split(' (')[0]).join(' · ')}</p>
           <div className="hazard-responders">
             {unique.map(action => {
               const status = statusOf(action, elapsed, live);
@@ -199,14 +193,11 @@ function Overview({ view, originName, keyName, keyRelation, reached, people, ass
           <div>
             <strong>{view.hazard === 'fire' ? 'Evacuate' : 'Clear the affected rooms'}</strong>
             <p>{progress.out} of {progress.total} people safe{progress.trapped ? ` · ${progress.trapped} trapped` : ''} · all out by +{progress.lastOutMin.toFixed(1)} min</p>
+            <div className="hazard-drill-bar"><span style={{ width: `${(100 * progress.out) / Math.max(1, progress.total)}%` }} /></div>
           </div>
         </li>
       )}
-      <li className="hazard-step-actions">
-        {!view.responseStartedAt
-          ? <button type="button" className="hazard-run" onClick={onStart}>▶ {live ? 'Start response' : 'Run demo response'}</button>
-          : <button type="button" className="hazard-link" onClick={onDetails}>All {actions.length} response steps →</button>}
-      </li>
+      {view.responseStartedAt && <li className="hazard-step-actions"><button type="button" className="hazard-link" onClick={onDetails}>All {actions.length} response steps →</button></li>}
     </ol>
   );
 }
@@ -227,10 +218,10 @@ function useNow(active?: number) {
 }
 
 /** Scenario playback under the model: play/pause and scrub the minutes. */
-export function HazardPlayback({ view, onT, onPlay, style }: { view: HazardView; onT(t: number): void; onPlay(): void; style?: React.CSSProperties }) {
+export function HazardPlayback({ view, onT, onPlay }: { view: HazardView; onT(t: number): void; onPlay(): void }) {
   const minutes = view.data?.simulation.minutes ?? 30;
   return (
-    <div className="hazard-playback" style={style}>
+    <div className="hazard-playback">
       <div className="hazard-playback-head"><strong>Scenario playback</strong><span>{view.mode === 'incident' ? 'Predicted spread' : 'Illustrative scenario'}</span></div>
       <div className="hazard-timeline">
         <button type="button" className="hazard-play" onClick={onPlay} disabled={!view.data} aria-label={view.playing ? 'Pause' : 'Play'}>{view.playing ? '❚❚' : '▶'}</button>
@@ -265,7 +256,7 @@ function Response({ actions, startedAt, live, onStart }: { actions: PlaybookActi
         const status = startedAt ? statusOf(action, elapsed, live) : undefined;
         return (
           <li key={action.order} className={`hazard-action hazard-action--${action.kind}${status ? ` is-${status}` : ''}`}>
-            <span className="hazard-action-icon" aria-hidden>{ACTION_ICON[action.kind]}</span>
+            <span className="hazard-action-icon" aria-hidden>{action.order + 1}</span>
             <div>
               <strong>{action.title}</strong>
               <p>{action.detail}</p>
@@ -279,7 +270,6 @@ function Response({ actions, startedAt, live, onStart }: { actions: PlaybookActi
   </>;
 }
 
-const ACTION_ICON: Record<PlaybookAction['kind'], string> = { alarm: '🚨', call: '📞', notify: '💬', shutoff: '⏻', evacuate: '🏃' };
 
 function dedupe(rooms: ImpactRoom[]) {
   const seen = new Map<string, ImpactRoom>();

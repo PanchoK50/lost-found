@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,6 +10,7 @@ import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
 import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
+import type { SceneStyle } from './scene-detail';
 import { detectCategory } from '@/lib/world/mode';
 import { saveProfile, useProfile } from '@/lib/world/profile';
 import { LocationSheet } from '@/components/world/location-sheet';
@@ -38,6 +39,9 @@ import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
 import { playAlarm, useIncidents } from '@/lib/hazards/incidents';
 import { hazardMeta, type Incident } from '@/lib/hazards/types';
+
+/** Multiplayer (people, pins, pings, skills) is kept in the code but hidden from the interface: docs/UI_INVENTORY.md. */
+const SHOW_MULTIPLAYER = false;
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
 
@@ -76,7 +80,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const [expanded, setExpanded] = useState(false);
   // The route step the camera is showing: `${messageId}:${leg}-${step}`.
   const [activeStep, setActiveStep] = useState<string>();
-  const [insets, setInsets] = useState<SceneInsets>({ top: 0, left: 0, bottom: 0 });
   const wide = useWide();
   // Multiplayer: the shared world of this building (docs/MULTIPLAYER.md).
   const profile = useProfile();
@@ -93,7 +96,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const [hazardRoom, setHazardRoom] = useState<string | null>(null);
   const [hazardFloor, setHazardFloor] = useState<string | null>(null);
   const hazardPanel = useRef<HTMLElement>(null);
-  const hazardOpen = hazard.view !== null;
+  const [mapStyle, setMapStyle] = useMapStyle();
+  // The room selected on the model: a report starts there.
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const openIncident = useCallback((incident: Incident) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(incident.spaceId, incident.hazard, 'incident', incident); }, [hazard]);
   // An incident raised on another screen: sound the alarm and show it.
   const { arrived, clearArrived } = incidents;
@@ -109,6 +114,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     const [kind, spaceId] = (new URLSearchParams(window.location.search).get('simulate') ?? '').split(':');
     if ((kind === 'fire' || kind === 'water' || kind === 'electrical') && building.spaces.some(s => s.id === spaceId)) void openSimulation(spaceId, kind);
   }, [building, openSimulation]);
+  // Start-screen entry points for the emergency side: a water leak on an upper floor, a fire in a busy room.
+  const demoScenarios = useMemo(() => scenariosFor(building), [building]);
   const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive]);
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
@@ -133,8 +140,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const floorList = useRef<HTMLDivElement>(null);
   const latestQuestion = useRef<HTMLParagraphElement>(null);
   const started = messages.length > 0;
-  // The start block ("Ask me anything", suggestions) gives way once someone explores a floor, so the map gets the screen.
-  const intro = !started && directive.focus.mode === 'building' && !hazard.view;
   const floors = [...building.floors].sort((a, b) => a.level - b.level);
   const focusedFloor = shownDirective.focus.mode === 'floor' ? shownDirective.focus.floorId : undefined;
   // On phones the sheet shows only the latest exchange until expanded.
@@ -142,26 +147,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const lastUser = messages.findLastIndex(m => m.role === 'user');
   const visible = showAll ? messages : messages.slice(Math.max(0, busy ? lastUser : messages.length - 1));
 
-  // Frame the model in whatever the UI leaves free, measured from the real layout.
-  useLayoutEffect(() => {
-    const measure = () => {
-      const h = window.innerHeight;
-      const top = header.current?.getBoundingClientRect().bottom ?? 0;
-      const dockTop = dock.current?.getBoundingClientRect().top ?? h;
-      const sheet = transcript.current?.getBoundingClientRect();
-      const panel = hazardPanel.current?.getBoundingClientRect();
-      const next = wide
-        ? { top, left: sheet ? sheet.right : 0, bottom: h - dockTop, right: panel ? window.innerWidth - panel.left : 0 }
-        : { top, left: 0, bottom: h - Math.min(dockTop, sheet?.top ?? h, panel?.top ?? h) };
-      const round = (v: number) => Math.round(v / 8) * 8;
-      setInsets(prev => (round(prev.top) === round(next.top) && round(prev.left) === round(next.left) && round(prev.bottom) === round(next.bottom) && round(prev.right ?? 0) === round(next.right ?? 0) ? prev : next));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    [header, transcript, dock, hazardPanel].forEach(ref => ref.current && observer.observe(ref.current));
-    window.addEventListener('resize', measure);
-    return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
-  }, [wide, started, intro, hazardOpen]);
+  // The model has its own area in the platform layout: nothing covers it, so the camera needs no insets.
+  const insets: SceneInsets = ZERO_INSETS;
   useEffect(() => {
     const list = floorList.current;
     if (!list) return;
@@ -265,45 +252,98 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [building, myRoom]);
 
   return (
-    <main className={`experience${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+    <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}`}>
+      <header className="shell-top" ref={header}>
+        <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
+        <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
+          {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}<span aria-hidden>▾</span>
+        </button>
+        <span className="shell-spacer" />
+        <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>
+        <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>
+        <button type="button" className="shell-account" onClick={() => setSheet('account')} aria-label={profile ? `Signed in as ${profile.name}. Switch account` : 'Sign in'}>{profile ? initials(profile.name) : 'Sign in'}</button>
+        {SHOW_MULTIPLAYER && <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
+          location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />}
+      </header>
 
-      <div className="hud-top" ref={header}>
-        <header className="hud-bar">
-          <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
-          {started && <button type="button" className="back-overview" onClick={startOver}>← Overview</button>}
-          <nav className="building-switch" aria-label="Building">
-            <button type="button" className="active" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another or add one`}>
-              {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name} ▾
-            </button>
-            <button type="button" onClick={() => setSheet('buildings')}>{buildings.length} buildings</button>
-          </nav>
-          <nav className="emergency-actions" aria-label="Emergencies">
-            {hazard.view && <span className={`mode-badge${hazard.view.mode === 'incident' ? ' mode-badge--live' : ''}`}><i />{hazard.view.mode === 'incident' ? 'Live incident' : 'Simulation'}</span>}
-            <button type="button" className="emergency-report" onClick={() => setSheet('damage')}>🚨 Report damage</button>
-            <button type="button" onClick={() => setSheet('readiness')}>🛡 Readiness</button>
-          </nav>
-          <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
-            location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />
-        </header>
-        <nav className="floor-rail" aria-label="Floors">
-          <button type="button" className={(hazard.view ? !hazardFloor && !hazardRoom : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardFloor(null); setHazardRoom(null); } else showOverview(); }} aria-label="Whole building">⌂</button>
-          <div className="floor-list" ref={floorList}>
-            {floors.map(floor => (
-              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(world, floor.id), incidents.active, building, floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
+      <aside className="shell-side" aria-label="Building navigation">
+        <section>
+          <h2>Floors</h2>
+          <nav className="shell-floors" ref={floorList} aria-label="Floors">
+            <button type="button" className={(hazard.view ? !hazardFloor && !hazardRoom : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardFloor(null); setHazardRoom(null); } else showOverview(); }}>Whole building</button>
+            {[...floors].reverse().map(floor => (
+              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
             ))}
+          </nav>
+        </section>
+        <section>
+          <h2>View</h2>
+          <div className="shell-segmented" role="group" aria-label="Map style">
+            {(['blocks', 'detailed'] as const).map(option => <button type="button" key={option} aria-pressed={mapStyle === option} onClick={() => setMapStyle(option)}>{option === 'blocks' ? 'Blocks' : 'Detailed'}</button>)}
           </div>
-        </nav>
-      </div>
+        </section>
+        <section>
+          <h2>Incidents</h2>
+          {incidents.active.length ? (
+            <ul className="shell-list">
+              {incidents.active.map(incident => {
+                const space = building.spaces.find(s => s.id === incident.spaceId);
+                return (
+                  <li key={incident.id}>
+                    <button type="button" className={hazard.view?.incident?.id === incident.id ? 'active' : ''} onClick={() => openIncident(incident)}>
+                      <i className={`hazard-dot hazard-dot--${incident.hazard}`} /><span><strong>{hazardMeta[incident.hazard].label}</strong><em>{space?.name} · <Ago at={incident.createdAt} /></em></span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : <p className="shell-empty">No active incidents.</p>}
+        </section>
+        <section>
+          <h2>Simulate</h2>
+          <ul className="shell-list">
+            {demoScenarios.map(scenario => (
+              <li key={scenario.hazard}>
+                <button type="button" className={hazard.view?.mode === 'simulation' && hazard.view.spaceId === scenario.spaceId ? 'active' : ''} onClick={() => { setHazardRoom(null); setHazardFloor(null); void hazard.open(scenario.spaceId, scenario.hazard); }}>
+                  <i className={`hazard-dot hazard-dot--${scenario.hazard}`} /><span><strong>{scenario.hazard === 'fire' ? 'Fire' : 'Water leak'}</strong><em>{building.spaces.find(s => s.id === scenario.spaceId)?.name}</em></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="shell-hint">Or select any room on the model.</p>
+        </section>
+      </aside>
 
-      <div className="console">
-        {started && (
-          <section ref={transcript} className={`transcript${showAll ? ' transcript--expanded' : ''}`} aria-label="Conversation" aria-live="polite">
-            {!wide && messages.length > 2 && (
-              <button type="button" className="sheet-handle" onClick={() => setExpanded(e => !e)} aria-expanded={expanded}>
-                <span />{expanded ? 'Show latest only' : `Conversation · ${Math.ceil(messages.length / 2)} questions`}
-              </button>
-            )}
+      <section className="shell-main">
+        <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} mapStyle={mapStyle} onSelectRoom={setSelectedRoom} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
+        <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
+      </section>
+
+      <aside className="shell-panel" aria-label="Assistant">
+        {hazard.view && (
+          <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onStartResponse={hazard.startResponse}
+            onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
+            onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
+        )}
+        <section ref={transcript} className={`shell-chat${hazard.view ? ' shell-chat--compact' : ''}`} hidden={Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
+          {!started && !hazard.view && (
+            <div className="shell-intro">
+              <h1>Ask about this building</h1>
+              <p>Where things are, how to get there, what is above or below, what happens if something breaks.</p>
+              {importIntro && (
+                <div className="import-intro">
+                  <strong>Built from your plans.</strong>
+                  <span>{importIntro.checks ? `${importIntro.checks} thing${importIntro.checks === 1 ? '' : 's'} to check, e.g. “${importIntro.first}”` : 'Nothing to check: ask me anything.'}</span>
+                  {importIntro.checks > 0 && <button type="button" className="button button--primary" onClick={() => void ask('Let’s check what you were unsure about in this building, one question at a time.')}>Check it with me</button>}
+                </div>
+              )}
+              <div className="shell-examples">
+                {suggestions.slice(0, 3).map(s => <button type="button" key={s.label} onClick={() => void ask(s.question)}>{s.question.replace(/ Finish with.*$/, '')}</button>)}
+              </div>
+            </div>
+          )}
+          {started && (
             <div className="transcript-scroll">
               {visible.map(message => message.role === 'user'
                 ? <p key={message.id} ref={message.id === messages[lastUser]?.id ? latestQuestion : undefined} className="bubble bubble--user">{message.content}</p>
@@ -316,7 +356,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
                       </button>
                     )}
-                    <p>{withoutAnswerLine(message.content)}</p>
+                    <Reply text={withoutAnswerLine(message.content)} />
                     {message.response?.actions?.length ? (
                       <div className="answer-actions">
                         {message.response.actions.map(action => (
@@ -353,38 +393,27 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                     ) : null}
                   </article>)}
               {busy && <div className="bubble bubble--thinking" role="status"><AgentAvatar thinking />Looking it up…</div>}
+              {busy && <div className="bubble bubble--thinking" role="status"><AgentAvatar thinking />Looking it up…</div>}
               <div ref={transcriptEnd} />
             </div>
-          </section>
-        )}
-
-        <section className="dock" ref={dock}>
-          {intro && <div className="hero">
-            <h1>Ask me anything.</h1>
-          </div>}
-          {intro && importIntro && (
-            <div className="import-intro">
-              <strong>Built from your plans.</strong>
-              <span>{importIntro.checks ? `${importIntro.checks} thing${importIntro.checks === 1 ? '' : 's'} to check, e.g. “${importIntro.first}”` : 'Nothing to check: ask me anything.'}</span>
-              {importIntro.checks > 0 && <button type="button" className="button button--primary" onClick={() => void ask('Let’s check what you were unsure about in this building, one question at a time.')}>Check it with me</button>}
-            </div>
           )}
-          {intro && <div className="chips">{suggestions.map(s => <button type="button" key={s.label} title={s.question} onClick={() => void ask(s.question)}>{s.label}</button>)}</div>}
-          {profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
-          {world && profile && mentionQuery(draft) !== undefined
+        </section>
+        <section className="shell-ask" ref={dock}>
+          {SHOW_MULTIPLAYER && profile && <PasserBy world={world} profile={profile} building={building} routes={directive.routes} act={act} />}
+          {SHOW_MULTIPLAYER && (world && profile && mentionQuery(draft) !== undefined
             ? <MentionPicker players={world.players.filter(p => p.id !== profile.id)} draft={draft} onPick={text => { setDraft(text); input.current?.focus(); }} />
-            : world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />}
+            : world && <SkillChips skills={world.skills} draft={draft} onUse={skill => void ask(skill.name, skill.id)} />)}
           <form className="ask" onSubmit={submit}>
-            <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>
-            <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
+            {SHOW_MULTIPLAYER && <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>}
+            <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={hazard.view ? 'Ask or coordinate…' : started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
             <MicButton onTranscript={addTranscript} onError={setVoiceError} />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
           </form>
           {voiceError && <p className="voice-error" role="alert">{voiceError}</p>}
         </section>
-      </div>
+      </aside>
 
-      {profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('messages')} onShareLocation={() => {
+      {SHOW_MULTIPLAYER && profile && settings && <Inbox world={world} playerId={profile.id} building={building} pingFrom={settings.pingFrom} groups={profile.groups} top={insets.top + 8} act={act} onGo={routeTo} onMore={() => setSheet('messages')} onShareLocation={() => {
         if (profile && settings?.share === 'off') saveProfile({ ...profile, settings: { ...profile.settings, share: 'team' } });
         setSheet('location');
       }} />}
@@ -395,29 +424,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
       {sheet === 'buildings' && <BuildingsSheet buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
-      {incidents.active.length > 0 && (
-        <div className="alarm-banners" style={{ top: insets.top + 8 }}>
-          {incidents.active.slice(-2).map(incident => {
-            const space = building.spaces.find(s => s.id === incident.spaceId);
-            const floor = building.floors.find(f => f.id === space?.floor_id);
-            return (
-              <div key={incident.id} className={`alarm-banner alarm-banner--${incident.hazard}`} role="alert">
-                <span className="alarm-icon" aria-hidden>{hazardMeta[incident.hazard].icon}</span>
-                <span className="alarm-text"><strong>{hazardMeta[incident.hazard].label}</strong> · {space?.name}{floor ? ` · ${floor.name}` : ''} · <Ago at={incident.createdAt} /></span>
-                <button type="button" onClick={() => openIncident(incident)}>View</button>
-                <button type="button" onClick={() => { incidents.setStatus(incident.id, 'resolved'); if (hazard.view?.incident?.id === incident.id) hazard.close(); }}>Resolve</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {hazard.view && (
-        <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onStartResponse={hazard.startResponse}
-          onRoom={spaceId => setHazardRoom(spaceId)} onShowModel={() => { setHazardRoom(null); setHazardFloor(null); }} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
-          onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
-      )}
-      {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} style={{ bottom: insets.bottom + 10, left: insets.left + 16, right: (insets.right ?? 0) + 16 }} />}
-      {sheet === 'damage' && <ReportDamage building={building} myRoom={myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
+      {sheet === 'damage' && <ReportDamage building={building} myRoom={selectedRoom ?? myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
         incidents.raise(incident);
         closeSheet();
         playAlarm();
@@ -431,8 +438,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       }} />}
       {sheet === 'location' && profile && <LocationSheet building={building} room={myRoom} sharing={settings?.share !== 'off'} onChange={setLocation} onSettings={() => setSheet('settings')} onClose={closeSheet} />}
       {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
-
-      <footer className="attribution">{building.building.attribution} · {building.building.license}</footer>
     </main>
   );
 }
@@ -472,8 +477,57 @@ function AgentAvatar({ thinking = false, size }: { thinking?: boolean; size?: 'l
 }
 
 /** Benchmark replies end with an "Answer: …" line; the headline card already shows it. */
+/** The agent writes light markdown: paragraphs, "- " lists and **bold**. Render exactly that, nothing more. */
+function Reply({ text }: { text: string }) {
+  const blocks: { list: boolean; lines: string[] }[] = [];
+  for (const raw of text.replace(/ - (?=\*\*|[A-Z0-9])/g, '\n- ').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const list = /^[-•]\s+/.test(line);
+    const last = blocks.at(-1);
+    if (last && last.list === list && list) last.lines.push(line.replace(/^[-•]\s+/, ''));
+    else blocks.push({ list, lines: [list ? line.replace(/^[-•]\s+/, '') : line] });
+  }
+  const inline = (line: string) => line.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part));
+  return <div className="reply">{blocks.map((block, i) => block.list
+    ? <ul key={i}>{block.lines.map((line, j) => <li key={j}>{inline(line)}</li>)}</ul>
+    : <p key={i}>{inline(block.lines[0])}</p>)}</div>;
+}
+
 function withoutAnswerLine(reply: string) {
   return reply.replace(/\n*^\s*Answer:.*$/gim, '').trim();
+}
+
+const ZERO_INSETS: SceneInsets = { top: 0, left: 0, bottom: 0, right: 0 };
+const STYLE_KEY = 'lf-scene-style';
+const styleListeners = new Set<() => void>();
+/** Blocks or Detailed, remembered per browser (an external store: no hydration mismatch, no effect). */
+function useMapStyle(): [SceneStyle, (style: SceneStyle) => void] {
+  const style = useSyncExternalStore(
+    listener => { styleListeners.add(listener); return () => { styleListeners.delete(listener); }; },
+    () => (localStorage.getItem(STYLE_KEY) === 'detailed' ? 'detailed' : 'blocks'),
+    () => 'blocks',
+  );
+  const set = useCallback((next: SceneStyle) => { localStorage.setItem(STYLE_KEY, next); styleListeners.forEach(l => l()); }, []);
+  return [style as SceneStyle, set];
+}
+
+/** Two ready-made simulations for the start screen, picked from the building's own rooms (works on any building). */
+function scenariosFor(building: Building): { hazard: 'water' | 'fire'; spaceId: string; label: string }[] {
+  const levels = new Map(building.floors.map(f => [f.id, f.level]));
+  const lowest = Math.min(...building.floors.map(f => f.level));
+  const wet = building.spaces.filter(s => ['kitchen', 'bathroom', 'toilet', 'canteen'].includes(s.room_type) && (levels.get(s.floor_id) ?? 0) > lowest)
+    .sort((a, b) => (levels.get(b.floor_id) ?? 0) - (levels.get(a.floor_id) ?? 0));
+  const rooms = building.spaces.filter(s => s.type === 'room').map(s => ({ s, seats: building.assets.filter(a => a.space_id === s.id && /chair|seating/.test(a.type)).length }))
+    .sort((a, b) => b.seats - a.seats);
+  const out: { hazard: 'water' | 'fire'; spaceId: string; label: string }[] = [];
+  if (rooms[0]) out.push({ hazard: 'fire', spaceId: rooms[0].s.id, label: `Simulate a fire in ${rooms[0].s.name}` });
+  if (wet[0]) out.push({ hazard: 'water', spaceId: wet[0].id, label: `Simulate a leak in ${wet[0].name}` });
+  return out;
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
 }
 
 /** "2 min ago", refreshed every 20 s. */
@@ -495,7 +549,7 @@ function FloorButton({ floor, active, counts, onClick }: { floor: Building['floo
   const label = counts.summary ? `${floor.name}: ${counts.summary}` : floor.name;
   return (
     <button type="button" className={`floor-button${active ? ' active' : ''}`} onClick={onClick} aria-label={label} title={label} aria-pressed={active}>
-      {floorShort(floor.level)}
+      <span className="floor-button-short">{floorShort(floor.level)}</span><span className="floor-button-name">{floor.name}</span>
       {counts.alerts > 0 && <span className="floor-badge floor-badge--alert">{counts.alerts}</span>}
       {counts.people > 0 && <span className="floor-badge floor-badge--people">{counts.people}</span>}
     </button>

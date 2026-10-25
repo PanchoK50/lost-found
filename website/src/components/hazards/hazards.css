@@ -1,40 +1,57 @@
 /* Emergencies: header actions, alarm banners, the hazard side panel, report and readiness sheets. */
 .emergency-actions { display: flex; gap: 6px; }
 .emergency-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); font-size: 13px; font-weight: 600; color: var(--ink); box-shadow: var(--shadow); white-space: nowrap; }
-.emergency-actions .emergency-report { background: #e5484d; border-color: #e5484d; color: #fff; }
+.emergency-actions .emergency-report { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: none; }
+.emergency-actions .emergency-quiet { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.emergency-actions .emergency-quiet:hover { background: var(--glass); border-color: var(--line); }
+.emergency-actions .account-button { min-width: 40px; padding: 0 10px; border-radius: 999px; background: var(--ink); border-color: var(--ink); color: #fff; font-size: 12px; letter-spacing: .04em; box-shadow: none; }
+.chips .chip-scenario { display: inline-flex; align-items: center; gap: 7px; }
+.hazard-chip { display: inline-flex; align-items: center; gap: 6px; }
+.hazard-chip .hazard-dot, .chips .hazard-dot { width: 8px; height: 8px; }
+.hazard-swatch { flex: none; width: 12px; height: 12px; margin-top: 8px; border-radius: 3px; }
+.hazard-swatch--fire { background: #e5484d; }
+.hazard-swatch--water { background: #2f80ed; }
+.hazard-swatch--electrical { background: #f5a623; }
+.hazard-subhead { margin: 14px 14px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .button--danger { border-color: #e5484d; background: #e5484d; color: #fff; }
 
 .hazard-chip { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 12px; font-weight: 600; color: var(--ink); }
 .hazard-chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: #fff; }
-.hazard-chip--fire:hover, .hazard-chip--fire[aria-pressed="true"] { border-color: #e5484d; background: #e5484d; color: #fff; }
-.hazard-chip--water:hover, .hazard-chip--water[aria-pressed="true"] { border-color: #2f80ed; background: #2f80ed; color: #fff; }
-.hazard-chip--electrical:hover, .hazard-chip--electrical[aria-pressed="true"] { border-color: #f5a623; background: #f5a623; color: #2b2b2b; }
+.hazard-chip:hover { border-color: var(--ink); }
+.hazard-chip--fire[aria-pressed="true"] { border-color: #e5484d; background: #fff1f1; color: #b42318; }
+.hazard-chip--water[aria-pressed="true"] { border-color: #2f80ed; background: #eef5ff; color: #1d5bb8; }
+.hazard-chip--electrical[aria-pressed="true"] { border-color: #f5a623; background: #fff7e8; color: #8a5a00; }
 .room-card-simulate { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .room-card-simulate > span { width: 100%; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 
 /* Alarm banners: top centre, over the map. */
 .alarm-banners { position: absolute; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; gap: 6px; width: min(640px, calc(100vw - 24px)); }
-.alarm-banner { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; color: #fff; font-size: 13px; box-shadow: 0 12px 40px rgba(229, 72, 77, .35); animation: alarm-pulse 1.4s ease-in-out infinite; }
-.alarm-banner--fire { background: #e5484d; }
-.alarm-banner--water { background: #2f80ed; box-shadow: 0 12px 40px rgba(47, 128, 237, .35); }
-.alarm-banner--electrical { background: #f5a623; color: #2b2b2b; box-shadow: 0 12px 40px rgba(245, 166, 35, .35); }
+.alarm-banner { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border: 1px solid var(--line); border-left: 4px solid #e5484d; border-radius: 12px; background: #fff; color: var(--text); font-size: 13px; box-shadow: var(--shadow); }
+.alarm-banner--water { border-left-color: #2f80ed; }
+.alarm-banner--electrical { border-left-color: #f5a623; }
 .alarm-icon { font-size: 18px; }
 .alarm-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.alarm-banner button { flex: none; min-height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .22); color: inherit; font-size: 12px; font-weight: 700; }
-.alarm-banner button:first-of-type { background: #fff; color: #2b2b2b; }
+.alarm-banner button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font-size: 12px; font-weight: 600; }
+.alarm-banner button:first-of-type { border-color: var(--ink); background: var(--ink); color: #fff; }
 @keyframes alarm-pulse { 50% { transform: scale(1.012); filter: brightness(1.08); } }
 
 /* Hazard panel: bottom sheet on phones, left column on desktop. */
 .hazard-panel { position: absolute; z-index: 5; left: 8px; right: 8px; bottom: 8px; max-height: 52vh; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 .hazard-panel--live { border-color: #e5484d; }
+/* Phones: the panel sits under the header; playback and the question bar stay at the bottom. */
+.experience--hazard .hazard-panel { bottom: auto; top: calc(64px + var(--safe-top)); max-height: 42vh; }
+/* Desktop: three fixed zones, nothing overlaps. Left: conversation (when started). Right: the hazard panel.
+   Centre: the model, with the playback bar and the question bar stacked at its bottom. */
 @media (min-width: 900px) {
-  .hazard-panel { top: 76px; bottom: 16px; right: 16px; left: auto; width: 420px; max-height: none; }
-  .experience--hazard .floor-rail { right: 452px; }
+  .experience--hazard { --side: 424px; --left: 24px; }
+  .experience--hazard.experience--started { --left: 408px; }
+  .experience--hazard .hazard-panel { top: 76px; bottom: 24px; right: 24px; left: auto; width: 400px; max-height: none; }
+  .experience--hazard .dock { left: var(--left); right: var(--side); bottom: 24px; transform: none; width: auto; max-width: 720px; margin: 0 auto; padding: 0 24px; gap: 10px; }
+  .experience--hazard .floor-rail { right: calc(var(--side) + 16px); }
+  .experience--hazard .attribution { right: calc(var(--side) + 16px); }
 }
 .hazard-head { display: flex; gap: 12px; align-items: flex-start; padding: 14px 14px 10px; border-bottom: 1px solid var(--line); }
-.hazard-panel--fire .hazard-head { background: linear-gradient(180deg, #fff1f1, #fff); }
-.hazard-panel--water .hazard-head { background: linear-gradient(180deg, #eef5ff, #fff); }
-.hazard-panel--electrical .hazard-head { background: linear-gradient(180deg, #fff7e8, #fff); }
+
 .hazard-icon { font-size: 28px; line-height: 1; }
 .hazard-head > div { flex: 1; min-width: 0; }
 .hazard-kicker { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
@@ -55,7 +72,7 @@
 .hazard-stat { display: flex; flex-direction: column; padding: 8px; border-radius: 12px; background: var(--paper); }
 .hazard-stat strong { font-size: 20px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .hazard-stat span { font-size: 11px; color: var(--muted); }
-.hazard-cascade { margin: 0 14px 8px; padding: 6px 10px; border-radius: 10px; background: #fff7e8; font-size: 12px; }
+.hazard-cascade { margin: 0 14px 8px; padding: 6px 10px; border-left: 3px solid #f5a623; background: var(--paper); font-size: 12px; color: var(--text); }
 .hazard-tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); }
 .hazard-tabs button { flex: 1; padding: 9px 4px; border: 0; border-bottom: 2px solid transparent; background: none; font-size: 12px; font-weight: 600; color: var(--muted); }
 .hazard-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
@@ -85,7 +102,7 @@
 .hazard-action[class*="is-"] { opacity: 1; }
 .hazard-action.is-dialing, .hazard-action.is-in_progress { background: #fffbea; }
 .hazard-action.is-confirmed, .hazard-action.is-done { background: #f1faf3; }
-.hazard-action-icon { font-size: 18px; }
+.hazard-action-icon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); color: var(--muted); font-size: 11px; font-weight: 700; }
 .hazard-action strong { color: var(--ink); font-size: 13px; }
 .hazard-action p { margin: 2px 0; color: var(--text); }
 .hazard-contact { color: var(--muted); }
@@ -125,10 +142,10 @@
 .hazard-drill-bar span { display: block; height: 100%; background: #2f8f5b; transition: width .2s; }
 
 /* Header badge while a simulation or incident is open */
-.mode-badge { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border: 1px solid #f5a623; border-radius: 999px; background: #fff7e8; color: #8a5a00; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-.mode-badge i { width: 8px; height: 8px; border-radius: 50%; background: #f5a623; animation: alarm-pulse 1.2s infinite; }
+.mode-badge { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.mode-badge i { width: 8px; height: 8px; border-radius: 50%; background: #f5a623; }
 .mode-badge--live { border-color: #e5484d; background: #fff1f1; color: #b42318; }
-.mode-badge--live i { background: #e5484d; }
+.mode-badge--live i { background: #e5484d; animation: alarm-pulse 1.2s infinite; }
 
 /* Overview: numbered response steps */
 .hazard-steps { list-style: none; margin: 0; padding: 6px 14px 10px; }
@@ -148,14 +165,17 @@
 .hazard-responder.is-ok i { background: #2f8f5b; }
 .hazard-responder.is-busy i { background: #f5a623; animation: alarm-pulse 1s infinite; }
 .hazard-step-actions { padding-top: 12px; }
-.hazard-run { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; box-shadow: 0 8px 24px rgba(240, 92, 3, .25); }
-.hazard-run:hover { background: var(--accent-hover); }
+.hazard-run { width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; }
+.hazard-run:hover { background: #001a57; }
 
 /* Scenario playback bar under the model */
-.hazard-playback { position: absolute; z-index: 4; max-width: 640px; margin: 0 auto; padding: 10px 14px 6px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.hazard-playback { padding: 8px 14px 4px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
 .hazard-playback-head { display: flex; justify-content: space-between; font-size: 13px; }
 .hazard-playback-head strong { color: var(--ink); }
 .hazard-playback-head span { color: var(--muted); font-size: 12px; }
 .hazard-playback .hazard-timeline { padding: 6px 0 4px; }
 .hazard-playback .hazard-play { background: var(--blue); }
 .hazard-playback .hazard-clock { min-width: 36px; font-weight: 500; color: var(--muted); font-size: 12px; text-align: center; }
+
+.hazard-step .hazard-drill-bar { height: 6px; margin-top: 8px; border-radius: 999px; background: var(--paper); overflow: hidden; }
+.hazard-step .hazard-drill-bar span { display: block; height: 100%; background: #2f8f5b; transition: width .2s; }

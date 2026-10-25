@@ -14,7 +14,8 @@ const PER_ROOM = 4;
 const QUEUE_MIN = 0.06;  // figures from one room leave a few seconds apart
 const BODY = new THREE.CapsuleGeometry(0.24, 1.05, 4, 10);
 BODY.translate(0, 0.765, 0); // stand on y = 0
-const COLORS = { waiting: new THREE.Color('#002478'), walking: new THREE.Color('#f05c03'), queue: new THREE.Color('#f5a623'), safe: new THREE.Color('#2f8f5b'), trapped: new THREE.Color('#e5484d') };
+// Few states, quiet colours: grey waiting, navy moving (walking or queuing), green safe, red only when trapped.
+const COLORS = { waiting: new THREE.Color('#9aa3b2'), walking: new THREE.Color('#002478'), queue: new THREE.Color('#002478'), safe: new THREE.Color('#2f8f5b'), trapped: new THREE.Color('#e5484d') };
 
 interface Figure { path: THREE.Vector3[]; floors: string[]; lengths: number[]; total: number; start: number; out: number; offset: THREE.Vector2; cutOff: boolean; exitOut: THREE.Vector3 }
 

@@ -35,7 +35,8 @@ const palette = {
   stop: '#8a3fc4',
 };
 /** Synera path gradient, sampled from their stage imagery. */
-const routeGradient = ['#2f55d4', '#8a3fc4', '#e04f9a', '#f26b4f'].map(c => new THREE.Color(c));
+// Routes: one calm blue, slightly darker at the start so the direction still reads.
+const routeGradient = ['#1e3a8a', '#2563eb'].map(c => new THREE.Color(c));
 const lift: Record<Tone, number> = { primary: 1, secondary: 0.2, muted: 0.1 };
 
 /** Pixels covered by UI on each side; the camera frames the model in the remaining area. */
@@ -59,6 +60,10 @@ interface Props {
   myRoom?: string;
   /** "Simulate here" on a tapped room: what if a fire, a leak or a power fault starts in it? */
   onSimulate?(spaceId: string, hazard: HazardKind): void;
+  /** Map style chosen outside the scene (the platform sidebar); when set, the scene shows no switch of its own. */
+  mapStyle?: SceneStyle;
+  /** The room currently selected on the model (or null), e.g. to prefill a report. */
+  onSelectRoom?(spaceId: string | null): void;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -74,7 +79,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
@@ -109,6 +114,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   }, []);
   const inspect = useCallback((id: string | null) => { setHovered(id); document.body.style.cursor = id ? 'help' : ''; }, []);
   const select = useCallback((id: string) => setSelected({ id, directive: directiveKey }), [directiveKey]);
+  useEffect(() => { onSelectRoom?.(picked); }, [picked, onSelectRoom]);
   // Esc first leaves a zoomed-in room (back to its floor) before the page's own Esc handling.
   useEffect(() => {
     if (!picked) return;
@@ -123,7 +129,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   // Phones get a lighter GPU budget: lower pixel ratio and smaller shadow maps.
   const coarse = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
   // Like a map/satellite switch: plain blocks or the detailed model with walls, floors and furniture. Remembered per browser.
-  const [style, setStyle] = useState<SceneStyle>(() => (localStorage.getItem(STYLE_KEY) === 'detailed' ? 'detailed' : 'blocks'));
+  const [ownStyle, setStyle] = useState<SceneStyle>(() => (localStorage.getItem(STYLE_KEY) === 'detailed' ? 'detailed' : 'blocks'));
+  const style = mapStyle ?? ownStyle;
   const chooseStyle = (next: SceneStyle) => { setStyle(next); localStorage.setItem(STYLE_KEY, next); };
   const detailed = style === 'detailed';
   const textures = useTextures(detailed);
@@ -162,15 +169,14 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
       <div className="scene-anchors">
         {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
-      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + 84 }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
-      <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
+      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + (mapStyle ? 12 : 84) }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
+      {!mapStyle && <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
         {(['blocks', 'detailed'] as const).map(option => (
-          <button type="button" key={option} className={`scene-style-option scene-style-option--${option}`} aria-pressed={style === option} onClick={() => chooseStyle(option)}>
-            <span className="scene-style-preview" aria-hidden />
+          <button type="button" key={option} className="scene-style-option" aria-pressed={style === option} onClick={() => chooseStyle(option)}>
             {option === 'blocks' ? 'Blocks' : 'Detailed'}
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -291,7 +297,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.56 : directive.focus.mode === 'xray' ? 0.6 : 0.72);
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 1 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
     const polar = room ? 0.32 : directive.focus.mode === 'floor' ? 0.5 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.95;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
@@ -313,7 +319,8 @@ function roomBox(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: s
   m.geometry.computeBoundingBox();
   const b = m.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, poses.get(m.space.floor_id)?.y ?? 0, 0));
   const c = b.getCenter(new THREE.Vector3());
-  const half = Math.max(b.max.x - b.min.x, b.max.z - b.min.z, 9) / 2 + 1;
+  // Enough of the surroundings to keep one's bearings: at least 18 m across.
+  const half = Math.max(b.max.x - b.min.x, b.max.z - b.min.z, 18) / 2 + 2;
   return new THREE.Box3(new THREE.Vector3(c.x - half, b.min.y, c.z - half), new THREE.Vector3(c.x + half, b.min.y + 1, c.z + half));
 }
 
@@ -629,14 +636,14 @@ function RoomCard({ model, spaceId, style, onRoute, onSetLocation, myRoom, onSim
       {(onRoute || onSetLocation) && (
         <div className="room-card-actions">
           {onRoute && !here && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}
-          {onSetLocation && (here ? <span className="scene-tip-here">📍 You are here</span> : <button type="button" onClick={() => onSetLocation(spaceId)}>I&apos;m here</button>)}
+          {onSetLocation && (here ? <span className="scene-tip-here">You are here</span> : <button type="button" className="room-card-secondary" onClick={() => onSetLocation(spaceId)}>I&apos;m here</button>)}
         </div>
       )}
       {onSimulate && (
         <div className="room-card-simulate" role="group" aria-label="Simulate here">
           <span>Simulate here</span>
           {(['fire', 'water', 'electrical'] as const).map(kind => (
-            <button type="button" key={kind} className={`hazard-chip hazard-chip--${kind}`} onClick={() => onSimulate(spaceId, kind)}>{hazardMeta[kind].icon} {kind === 'electrical' ? 'Power' : hazardMeta[kind].label.split(' ')[0]}</button>
+            <button type="button" key={kind} className={`hazard-chip hazard-chip--${kind}`} onClick={() => onSimulate(spaceId, kind)}><i className={`hazard-dot hazard-dot--${kind}`} />{kind === 'electrical' ? 'Power' : hazardMeta[kind].label.split(' ')[0]}</button>
           ))}
         </div>
       )}

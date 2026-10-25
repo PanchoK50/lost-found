@@ -33,7 +33,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
   const [text, setText] = useState('');
   const [place, setPlace] = useState(myRoom ?? '');
   const [assessment, setAssessment] = useState<Assessment>();
-  const [hazard, setHazard] = useState<HazardKind>('water');
+  const [hazard, setHazard] = useState<HazardKind>();
   const [severity, setSeverity] = useState<1 | 2 | 3>(2);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -60,6 +60,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
   }
 
   function raise() {
+    if (!hazard) { setError('Choose fire, water or electrical.'); return; }
     if (!place) { setError('Pick the room.'); return; }
     onRaise({
       id: crypto.randomUUID(), buildingId: building.building.id, hazard, spaceId: place, severity,
@@ -73,7 +74,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
       <div className="report-damage">
         <label className="report-photo">
           {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL, nothing to optimise */}
-          {photo ? <img src={photo} alt="Your photo" /> : <span>📷 Take or choose a photo</span>}
+          {photo ? <img src={photo} alt="Your photo" /> : <span>Add a photo</span>}
           <input type="file" accept="image/*" capture="environment" onChange={async event => {
             const file = event.target.files?.[0];
             if (file) { setPhoto(await downscale(file)); setAssessment(undefined); }
@@ -84,7 +85,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
 
         {assessment && (
           <div className={`report-assessment${assessment.immediate_danger ? ' report-assessment--danger' : ''}`}>
-            <strong>{assessment.hazard === 'none' ? 'No damage recognised' : `${hazardMeta[assessment.hazard].icon} ${assessment.title}`}</strong>
+            <strong>{assessment.hazard === 'none' ? 'No damage recognised' : assessment.title}</strong>
             <p>{assessment.description}</p>
             {assessment.hazard !== 'none' && <span>Severity {assessment.severity}/3 · {Math.round(assessment.confidence * 100)}% sure{assessment.immediate_danger ? ' · danger to people' : ''}</span>}
           </div>
@@ -93,7 +94,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
         <label className="report-field">What is it?
           <div className="report-kinds" role="group">
             {(['fire', 'water', 'electrical'] as const).map(kind => (
-              <button type="button" key={kind} className={`hazard-chip hazard-chip--${kind}`} aria-pressed={hazard === kind} onClick={() => setHazard(kind)}>{hazardMeta[kind].icon} {hazardMeta[kind].label}</button>
+              <button type="button" key={kind} className={`hazard-chip hazard-chip--${kind}`} aria-pressed={hazard === kind} onClick={() => setHazard(kind)}>{hazardMeta[kind].label}</button>
             ))}
           </div>
         </label>
@@ -108,7 +109,7 @@ export function ReportDamage({ building, myRoom, reporter, onRaise, onClose }: {
           <SpaceSelect building={building} value={place} onChange={setPlace} empty="Pick the room" />
         </label>
         {error && <p className="hazard-error">{error}</p>}
-        <button type="button" className="button button--danger" onClick={raise}>🚨 Raise the alarm</button>
+        <button type="button" className="button button--danger" onClick={raise} disabled={!hazard || !place}>Raise the alarm</button>
       </div>
     </Sheet>
   );
