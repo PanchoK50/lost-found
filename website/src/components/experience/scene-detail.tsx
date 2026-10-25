@@ -70,9 +70,8 @@ export function useTextures(enabled: boolean) {
 
 // ---------- walls and doors ----------
 
-const WALL_THICKNESS = 0.22;
-/** Facades read as load-bearing: thicker than partitions. */
-const FACADE_THICKNESS = 0.42;
+/** One uniform wall thickness, a touch slimmer than a real plan cut so the drawing stays light. */
+const WALL_THICKNESS = 0.2;
 /** Wall tops are a soft grey, like cut foam-board, so the plan reads without heavy black lines; sides stay light. */
 const WALL_TOP = new THREE.Color('#a3adbc').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
 const WALL_UV_HEIGHT = 2.5;
@@ -171,7 +170,7 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
   const seen = new Set<string>();
   const angle = new Map<string, number>();
   const key = (p: Point) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`;
-  // Facades are edges with exactly one indoor space on either side; they get a thicker wall than the partitions.
+  // Facade edges (exactly one indoor space on either side) get full height even next to outdoor ground.
   const edgeSpaces = new Map<string, Space[]>();
   for (const { space } of floor.spaces) {
     const ring = cleanRing(space.polygon);
@@ -193,7 +192,6 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
       if (length < 0.05) continue;
       const ux = dx / length, uy = dy / length;
       const neighbours = edgeSpaces.get(edge) ?? [space];
-      const facade = neighbours.filter(s => s.type !== 'outdoor').length === 1;
       const height = neighbours.some(s => s.type !== 'outdoor') ? 1 : OUTDOOR_WALL_FACTOR;
       const gaps: [number, number][] = [];
       for (const door of doors) {
@@ -206,8 +204,7 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
         }
       }
       for (const [s, e] of solidIntervals(length, gaps)) {
-        const a = toWorld([p[0] + ux * s, p[1] + uy * s]), b = toWorld([p[0] + ux * e, p[1] + uy * e]);
-        addWallBox(walls, a, b, 0, height, facade ? FACADE_THICKNESS : WALL_THICKNESS);
+        addWallBox(walls, toWorld([p[0] + ux * s, p[1] + uy * s]), toWorld([p[0] + ux * e, p[1] + uy * e]), 0, height, WALL_THICKNESS);
       }
     }
   }
