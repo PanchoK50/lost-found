@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type Ref } from 'react';
 import type { Building } from '@/lib/buildings/types';
 import { hazardMeta, type ImpactRoom, type PlaybookAction, type Relation } from '@/lib/hazards/types';
-import type { HazardView } from './use-hazard';
+import { evacuationProgress, type HazardView } from './use-hazard';
 
 const RELATION_LABEL: Record<Relation, string> = {
   origin: 'Where it started', below: 'Floor below', 'next door': 'Next door', above: 'Floor above', 'same floor': 'Same floor', 'other floor': 'Other floors',
@@ -32,6 +32,7 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
   const assets = useMemo(() => (data?.impact.assets_at_risk ?? []).filter(a => a.arrival_min <= view.t + 1e-6), [data, view.t]);
   const powerOut = reached.filter(r => r.kind === 'electrical').length;
   const minutes = data?.simulation.minutes ?? 30;
+  const progress = data?.evacuation ? evacuationProgress(data, view.t) : undefined;
 
   return (
     <aside ref={panelRef} className={`hazard-panel hazard-panel--${view.hazard}${view.mode === 'incident' ? ' hazard-panel--live' : ''}`} aria-label={`${meta.label} in ${origin?.name}`}>
@@ -69,12 +70,18 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
           <Stat value={assets.length} label="critical assets" />
           {(powerOut > 0 || view.hazard === 'electrical') && <Stat value={powerOut} label="without power" />}
         </div>
+        {progress && progress.total > 0 && (
+          <div className="hazard-drill" aria-live="polite">
+            <div className="hazard-drill-bar"><span style={{ width: `${(100 * progress.out) / progress.total}%` }} /></div>
+            <span>🏃 <strong>{progress.out}</strong> of {progress.total} people safe{progress.out >= progress.total - progress.trapped && progress.total - progress.trapped > 0 ? ` · all out by +${progress.lastOutMin.toFixed(1)} min` : ''}{progress.trapped ? ` · ${progress.trapped} trapped` : ''}</span>
+          </div>
+        )}
         {data.impact.cascades.filter(c => c.at_min <= view.t).map(c => (
           <p key={c.circuit} className="hazard-cascade">⚡ {c.reason}: power cut on that circuit (+{Math.round(c.at_min)} min).</p>
         ))}
 
         <nav className="hazard-tabs" role="tablist">
-          {(['rooms', 'assets', ...(data.evacuation ? ['evacuation' as const] : []), 'response'] as Tab[]).map(t => (
+          {(['rooms', 'assets', ...(data.evacuation?.walkers.length ? ['evacuation' as const] : []), 'response'] as Tab[]).map(t => (
             <button type="button" role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t === 'rooms' ? 'Rooms' : t === 'assets' ? 'Assets' : t === 'evacuation' ? 'Evacuation' : 'Response'}</button>
           ))}
         </nav>
@@ -92,13 +99,16 @@ export function HazardPanel({ building, view, panelRef, onT, onPlay, onStartResp
           ) : <p className="hazard-empty">No critical equipment hit yet.</p>)}
           {tab === 'evacuation' && data.evacuation && (
             <div className="hazard-evac">
-              <p><strong>{data.evacuation.people}</strong> people to get out · longest way {Math.round(data.evacuation.longest_m)} m (about {Math.max(1, Math.round(data.evacuation.longest_min))} min) · lifts off.</p>
+              <p><strong>{data.evacuation.people}</strong> people to get out · longest way {Math.round(data.evacuation.longest_m)} m · everyone out by <strong>+{data.evacuation.all_out_min.toFixed(1)} min</strong>{view.hazard === 'fire' ? ' · lifts off' : ''}.</p>
+              {data.evacuation.exits.length > 1 && data.evacuation.exits[0].people > 0.7 * data.evacuation.people && (
+                <p className="hazard-cascade">🚪 Bottleneck: {Math.round((100 * data.evacuation.exits[0].people) / data.evacuation.people)}% of people use one exit ({data.evacuation.exits[0].width_m.toFixed(1)} m wide, clear at +{data.evacuation.exits[0].clear_min.toFixed(1)} min). Signpost the other exits.</p>
+              )}
               {data.evacuation.cut_off.length > 0 && <p className="hazard-error">{data.evacuation.cut_off.length} rooms cut off by the fire: {data.evacuation.cut_off.slice(0, 4).map(c => c.name).join(', ')}. Rescue needed.</p>}
               <ul className="hazard-list">
                 {data.evacuation.exits.slice(0, 5).map(exit => {
                   const opening = building.openings.find(o => o.id === exit.opening_id);
                   const inside = building.spaces.find(s => opening?.space_ids.includes(s.id));
-                  return <li key={exit.opening_id}><span className="hazard-row"><strong>Exit by {inside?.name ?? 'entrance'}</strong><span>{exit.people} people</span></span></li>;
+                  return <li key={exit.opening_id}><span className="hazard-row"><strong>Exit by {inside?.name ?? 'entrance'}</strong><span>{exit.people} people · clear +{exit.clear_min.toFixed(1)} min</span></span></li>;
                 })}
               </ul>
             </div>

@@ -11,6 +11,7 @@ import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, ty
 import type { WorldState } from '@/lib/world/types';
 import { hazardMeta, type HazardKind } from '@/lib/hazards/types';
 import { worldAnchors } from '@/components/world/world-anchors';
+import { People } from './scene-people';
 import { DetailedAssets, Doors, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
 /**
@@ -84,7 +85,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   }, [directive.hazards]);
   const overview = directive.focus.mode === 'building';
   // Hazard levels change every frame while a simulation plays: they must not reset labels, routes or the tapped room.
-  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined }), [directive]);
+  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined, minute: undefined, evacuees: undefined }), [directive]);
   const [hovered, setHovered] = useState<string | null>(null);
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
@@ -127,6 +128,12 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   const detailed = style === 'detailed';
   const textures = useTextures(detailed);
   const models = useAssetModels(useMemo(() => building.assets.map(asset => asset.type), [building]), detailed);
+  // Where people stand on a floor: on the slab (detailed) or on the block tops (blocks).
+  const floorBase = useCallback((floorId: string) => {
+    const f = model.floors.find(floor => floor.floor.id === floorId);
+    const pose = poses.get(floorId);
+    return detailed ? SLAB : f && pose ? blockHeight(f.storey, pose.flat) : 0;
+  }, [model, poses, detailed]);
 
   return (
     <div className="scene-root">
@@ -142,6 +149,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
           <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
+        {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
         {directive.focus.mode === 'floor' && directive.focus.around && (
           <Cursor key={`cursor-${directiveKey}`} position={worldAt(model, poses, { floorId: directive.focus.floorId, position: directive.focus.around }, 1.7)} />

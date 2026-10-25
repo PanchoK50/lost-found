@@ -124,4 +124,8 @@ export interface SceneDirective {
   hazards?: { spaceId: string; kind: 'fire' | 'water' | 'electrical'; level: number }[];
   /** Frame the whole focused floor(s) instead of the highlights and routes (emergency views). */
   frameAll?: boolean;
+  /** Evacuation drill: people per room and their way out; they move with `minute` at `walkMPerMin`. */
+  evacuees?: { id: string; path: FloorPoint[]; startMin: number; outMin?: number; count: number; cutOff?: boolean }[];
+  minute?: number;
+  walkMPerMin?: number;
 }

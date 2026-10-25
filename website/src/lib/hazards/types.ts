@@ -26,8 +26,12 @@ export interface Evacuation {
   rooms: { space_id: string; name: string; floor: string; people: number; distance_m: number; minutes: number; exit: string }[];
   cut_off: { space_id: string; name: string; floor: string; people: number }[];
   longest_m: number; longest_min: number;
-  exits: { opening_id: string; people: number; position: [number, number]; floor_id: string }[];
+  exits: { opening_id: string; people: number; position: [number, number]; floor_id: string; width_m: number; clear_min: number }[];
   routes: { space_id: string; name: string; exit: string; distance_m: number; polylines: { floor_id: string; level: number; points: [number, number][] }[]; space_path: string[] }[];
+  /** Per room: its people and the way out as [floor_id, x, y] points, for the walking-people animation. */
+  walkers: { space_id: string; people: number; distance_m: number; start_min: number; out_min?: number; exit?: string; cut_off?: boolean; path: [string, number, number][] }[];
+  all_out_min: number;
+  walk_m_per_min: number;
 }
 export interface Contact { id: string; role: string; name: string; phone: string; eta_min: number | null }
 export interface PlaybookAction {

@@ -20,7 +20,9 @@ export interface HazardView {
   responseStartedAt?: number;
 }
 
-const PLAY_SECONDS = 18;
+const PLAY_SECONDS = 30;
+const SLOW_MIN = 6;
+const SLOW_SECONDS = 20;
 
 export function useHazard(building: Building) {
   const [view, setView] = useState<HazardView | null>(null);
@@ -63,7 +65,9 @@ export function useHazard(building: Building) {
       last = now;
       setView(current => {
         if (!current || !current.playing) return current;
-        const t = Math.min(minutes, current.t + (dt * minutes) / PLAY_SECONDS);
+        // The first minutes (alarm, people walking out) play slowly; the rest of the spread faster.
+        const rate = current.t < SLOW_MIN ? SLOW_MIN / SLOW_SECONDS : (minutes - SLOW_MIN) / Math.max(1, PLAY_SECONDS - SLOW_SECONDS);
+        const t = Math.min(minutes, current.t + dt * rate);
         return { ...current, t, playing: t < minutes };
       });
       frame = requestAnimationFrame(tick);
@@ -95,8 +99,12 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
   const routes: SceneDirective['routes'] = view.hazard === 'fire' && data?.evacuation && view.t >= 1
     ? data.evacuation.routes.slice(0, 6).map(route => ({ spacePath: route.space_path, points: route.polylines.flatMap(run => run.points.map(position => ({ floorId: run.floor_id, position }) as FloorPoint)), label: route.name }))
     : undefined;
+  const evacuees = data ? evacueesOf(data) : undefined;
   return {
     focus,
+    evacuees,
+    minute: view.t,
+    walkMPerMin: data?.evacuation?.walk_m_per_min,
     // The whole floor stays in view while the spread plays; a room tapped in the panel zooms to it.
     frameAll: !focusRoom,
     hazards,
@@ -105,6 +113,35 @@ export function hazardDirective(building: Building, view: HazardView, focusRoom?
     highlights: focusRoom ? [{ spaceId: focusRoom, tone: 'secondary' }] : undefined,
     closed: view.hazard === 'fire' && data?.evacuation ? data.evacuation.lifts_off : undefined,
   };
+}
+
+// One evacuee list per simulation result: the scene rebuilds its figures only when this changes, not every frame.
+const evacueeCache = new WeakMap<SimulateResponse, NonNullable<SceneDirective['evacuees']>>();
+function evacueesOf(data: SimulateResponse) {
+  let list = evacueeCache.get(data);
+  if (!list) {
+    list = (data.evacuation?.walkers ?? []).map(w => ({
+      id: w.space_id, startMin: w.start_min, outMin: w.out_min, count: w.people, cutOff: w.cut_off,
+      path: w.path.map(([floorId, x, y]) => ({ floorId, position: [x, y] as [number, number] })),
+    }));
+    evacueeCache.set(data, list);
+  }
+  return list;
+}
+
+/** People already out at minute t, and when the last one is out. */
+export function evacuationProgress(data: SimulateResponse, t: number) {
+  const walkers = data.evacuation?.walkers ?? [];
+  const speed = data.evacuation?.walk_m_per_min ?? 60;
+  let out = 0, total = 0, trapped = 0, last = 0;
+  for (const w of walkers) {
+    total += w.people;
+    if (w.cut_off) { trapped += w.people; continue; }
+    const arrive = w.out_min ?? w.start_min + w.distance_m / speed;
+    last = Math.max(last, arrive);
+    if (t >= arrive) out += w.people;
+  }
+  return { out, total, trapped, lastOutMin: last };
 }
 
 function centroid(polygon: [number, number][]): [number, number] {

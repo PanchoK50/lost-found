@@ -400,7 +400,7 @@ def simulate_hazard(request: SimulateRequest) -> dict:
     minutes = max(1.0, min(request.minutes, 120.0))
     result = hazard_spread.simulate(building, request.hazard, request.space_id, minutes)
     summary = hazard_impact.impact(building, result)
-    evacuation = hazard_evacuation.evacuate(building, result, request.evacuate_at_min) if request.hazard == "fire" else None
+    evacuation = hazard_evacuation.evacuate(building, result, request.evacuate_at_min)
     return {
         "building_id": request.building_id, "simulation": result, "impact": summary, "evacuation": evacuation,
         "playbook": hazard_playbooks.plan(building, summary, evacuation, request.severity, request.contacts),
