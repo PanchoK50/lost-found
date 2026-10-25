@@ -15,11 +15,11 @@ import { People } from './scene-people';
 import { DetailedAssets, Doors, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
 /**
- * Synera-style model: white, studio-lit blocks on a cool light ground. Orange marks the answer,
+ * Archviz-model look: white, studio-lit model on a warm paper ground. Orange marks the answer,
  * light blue the reference room; routes use Synera's blue → violet → pink → coral path gradient.
  */
 const palette = {
-  background: '#f4f5f7',
+  background: '#edeae3',
   room: '#ffffff',
   hall: '#fafbfc',
   corridor: '#eceff4',
@@ -147,15 +147,16 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
         <fog attach="fog" args={[palette.background, 400, 1400]} />
-        {/* Bright, soft studio light so the model reads white, like Synera's renders. */}
-        <ambientLight intensity={0.55} />
-        <hemisphereLight args={['#ffffff', '#e8edf4', 1.7]} />
-        <directionalLight position={[60, 120, 40]} intensity={1.25} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
+        {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
+        <ambientLight intensity={0.3} />
+        <hemisphereLight args={['#fff6ea', '#dfe3ea', 0.95]} />
+        <directionalLight position={[80, 130, 55]} intensity={1.6} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
+        <Podium model={model} />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
         {directive.focus.mode === 'floor' && directive.focus.around && (
@@ -298,7 +299,8 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
     const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 1 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
-    const polar = room ? 0.32 : directive.focus.mode === 'floor' ? 0.5 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.95;
+    // A lower angle, like an archviz dollhouse render, shows the cut walls and interiors better.
+    const polar = room ? 0.4 : directive.focus.mode === 'floor' ? 0.75 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.95;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
     const smooth = !first.current;
@@ -328,7 +330,10 @@ function damp(current: number, target: number, delta: number, lambda = 4) {
   return THREE.MathUtils.damp(current, target, lambda, delta);
 }
 
-type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset' | 'wall', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial; floors: Record<FloorTexture, THREE.MeshStandardMaterial> };
+type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset' | 'wall' | 'glass', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial; floors: Record<FloorTexture, THREE.MeshStandardMaterial> };
+
+/** Base colours multiplied onto the floor textures, so materials read like an archviz plan (warm wood, grey carpet, cool tiles). */
+const FLOOR_TINTS: Record<FloorTexture, string> = { epoxy: '#e9e6e1', carpet: '#e2e5ea', parquet: '#f2e6d4', tiles: '#eaedef', terrazzo: '#e9e7e2' };
 
 interface FloorViewProps {
   model: FloorModel;
@@ -354,6 +359,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
+  const glassRef = useRef<THREE.Mesh>(null);
   const doors = useRef<THREE.Group>(null);
   const furniture = useRef<THREE.Group>(null);
   const hazardLayer = useRef<THREE.Group>(null);
@@ -367,8 +373,10 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       room: surface(palette.room), hall: surface(palette.hall), corridor: surface(palette.corridor), core: surface(palette.core),
       primary: surface(palette.primary), secondary: surface(palette.secondary), muted: surface(palette.muted), asset: surface(palette.asset),
       wall: Object.assign(surface('#ffffff'), { vertexColors: true }),
+      // Facade glazing between sill and header; faded with the floor's opacity.
+      glass: new THREE.MeshStandardMaterial({ color: '#b9cfdf', roughness: 0.35, metalness: 0, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
       edge: new THREE.LineBasicMaterial({ color: palette.edge, transparent: true }),
-      floors: Object.fromEntries(FLOOR_TEXTURES.map(name => [name, surface('#ffffff')])) as Record<FloorTexture, THREE.MeshStandardMaterial>,
+      floors: Object.fromEntries(FLOOR_TEXTURES.map(name => [name, surface(FLOOR_TINTS[name])])) as Record<FloorTexture, THREE.MeshStandardMaterial>,
     };
   }, []);
   useEffect(() => () => { const { floors, ...rest } = materials; [...Object.values(rest), ...Object.values(floors)].forEach(m => m.dispose()); }, [materials]);
@@ -383,7 +391,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     assign(materials.wall, textures.get('plaster'));
   }, [materials, textures]);
   const detail = useMemo(() => buildFloorDetail(model, toWorld), [model, toWorld]);
-  useEffect(() => () => detail.walls.dispose(), [detail]);
+  useEffect(() => () => { detail.walls.dispose(); detail.glass.dispose(); }, [detail]);
   const assets = useMemo(() => buildAssets(model, toWorld), [model, toWorld]);
   useEffect(() => { if (assets) colorAssets(assets, model, litAssets); }, [assets, model, litAssets]);
 
@@ -406,6 +414,11 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       walls.current.visible = detailed;
       walls.current.position.y = SLAB;
       walls.current.scale.y = wallHeight(model.storey, s.flat);
+    }
+    if (glassRef.current) {
+      glassRef.current.visible = detailed;
+      glassRef.current.position.y = SLAB;
+      glassRef.current.scale.y = wallHeight(model.storey, s.flat);
     }
     if (edges.current) edges.current.visible = !detailed;
     if (doors.current) {
@@ -445,6 +458,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
       <mesh ref={walls} geometry={detail.walls} material={materials.wall} visible={detailed} castShadow receiveShadow raycast={() => null} />
+      <mesh ref={glassRef} geometry={detail.glass} material={materials.glass} visible={detailed} raycast={() => null} />
       <group ref={doors}><Doors doors={detail.doors} /></group>
       <group ref={hazardLayer}>
         {model.spaces.flatMap(m => (hazards.get(m.space.id) ?? []).map(h => (
@@ -489,6 +503,7 @@ function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null
     material.opacity = s.opacity * (overview ? 0.94 : 1);
     material.depthWrite = !ghost;
   }
+  materials.glass.opacity = 0.5 * s.opacity * (overview ? 0.94 : 1);
   materials.edge.opacity = Math.min(1, s.opacity * 1.6) * 0.85;
   materials.asset.opacity = s.opacity * s.flat;
   if (assets) {
@@ -544,7 +559,20 @@ function Ground({ y }: { y: number }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position-y={y} receiveShadow>
       <planeGeometry args={[3000, 3000]} />
-      <shadowMaterial transparent opacity={0.08} />
+      <meshStandardMaterial color="#dcd7cd" roughness={1} />
+    </mesh>
+  );
+}
+
+/** Base plate under the building, like a plinth under a scale model; its top sits just under the slab tops. */
+function Podium({ model }: { model: BuildingModel }) {
+  const base = (model.floors[0]?.floor.elevation_m ?? 0) - 0.02;
+  const width = model.box.maxX - model.box.minX + 6, depth = model.box.maxZ - model.box.minZ + 6;
+  const cx = (model.box.minX + model.box.maxX) / 2, cz = (model.box.minZ + model.box.maxZ) / 2;
+  return (
+    <mesh position={[cx, base + 0.04, cz]} castShadow receiveShadow>
+      <boxGeometry args={[width, 0.12, depth]} />
+      <meshStandardMaterial color="#f1eee7" roughness={0.95} />
     </mesh>
   );
 }

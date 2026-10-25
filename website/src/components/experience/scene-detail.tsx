@@ -11,7 +11,8 @@ export type SceneStyle = 'blocks' | 'detailed';
 /** Detailed style: floors become thin slabs with walls on top; walls drop from storey height to a cut when a floor is opened. */
 export const SLAB = 0.12;
 export function wallHeight(storey: number, flat: number) {
-  const full = storey * 0.92, cut = 2.1;
+  // Cut at ~1.2 m, like an archviz dollhouse plan: interiors read from above, low furniture stays inside.
+  const full = storey * 0.92, cut = 1.25;
   return full + (cut - full) * flat;
 }
 
@@ -69,9 +70,12 @@ export function useTextures(enabled: boolean) {
 
 // ---------- walls and doors ----------
 
-const WALL_THICKNESS = 0.24;
+const WALL_THICKNESS = 0.22;
+/** Facades read as load-bearing: thicker than partitions, with a window band between sill and header. */
+const FACADE_THICKNESS = 0.42;
+const GLASS_SILL = 0.95, GLASS_HEAD = 2.35;
 /** Wall tops are drawn dark so the plan reads like a crisp architectural drawing; sides stay light. */
-const WALL_TOP = new THREE.Color('#5b6577').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
+const WALL_TOP = new THREE.Color('#6b7484').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
 const WALL_UV_HEIGHT = 2.5;
 const OUTDOOR_WALL_FACTOR = 0.35;
 
@@ -79,10 +83,13 @@ export interface DoorMarker { id: string; x: number; z: number; angle: number; w
 export interface FloorDetail {
   /** Unit-height walls with gaps at the doors; scale Y to set their height. */
   walls: THREE.BufferGeometry;
+  /** Unit-height window band on the facades (between sill and header); scale Y together with the walls. */
+  glass: THREE.BufferGeometry;
   doors: DoorMarker[];
 }
 
-export const doorColors = { entrance: '#2f8f5b', door: '#4b6fae', opening: '#9fb4d6', step: '#e2a23a' };
+/** Door thresholds on the slab: green for entrances, amber where there is a step; kept pale so they don't dominate the plan. */
+export const doorColors = { entrance: '#43906c', door: '#7d97c4', opening: '#c3d0e4', step: '#dfb46f' };
 
 class Builder {
   positions: number[] = [];
@@ -145,13 +152,13 @@ function solidIntervals(length: number, gaps: [number, number][]): [number, numb
   return result.filter(([s, e]) => e - s > 0.04);
 }
 
-function addWallBox(builder: Builder, a: [number, number], b: [number, number], height: number) {
+function addWallBox(builder: Builder, a: [number, number], b: [number, number], y0: number, y1: number, thickness: number) {
   const dx = b[0] - a[0], dz = b[1] - a[1];
   const length = Math.hypot(dx, dz);
-  const nx = (-dz / length) * (WALL_THICKNESS / 2), nz = (dx / length) * (WALL_THICKNESS / 2);
+  const nx = (-dz / length) * (thickness / 2), nz = (dx / length) * (thickness / 2);
   const c = [[a[0] + nx, a[1] + nz], [b[0] + nx, b[1] + nz], [b[0] - nx, b[1] - nz], [a[0] - nx, a[1] - nz]];
-  const lo = (i: number) => [c[i][0], 0, c[i][1]];
-  const hi = (i: number) => [c[i][0], height, c[i][1]];
+  const lo = (i: number) => [c[i][0], y0, c[i][1]];
+  const hi = (i: number) => [c[i][0], y1, c[i][1]];
   builder.quad(hi(0), hi(1), hi(2), hi(3), [0, 1, 0]);
   builder.quad(lo(0), lo(1), hi(1), hi(0), [nx, 0, nz]);
   builder.quad(lo(2), lo(3), hi(3), hi(2), [-nx, 0, -nz]);
@@ -162,14 +169,27 @@ function addWallBox(builder: Builder, a: [number, number], b: [number, number], 
 /** Walls along every space outline (shared edges once), with gaps where the doors sit, plus door markers along the wall. */
 export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWorld']): FloorDetail {
   const walls = new Builder();
+  const glass = new Builder();
   const bySpace = new Map<string, Opening[]>();
   for (const opening of floor.openings) for (const id of opening.space_ids) bySpace.set(id, [...(bySpace.get(id) ?? []), opening]);
   const seen = new Set<string>();
   const angle = new Map<string, number>();
   const key = (p: Point) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`;
+  // Facades are edges with exactly one indoor space on either side; they get a thicker wall and a window band.
+  const edgeSpaces = new Map<string, Space[]>();
   for (const { space } of floor.spaces) {
     const ring = cleanRing(space.polygon);
-    const height = space.type === 'outdoor' ? OUTDOOR_WALL_FACTOR : 1;
+    for (let i = 0; i < ring.length; i++) {
+      const edge = [key(ring[i]), key(ring[(i + 1) % ring.length])].sort().join('|');
+      edgeSpaces.set(edge, [...(edgeSpaces.get(edge) ?? []), space]);
+    }
+  }
+  // The window band as a fraction of unit wall height, so it scales with the walls when a floor is cut open.
+  const fullHeight = wallHeight(floor.storey, 0);
+  const sillTop = Math.min(GLASS_SILL / fullHeight, 0.6);
+  const headBottom = Math.min(Math.max(GLASS_HEAD / fullHeight, sillTop + 0.08), 0.98);
+  for (const { space } of floor.spaces) {
+    const ring = cleanRing(space.polygon);
     const doors = bySpace.get(space.id) ?? [];
     for (let i = 0; i < ring.length; i++) {
       const p = ring[i], q = ring[(i + 1) % ring.length];
@@ -180,6 +200,9 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
       const length = Math.hypot(dx, dy);
       if (length < 0.05) continue;
       const ux = dx / length, uy = dy / length;
+      const neighbours = edgeSpaces.get(edge) ?? [space];
+      const facade = neighbours.filter(s => s.type !== 'outdoor').length === 1;
+      const height = neighbours.some(s => s.type !== 'outdoor') ? 1 : OUTDOOR_WALL_FACTOR;
       const gaps: [number, number][] = [];
       for (const door of doors) {
         const rx = door.position[0] - p[0], ry = door.position[1] - p[1];
@@ -191,7 +214,15 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
         }
       }
       for (const [s, e] of solidIntervals(length, gaps)) {
-        addWallBox(walls, toWorld([p[0] + ux * s, p[1] + uy * s]), toWorld([p[0] + ux * e, p[1] + uy * e]), height);
+        const a = toWorld([p[0] + ux * s, p[1] + uy * s]), b = toWorld([p[0] + ux * e, p[1] + uy * e]);
+        if (facade) {
+          // Solid wall below and above the window band; the band itself goes into a translucent mesh.
+          addWallBox(walls, a, b, 0, sillTop, FACADE_THICKNESS);
+          addWallBox(walls, a, b, headBottom, 1, FACADE_THICKNESS);
+          addWallBox(glass, a, b, sillTop, headBottom, FACADE_THICKNESS + 0.04);
+        } else {
+          addWallBox(walls, a, b, 0, height, WALL_THICKNESS);
+        }
       }
     }
   }
@@ -200,7 +231,7 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
     const color = opening.kind === 'entrance' ? doorColors.entrance : !opening.step_free ? doorColors.step : opening.kind === 'opening' ? doorColors.opening : doorColors.door;
     return { id: opening.id, x, z, angle: angle.get(opening.id) ?? 0, width: opening.width_m, color };
   });
-  return { walls: walls.build(), doors };
+  return { walls: walls.build(), glass: glass.build(), doors };
 }
 
 /** Door thresholds: a coloured strip across the wall, green for entrances, amber where there is a step. */
@@ -222,7 +253,7 @@ export function Doors({ doors }: { doors: DoorMarker[] }) {
   if (!doors.length) return null;
   return (
     <instancedMesh key={doors.length} ref={ref} args={[undefined, undefined, doors.length]} raycast={() => null} renderOrder={3}>
-      <boxGeometry args={[1, 0.05, 0.4]} />
+      <boxGeometry args={[1, 0.035, 0.32]} />
       <meshBasicMaterial toneMapped={false} />
     </instancedMesh>
   );
@@ -232,7 +263,22 @@ export function Doors({ doors }: { doors: DoorMarker[] }) {
 
 type AssetModel = { parts: { geometry: THREE.BufferGeometry; material: THREE.Material }[]; size: THREE.Vector3 };
 
-const MODEL_BRIGHTNESS = 1.6;
+const MODEL_BRIGHTNESS = 1.25;
+/** Soft per-type tints, multiplied onto the model's colours, so rooms read more colourful like an archviz plan. */
+const MODEL_TINTS: Record<string, string> = {
+  office_chair: '#dde3ee', chair: '#dfe4ee', dining_chair: '#dfe4ee', outdoor_chair: '#dfe4ee',
+  sofa: '#d9e2f2', armchair: '#d9e2f2', plant: '#d9e9d6',
+  filing_cabinet: '#e4e8ee', locker: '#e4e8ee', tool_cabinet: '#e2e6ec',
+  shelf: '#e8e4da', bookshelf: '#e8e4da', wardrobe: '#e6e3dc', pallet_rack: '#e7e3d9', high_bay_rack: '#e7e3d9', rack: '#e7e3d9',
+  fridge: '#edf0f3', whiteboard: '#f2f4f6', vending_machine: '#dfe7ee', display_screen: '#f2f4f6',
+};
+const tintCache = new Map<string, THREE.Color>();
+/** Instance colour for a model type: its soft tint, or plain white. */
+function modelTint(type: string) {
+  let color = tintCache.get(type);
+  if (!color) { color = new THREE.Color(MODEL_TINTS[type] ?? '#ffffff'); tintCache.set(type, color); }
+  return color;
+}
 /** The generated models face the opposite way to the dataset's footprint rotation (all share one camera angle). */
 const MODEL_YAW_OFFSET = Math.PI;
 const MODEL_YAW_FIXES: Record<string, number> = { lecture_seating_row: Math.PI };
@@ -338,7 +384,7 @@ function modelMatrix(asset: Asset, storey: number, toWorld: BuildingModel['toWor
   return matrix.compose(new THREE.Vector3(x, base, z), new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(scale, scale, scale));
 }
 
-const boxGrey = new THREE.Color('#c9d0db'), modelWhite = new THREE.Color('#ffffff'), lit = new THREE.Color('#f26a1b');
+const boxGrey = new THREE.Color('#c9d0db'), lit = new THREE.Color('#f26a1b');
 
 /** A floor's furniture as 3D models where one exists, boxes otherwise; the answer's items turn orange. */
 export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: FloorModel; toWorld: BuildingModel['toWorld']; models: Map<string, AssetModel>; litAssets: Set<string> }) {
@@ -358,7 +404,7 @@ export function DetailedAssets({ floor, toWorld, models, litAssets }: { floor: F
     {[...byType].flatMap(([type, items]) => {
       const model = models.get(type)!;
       return model.parts.map((part, i) => (
-        <Instances key={`${type}-${i}`} assets={items} litAssets={litAssets} base={modelWhite} geometry={part.geometry} material={part.material} matrixFor={(asset, m) => modelMatrix(asset, floor.storey, toWorld, model.size, m)} />
+        <Instances key={`${type}-${i}`} assets={items} litAssets={litAssets} base={modelTint(type)} geometry={part.geometry} material={part.material} matrixFor={(asset, m) => modelMatrix(asset, floor.storey, toWorld, model.size, m)} />
       ));
     })}
   </>;
