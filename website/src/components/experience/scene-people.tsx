@@ -39,7 +39,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
   /** Walking speed, metres per minute. */
   speed: number;
   /** Height of the walkable surface of a floor (block top or slab), relative to its pose. */
-  floorBase(floorId: string): number;
+  floorBase(floorId: string | null): number;
 }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const now = useRef(minute);
@@ -52,8 +52,8 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
     evacuees.forEach((evacuee, roomIndex) => {
       const n = Math.max(1, Math.round(Math.min(evacuee.count, PER_ROOM) * share));
       const points = evacuee.path.map(p => {
-        const [x, z] = model.toWorld(p.position);
-        return new THREE.Vector3(x, (poses.get(p.floorId)?.y ?? 0) + floorBase(p.floorId), z);
+        const [x, z] = model.toWorld(p.position, p.floorId);
+        return new THREE.Vector3(x, (p.floorId === null ? 0 : poses.get(p.floorId)?.y ?? 0) + floorBase(p.floorId), z);
       });
       if (!points.length) return;
       const lengths = [0];
@@ -66,7 +66,7 @@ export function People({ model, poses, evacuees, minute, speed, floorBase }: {
       for (let i = 0; i < n; i++) {
         const seed = roomIndex * 31 + i * 7 + 1;
         out.push({
-          path: points, floors: evacuee.path.map(p => p.floorId), lengths, total: lengths.at(-1)!, start: evacuee.startMin + i * QUEUE_MIN,
+          path: points, floors: evacuee.path.map(p => p.floorId ?? ''), lengths, total: lengths.at(-1)!, start: evacuee.startMin + i * QUEUE_MIN,
           // Through the exit door once the queue lets them (spread over the room's share of the wait).
           out: evacuee.outMin !== undefined ? Math.max(evacuee.startMin, evacuee.outMin - (n - 1 - i) * QUEUE_MIN) : Infinity,
           offset: new THREE.Vector2((jitter(seed) - 0.5) * 1.6, (jitter(seed + 3) - 0.5) * 1.6), cutOff: !!evacuee.cutOff,

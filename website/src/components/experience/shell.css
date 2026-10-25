@@ -68,6 +68,8 @@
 .shell-examples { display: flex; flex-direction: column; gap: 6px; }
 .shell-examples button { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-align: left; font-size: 13px; color: var(--ink); line-height: 1.35; }
 .shell-examples button:hover { border-color: var(--ink); }
+/* The fixed cross-building example (fourth chip): a hint of the petrol primary marks it as the campus trip. */
+.shell-examples button.shell-example--campus { border-style: dashed; border-color: var(--ink); }
 .shell-ask { padding: 12px; border-top: 1px solid var(--line); }
 .shell .ask { box-shadow: none; }
 .shell-ask .voice-error { margin: 6px 4px 0; }

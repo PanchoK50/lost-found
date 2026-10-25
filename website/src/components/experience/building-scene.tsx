@@ -7,7 +7,7 @@ import { CameraControls, Line } from '@react-three/drei';
 import type { Line2 } from 'three-stdlib';
 import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
-import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
+import { blockHeight, buildCampusModel, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
 import type { WorldState } from '@/lib/world/types';
 import { hazardMeta, type HazardKind } from '@/lib/hazards/types';
 import { worldAnchors } from '@/components/world/world-anchors';
@@ -44,6 +44,8 @@ export interface SceneInsets { top: number; left: number; bottom: number; right?
 
 interface Props {
   building: Building;
+  /** The other campus buildings (cross-building routes): id → building + campus offset; the primary sits at [0, 0]. */
+  site?: Map<string, { building: Building; offset: [number, number] }>;
   directive: SceneDirective;
   insets: SceneInsets;
   onFocusFloor(floorId: string): void;
@@ -83,8 +85,21 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject }: Props) {
-  const model = useMemo(() => buildModel(building), [building]);
+export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject }: Props) {
+  const model = useMemo(() => {
+    const members = [...(site?.values() ?? [])];
+    const placed = members.length > 1 || (members.length === 1 && members[0].building.building.id !== building.building.id)
+      ? [{ building, offset: [0, 0] as [number, number] }, ...members.filter(m => m.building.building.id !== building.building.id)]
+      : null;
+    return placed ? buildCampusModel(placed) : buildModel(building);
+  }, [building, site]);
+  // Each floor's geometry lives in its own member's centred frame: bind toWorld to the floor's building.
+  const floorToWorld = useMemo(() => {
+    const bound = new Map<string, BuildingModel['toWorld']>();
+    for (const floor of model.floors) bound.set(floor.floor.id, (point: [number, number]) => model.toWorld(point, floor.floor.id));
+    return bound;
+  }, [model]);
+  const sceneSpan = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
   const hazards = useMemo(() => {
@@ -92,7 +107,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     for (const h of directive.hazards ?? []) if (h.level > 0.02) map.set(h.spaceId, [...(map.get(h.spaceId) ?? []), { kind: h.kind, level: h.level }]);
     return map;
   }, [directive.hazards]);
-  const overview = directive.focus.mode === 'building';
+  const overview = directive.focus.mode === 'building' || directive.focus.mode === 'campus';
   // Hazard levels change every frame while a simulation plays: they must not reset labels, routes or the tapped room.
   // Lit objects (e.g. the chat's selection) don't make a new answer either: the tapped room and camera stay.
   const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined, minute: undefined, evacuees: undefined, assets: undefined }), [directive]);
@@ -141,7 +156,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   const textures = useTextures(detailed);
   const models = useAssetModels(useMemo(() => building.assets.map(asset => asset.type), [building]), detailed);
   // Where people stand on a floor: on the slab (detailed) or on the block tops (blocks).
-  const floorBase = useCallback((floorId: string) => {
+  const floorBase = useCallback((floorId: string | null) => {
+    if (floorId === null) return SLAB;  // the campus ground between buildings
     const f = model.floors.find(floor => floor.floor.id === floorId);
     const pose = poses.get(floorId);
     return detailed ? SLAB : f && pose ? blockHeight(f.storey, pose.flat) : 0;
@@ -151,17 +167,17 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
     <div className="scene-root">
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[palette.background]} />
-        <fog attach="fog" args={[palette.background, 400, 1400]} />
+        <fog attach="fog" args={[palette.background, Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
         {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
         <ambientLight intensity={0.3} />
         <hemisphereLight args={['#fff6ea', '#dfe3ea', 0.95]} />
         <directionalLight position={[80, 130, 55]} intensity={1.6} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
+          <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
             onPickObject={onSelectObject ? (kind, id) => onSelectObject(kind, id) : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
-        <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
+        <Ground y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} />
         <Podium model={model} />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
@@ -302,7 +318,8 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   // Frame the answer: the spaces it names or counts and its reference room, not the background candidates.
   const frame = useMemo(() => directive.frameSpaces ?? (directive.frameAll ? [] : (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId)), [directive.highlights, directive.frameAll, directive.frameSpaces]);
   const routePoints = useMemo(() => (directive.frameAll ? [] : [...(directive.routes ?? []).flatMap(r => r.points ?? []), ...(directive.links ?? []).flatMap(l => [l.from, l.to])]), [directive.routes, directive.links, directive.frameAll]);
-  const focusKey = JSON.stringify([directive.focus, frame, routePoints.length, room]);
+  // The campus grows when the other building arrives: re-frame when the model itself changes.
+  const focusKey = JSON.stringify([directive.focus, frame, routePoints.length, room, model.floors.length]);
   const first = useRef(true);
   useEffect(() => {
     const c = controls.current;
@@ -318,7 +335,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.8 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' || directive.focus.mode === 'campus' ? 0.8 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
     // A lower angle, like an archviz dollhouse render, shows the cut walls and interiors better.
     const polar = room ? 0.4 : directive.focus.mode === 'floor' ? 0.75 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.78;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
@@ -349,7 +366,9 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   useFrame((_, delta) => {
     if (BROLL.on && BROLL.orbit && controls.current) controls.current.rotate(THREE.MathUtils.degToRad(BROLL.orbit) * delta, 0, false);
   });
-  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={1500} maxPolarAngle={Math.PI / 2 - 0.35} />;
+  // A campus can span kilometres (far pairs route too): let the camera reach as far as the scene does.
+  const span = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
+  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.max(1500, span * 4)} maxPolarAngle={Math.PI / 2 - 0.35} />;
 }
 
 /** A room and a little of its surroundings, at least 9 m across so small rooms keep some context. */
@@ -615,7 +634,8 @@ function Podium({ model }: { model: BuildingModel }) {
 }
 
 /** Overlays only belong on floors that are actually shown (not ghosted or lifted away). */
-function shown(poses: Map<string, FloorPose>, floorId: string) {
+function shown(poses: Map<string, FloorPose>, floorId: string | null) {
+  if (floorId === null) return true;  // the campus ground between buildings
   return (poses.get(floorId)?.opacity ?? 0) > 0.5;
 }
 
@@ -626,8 +646,8 @@ function linkCorner(a: [number, number, number], b: [number, number, number]): [
 }
 
 function worldAt(model: BuildingModel, poses: Map<string, FloorPose>, point: FloorPoint, above: number): [number, number, number] {
-  const [x, z] = model.toWorld(point.position);
-  return [x, (poses.get(point.floorId)?.y ?? 0) + above, z];
+  const [x, z] = model.toWorld(point.position, point.floorId);
+  return [x, (point.floorId === null ? 0 : poses.get(point.floorId)?.y ?? 0) + above, z];
 }
 
 function answerAnchors(model: BuildingModel, poses: Map<string, FloorPose>, directive: SceneDirective): Anchor[] {

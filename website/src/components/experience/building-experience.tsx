@@ -49,6 +49,10 @@ type Message = { id: number; role: 'user' | 'assistant'; content: string; respon
 
 interface Props {
   building: Building;
+  /** ?campus=<id>: the campus to open (members with their offsets); cross-building answers extend this at runtime. */
+  campus?: { id: string; members: { buildingId: string; offset: [number, number] }[] };
+  /** ?ask=<question>: asked automatically once the page is ready (the fixed cross-building chip navigates here). */
+  autoAsk?: string;
   buildings: BuildingRow[];
   suggestions: { label: string; question: string }[];
   /** Just created from plans: offer to go through what the importer was unsure about. */
@@ -56,6 +60,8 @@ interface Props {
 }
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
+/** The fixed cross-building example: always offered as the fourth chip, on every building. */
+const CAMPUS_TRIP = { label: 'To another building', question: 'How do I get from N2301 in N3 to N0839 in N8?' };
 /** Matches the desktop breakpoint in globals.css. Phone layout is the default. */
 const wideQuery = '(min-width: 900px)';
 
@@ -67,12 +73,44 @@ function useWide() {
   );
 }
 
-export function BuildingExperience({ building, buildings, suggestions, importIntro }: Props) {
+export function BuildingExperience({ building, buildings, suggestions, importIntro, campus, autoAsk }: Props) {
   const router = useRouter();
   // Wake the Python agent while people read the start screen (cold starts on Vercel).
   useEffect(() => { void fetch('/api/health').catch(() => undefined); }, []);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [directive, setDirective] = useState<SceneDirective>(overview);
+  const [directive, setDirective] = useState<SceneDirective>(() => campus
+    ? { focus: { mode: 'campus', members: campus.members.map(m => ({ buildingId: m.buildingId, offset: m.offset })) } }
+    : overview);
+  // The other campus buildings (cross-building routes): loaded lazily, remembered for the session.
+  const [site, setSite] = useState<Map<string, { building: Building; offset: [number, number] }>>(() => new Map());
+  const ensureSite = useCallback(async (members: { buildingId: string; offset: [number, number] }[]) => {
+    for (const member of members) {
+      if (member.buildingId === building.building.id) continue;
+      setSite(current => {
+        if (current.has(member.buildingId)) {
+          if (current.get(member.buildingId)!.offset[0] === member.offset[0] && current.get(member.buildingId)!.offset[1] === member.offset[1]) return current;
+          const next = new Map(current); next.set(member.buildingId, { ...current.get(member.buildingId)!, offset: member.offset }); return next;
+        }
+        return current;
+      });
+      if (!site.has(member.buildingId)) {
+        try {
+          const res = await fetch(`/api/buildings/${encodeURIComponent(member.buildingId)}`);
+          if (!res.ok) continue;
+          const other = await res.json() as Building;
+          setSite(current => current.has(member.buildingId) ? current : new Map(current).set(member.buildingId, { building: other, offset: member.offset }));
+        } catch { /* the campus answer still works for the primary building */ }
+      }
+    }
+  }, [building.building.id, site]);
+  useEffect(() => { if (campus) void ensureSite(campus.members); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoAsked = useRef(false);
+  useEffect(() => {
+    if (!autoAsk || autoAsked.current) return;
+    autoAsked.current = true;
+    void ask(autoAsk); // eslint-disable-line @typescript-eslint/no-use-before-define -- ask is a hoisted function declaration
+  }, [autoAsk]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (directive.focus.mode === 'campus') void ensureSite(directive.focus.members.map(m => ({ buildingId: m.buildingId, offset: m.offset }))); }, [directive.focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   // Backend conversation id: follow-ups and edits (closed lifts, new doors) stay in one session.
@@ -401,7 +439,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       </aside>
 
       <section className="shell-main">
-        <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} mapStyle={mapStyle} onSelectRoom={setSelectedRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} onSelectRoom={setSelectedRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
       </section>
 
@@ -434,6 +472,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
               )}
               <div className="shell-examples">
                 {suggestions.slice(0, 3).map(s => <button type="button" key={s.label} onClick={() => void ask(s.question)}>{s.question.replace(/ Finish with.*$/, '')}</button>)}
+                {/* One fixed cross-building example on every building: from N3 it just asks, from anywhere else it opens the campus and asks there. */}
+                <button type="button" className="shell-example--campus" onClick={() => {
+                  if (building.building.id === 'osm-way22744230') void ask(CAMPUS_TRIP.question);
+                  else router.push(`/?campus=stammgelaende&ask=${encodeURIComponent(CAMPUS_TRIP.question)}`);
+                }}>{CAMPUS_TRIP.question}</button>
               </div>
             </div>
           )}
@@ -471,7 +514,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                         active={activeStep?.startsWith(`${message.id}:`) ? activeStep.slice(`${message.id}:`.length) : undefined}
                         onStep={(step, key) => {
                           // Fly to the maneuver on its floor, keeping the route and labels of this answer.
-                          setDirective({ ...message.response!.scene, focus: { mode: 'floor', floorId: step.at.floorId, around: step.at.position } });
+                          setDirective({ ...message.response!.scene, ...(step.at.floorId ? { focus: { mode: 'floor' as const, floorId: step.at.floorId, around: step.at.position } } : {}) });
                           setActiveStep(`${message.id}:${key}`);
                         }}
                         onOverview={() => { setDirective(message.response!.scene); setActiveStep(undefined); }}

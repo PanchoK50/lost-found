@@ -22,7 +22,8 @@ export interface FloorModel {
 export interface BuildingModel {
   floors: FloorModel[];
   spaces: Map<string, SpaceModel>;
-  toWorld(point: Point): [number, number];
+  /** `floorId` picks the member building on a campus model (null: the point is already in campus metres); single-building models ignore it. */
+  toWorld(point: Point, floorId?: string | null): [number, number];
   /** Building-space anchor points for openings and vertical connectors, used to mark closures. */
   anchors: Map<string, FloorPoint[]>;
   box: { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -43,7 +44,7 @@ export function buildModel(building: Building): BuildingModel {
     const edgeParts = floorSpaces.map(model => new THREE.EdgesGeometry(model.geometry, 30));
     const edges = edgeParts.length ? mergeGeometries(edgeParts) ?? new THREE.BufferGeometry() : new THREE.BufferGeometry();
     edgeParts.forEach(part => part.dispose());
-    const b = bounds(floorSpaces.flatMap(model => model.space.polygon.map(toWorld)));
+    const b = bounds(floorSpaces.flatMap(model => model.space.polygon.map(point => toWorld(point))));
     return {
       floor,
       storey: heights.get(floor.id) ?? 3,
@@ -64,6 +65,49 @@ export function buildModel(building: Building): BuildingModel {
   return { floors, spaces, toWorld, anchors, box: { minX: all.minX - cx, maxX: all.maxX - cx, minZ: -(all.maxY - cy), maxZ: -(all.minY - cy) } };
 }
 
+/**
+ * Several buildings placed on one campus frame (cross-building routing). Each member keeps its own centred
+ * model, translated to where the campus file (or the conversation) places it; `toWorld(point, floorId)`
+ * routes the point through the right member, and a null floorId is already campus-frame metres.
+ */
+export interface CampusMember { building: Building; offset: [number, number] }
+
+export function buildCampusModel(members: CampusMember[]): BuildingModel {
+  const placed = members.map(member => {
+    const model = buildModel(member.building);
+    // buildModel centres the building on its own centroid; the shift moves that centred frame so the
+    // member's local origin lands at its campus offset (campus y north → world z south).
+    const all = bounds(member.building.spaces.flatMap(space => space.polygon));
+    const cx = (all.minX + all.maxX) / 2, cy = (all.minY + all.maxY) / 2;
+    const shift: [number, number] = [cx + member.offset[0], -(cy + member.offset[1])];
+    model.floors.forEach(floor => {
+      floor.spaces.forEach(s => { s.geometry.translate(shift[0], 0, shift[1]); s.centre = [s.centre[0] + shift[0], s.centre[1] + shift[1]]; });
+      floor.edges.translate(shift[0], 0, shift[1]);
+      floor.box = { minX: floor.box.minX + shift[0], maxX: floor.box.maxX + shift[0], minZ: floor.box.minZ + shift[1], maxZ: floor.box.maxZ + shift[1] };
+    });
+    return { member, model, shift };
+  });
+  const byPrefix = new Map(placed.map(p => [p.member.building.building.id, p] as const));
+  const primary = placed[0];
+  const box = placed.reduce((acc, p) => ({
+    minX: Math.min(acc.minX, p.model.box.minX), maxX: Math.max(acc.maxX, p.model.box.maxX),
+    minZ: Math.min(acc.minZ, p.model.box.minZ), maxZ: Math.max(acc.maxZ, p.model.box.maxZ),
+  }), primary.model.box);
+  return {
+    floors: placed.flatMap(p => p.model.floors),
+    spaces: new Map(placed.flatMap(p => [...p.model.spaces])),
+    toWorld: (point: Point, floorId?: string | null): [number, number] => {
+      if (floorId === null) return [point[0], -point[1]];  // campus ground metres
+      const prefix = floorId?.slice(0, Math.max(0, floorId.indexOf('-F')));
+      const target = prefix ? byPrefix.get(prefix) : undefined;
+      const [x, z] = (target ?? primary).model.toWorld(point, floorId);
+      return target ? [x + target.shift[0], z + target.shift[1]] : [x, z];
+    },
+    anchors: new Map(placed.flatMap(p => [...p.model.anchors])),
+    box,
+  };
+}
+
 /** Unit-height prism; scale Y to set the wall height. */
 function extrude(polygon: Point[], cx: number, cy: number) {
   const points = polygon.at(-1)![0] === polygon[0][0] && polygon.at(-1)![1] === polygon[0][1] ? polygon.slice(0, -1) : polygon;
@@ -81,7 +125,7 @@ const XRAY_GAP = 7;
 export function layoutFloors(model: BuildingModel, focus: SceneFocus): Map<string, FloorPose> {
   const poses = new Map<string, FloorPose>();
   const elevation = (floor: Floor) => floor.elevation_m;
-  if (focus.mode === 'building') {
+  if (focus.mode === 'building' || focus.mode === 'campus') {
     for (const f of model.floors) poses.set(f.floor.id, { y: elevation(f.floor), opacity: 1, flat: 0, interactive: true });
     return poses;
   }
@@ -165,8 +209,8 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
     box.union(m.geometry.boundingBox!.clone().translate(new THREE.Vector3(0, poses.get(m.space.floor_id)?.y ?? 0, 0)));
   }
   for (const p of points) {
-    if (!onView(p.floorId)) continue;
-    const [x, z] = model.toWorld(p.position);
+    if (p.floorId === null || !onView(p.floorId)) continue;
+    const [x, z] = model.toWorld(p.position, p.floorId);
     box.expandByPoint(new THREE.Vector3(x, poses.get(p.floorId)?.y ?? 0, z));
   }
   if (focus.mode !== 'building' && !box.isEmpty()) {
@@ -183,7 +227,7 @@ export function focusBox(model: BuildingModel, poses: Map<string, FloorPose>, fo
     return new THREE.Box3(new THREE.Vector3(c.x - half, box.min.y, c.z - half), new THREE.Vector3(c.x + half, top, c.z + half));
   }
   const all = new THREE.Box3();
-  const visible = model.floors.filter(f => focus.mode === 'building' || focus.mode === 'xray' || (poses.get(f.floor.id)?.opacity ?? 0) > 0.5);
+  const visible = model.floors.filter(f => focus.mode === 'building' || focus.mode === 'campus' || focus.mode === 'xray' || (poses.get(f.floor.id)?.opacity ?? 0) > 0.5);
   for (const f of visible.length ? visible : model.floors) {
     const pose = poses.get(f.floor.id)!;
     all.expandByPoint(new THREE.Vector3(f.box.minX, pose.y, f.box.minZ));
