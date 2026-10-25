@@ -407,8 +407,17 @@ class Toolbox:
         stops = [self._space(start), *[self._space(v) for v in via], self._space(destination)]
         closed_ids = self._closed(closed)
         result = skills.route(self.building, stops[0], stops[-1], step_free, closed_ids, stops[1:-1])
-        self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result))
-        self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
+        # The agent sometimes also works out a fallback (e.g. "if staircase 1 is blocked too") after the route it
+        # recommends. Within one answer, the route shown and stored is the one for the real situation: fewest extra
+        # closures between the same stops, then the shortest. A later route between other stops always replaces it.
+        rank = (len(closed_ids), result["length_m"] if result["reachable"] else float("inf"))
+        kept = self.turn.get("route_rank") if isinstance(getattr(self, "turn", None), dict) else None
+        keep_previous = bool(kept and kept[0] == (tuple(stops), step_free) and kept[1] <= rank)
+        if not keep_previous:
+            if isinstance(getattr(self, "turn", None), dict):
+                self.turn["route_rank"] = ((tuple(stops), step_free), rank)
+            self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result))
+            self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
         if not result["reachable"]:
             self.last_answer_line = "Answer: no route"
             return {**result, "answer_line": "Answer: no route"}
@@ -416,7 +425,8 @@ class Toolbox:
             # Directions with turns and landmarks for the reply; the viewer draws the route itself.
             with self.building.temporarily_closed(*closed_ids):
                 details = directions.route_details(self.building, stops[0], stops[-1], step_free, stops[1:-1])
-            self.turn["route"] = details
+            if not keep_previous:
+                self.turn["route"] = details
             return {
                 "length_m": result["length_m"],
                 "steps": details["steps"],
@@ -424,7 +434,8 @@ class Toolbox:
             }
         labelled = {**result, "space_path": [self.building.label(s) if s in self.building.spaces else s for s in result["space_path"]]}
         output = self._answer("route", labelled)
-        self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
+        if not keep_previous:
+            self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
         return output
 
     def tool_nearest(self, start: str, what: str, step_free: bool) -> dict:

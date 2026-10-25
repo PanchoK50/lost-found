@@ -12,8 +12,9 @@ export interface Evacuee { id: string; path: FloorPoint[]; startMin: number; out
 const MAX_FIGURES = 320;
 const PER_ROOM = 4;
 const QUEUE_MIN = 0.06;  // figures from one room leave a few seconds apart
-const BODY = new THREE.CapsuleGeometry(0.24, 1.05, 4, 10);
-BODY.translate(0, 0.765, 0); // stand on y = 0
+// A little larger than life, so people read at building scale.
+const BODY = new THREE.CapsuleGeometry(0.36, 1.5, 4, 10);
+BODY.translate(0, 1.11, 0); // stand on y = 0
 // Few states, quiet colours: grey waiting, navy moving (walking or queuing), green safe, red only when trapped.
 const COLORS = { waiting: new THREE.Color('#9aa3b2'), walking: new THREE.Color('#002478'), queue: new THREE.Color('#002478'), safe: new THREE.Color('#2f8f5b'), trapped: new THREE.Color('#e5484d') };
 

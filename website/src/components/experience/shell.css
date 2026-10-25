@@ -243,3 +243,31 @@
 .hz-tracker li.is-active::before { border-color: var(--primary); }
 .hz-fixed { margin: 0; padding: 10px 16px; border-bottom: 1px solid var(--line); background: #eaf5e4; color: #1d5c00; font-size: 13px; font-weight: 600; }
 .hz-facts dd.is-urgent { color: var(--alarm); }
+
+/* ---------- Phone (after the desktop rules above, so it wins) ---------- */
+@media (max-width: 899px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px auto minmax(0, 1fr) auto; grid-template-areas: "top" "side" "main" "panel"; overflow: hidden; }
+  .shell-top { padding: 0 8px 0 0; gap: 6px; min-width: 0; }
+  .shell-top .brand { padding-right: 0; border-right: 0; margin-right: 0; flex: none; }
+  .shell-top .brand::before { width: 48px; margin-right: 0; }
+  .shell-top .brand span { display: none; }
+  .shell-building { flex: 1 1 auto; min-width: 0; max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; text-align: left; }
+  .shell-building span { display: none; }
+  .shell-lamps, .shell-spacer, .shell-top .shell-button:not(.shell-button--primary) { display: none; }
+  .shell-button--primary { flex: none; padding: 0 10px; }
+  .shell-account { flex: none; }
+  .shell-side { flex-direction: row; gap: 0; padding: 4px 0; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .shell-side > section:not(:first-child), .shell-side h2, .shell-credit { display: none; }
+  .shell-floors { flex-direction: row; }
+  .shell-floors button { width: auto; min-height: 34px; padding: 0 12px; border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .shell-floors button.active { border-bottom-color: var(--primary); }
+  .shell-floors .floor-button-short { display: inline; }
+  .shell-floors .floor-button-name { display: none; }
+  .shell-floors .floor-hazard, .shell-floors .floor-badge { margin-left: 6px; }
+  .shell-main { min-height: 0; }
+  .shell-panel { max-height: 46dvh; min-height: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .shell-main .hazard-playback { padding: 6px 12px; }
+  .shell-main .hazard-playback-head { display: none; }
+  .incident-toast { top: 56px; }
+  .shell .room-card { left: 8px !important; right: 8px; top: 8px !important; width: auto; }
+}

@@ -193,14 +193,19 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   useEffect(() => {
     const list = floorList.current;
     if (!list) return;
-    const active = list.querySelector('.active');
-    if (active) active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    else list.scrollTo({ left: 0, behavior: 'smooth' });
+    // Scroll only the floor strip itself (scrollIntoView would also shift the page on phones).
+    const strip = list.closest('.shell-side') ?? list;
+    const active = list.querySelector<HTMLElement>('.active');
+    if (active && strip.scrollWidth > strip.clientWidth) strip.scrollTo({ left: active.offsetLeft - strip.clientWidth / 2 + active.offsetWidth / 2, behavior: 'smooth' });
   }, [focusedFloor]);
   // Show the latest question with its answer card at the top, not the end of a long step list.
   useEffect(() => {
+    // Scroll the conversation pane only, never the page.
+    const pane = transcript.current;
     const target = busy ? transcriptEnd.current : latestQuestion.current ?? transcriptEnd.current;
-    target?.scrollIntoView({ behavior: 'smooth', block: busy ? 'end' : 'start' });
+    if (!pane || !target) return;
+    const top = target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop - 8;
+    pane.scrollTo({ top: busy ? pane.scrollHeight : top, behavior: 'smooth' });
   }, [messages, busy, expanded]);
 
   // Whole building, keeping the current answer's highlights and route.
@@ -448,7 +453,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                       />
                     ) : null}
                   </article>)}
-              {busy && <div className="bubble bubble--thinking" role="status"><AgentAvatar thinking />Looking it up…</div>}
               {busy && <div className="bubble bubble--thinking" role="status"><AgentAvatar thinking />Looking it up…</div>}
               <div ref={transcriptEnd} />
             </div>
