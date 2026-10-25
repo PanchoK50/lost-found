@@ -792,9 +792,13 @@ class Toolbox:
         along = dx * ux + dy * uy
         if abs(along) < 0.2:
             raise MapError(f"That direction is across the wall, not along it. The wall runs {'east–west' if abs(ux) > abs(uy) else 'north–south'}; say left/right along it.")
-        t = segment.project(here) + distance_m * (1 if along > 0 else -1)
+        current = segment.project(here)
+        t = current + distance_m * (1 if along > 0 else -1)
+        lo, hi = self._door_span(segment, door, inside)
         half = opening["width_m"] / 2
-        t_clamped = min(max(t, half), length - half)
+        if hi - lo < 2 * half:
+            raise MapError("There is no room to move this door along its wall.")
+        t_clamped = min(max(t, lo + half), hi - half)
         point = segment.interpolate(t_clamped)
         position = [round(point.x, 3), round(point.y, 3)]
         self.building.walks = dict(self.building.walks)
@@ -808,6 +812,46 @@ class Toolbox:
         edit = {"action": "move_door", "opening_id": door, "position": position}
         self._record(edit)
         return {**edit, "moved_m": moved, "note": "stopped at the end of the wall" if moved + 1e-6 < distance_m else ""}
+
+    WALL_CLEARANCE_M = 0.25  # a door keeps this much solid wall at either end (wall thickness plus a frame)
+
+    def _door_span(self, segment, door_id: str, inside: list[str]) -> tuple[float, float]:
+        """The stretch of `segment` the door may slide in, around where it is now: not past the wall's ends, not
+        across a point where another room's wall joins this one, and not over another door."""
+        from shapely.geometry import Point
+        length = segment.length
+        current = segment.project(Point(self.building.openings[door_id]["position"]))
+        blocked: list[tuple[float, float]] = []
+        near = segment.buffer(0.2)
+        floor_id = self.building.openings[door_id]["floor_id"]
+        for other in self.building.spaces_by_floor[floor_id]:
+            if other["id"] in inside:
+                continue
+            touch = self.building.polygon(other["id"]).exterior.intersection(near)
+            if touch.is_empty:
+                continue
+            # Where its outline meets this wall: project the touching part onto the wall line.
+            points = [Point(c) for g in getattr(touch, "geoms", [touch]) for c in getattr(g, "coords", [])] or [touch.centroid]
+            ts = [segment.project(pt) for pt in points]
+            a, b = min(ts), max(ts)
+            # A room alongside (sharing much of the wall) is not a junction; its corners are.
+            if b - a > 0.6:
+                blocked += [(a - 0.05, a + 0.05), (b - 0.05, b + 0.05)]
+            else:
+                blocked.append((a, b))
+        for oid, o in self.building.openings.items():
+            # Doors in this wall, and doors in a wall meeting it at a corner (their leaves would clash).
+            if oid == door_id or o["floor_id"] != floor_id or segment.distance(Point(o["position"])) > o["width_m"] / 2 + 0.3:
+                continue
+            t = segment.project(Point(o["position"]))
+            blocked.append((t - o["width_m"] / 2 - 0.1, t + o["width_m"] / 2 + 0.1))
+        lo, hi = 0.0, length
+        for a, b in blocked:
+            if b <= current:
+                lo = max(lo, b)
+            elif a >= current:
+                hi = min(hi, a)
+        return lo + self.WALL_CLEARANCE_M, hi - self.WALL_CLEARANCE_M
 
     def tool_move_object(self, asset: str, distance_m: float, direction: str) -> dict:
         from shapely.geometry import Point
