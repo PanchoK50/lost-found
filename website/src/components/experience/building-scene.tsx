@@ -429,6 +429,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const hazardLayer = useRef<THREE.Group>(null);
   const edges = useRef<THREE.LineSegments>(null);
   const detailed = style === 'detailed';
+  const solid = overview && pose.flat < 0.05 && pose.opacity > 0.9;
   // Objects and doors can be picked on the floor that is opened, not in the whole-building overview.
   const pickObject: PickObject | undefined = onPickObject && pose.interactive && !overview ? (kind, id) => onPickObject(kind, id) : undefined;
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -468,18 +469,20 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     group.current.position.y = s.y;
     group.current.visible = s.opacity > 0.01;
     // Detailed: rooms are thin slabs (highlights a little thicker) with walls standing on them.
-    const top = detailed ? SLAB : blockHeight(model.storey, s.flat);
+    // Whole-building view: one solid building (storeys flush, facade with windows, closed roof), not cut floors.
+    const solidNow = solid && s.flat < 0.05;
+    const top = solidNow ? model.storey : detailed ? SLAB : blockHeight(model.storey, s.flat);
     blocks.current.scale.y = top;
     for (const tone of ['primary', 'secondary', 'muted'] as const) {
       const g = raised.current[tone];
       if (g) g.scale.y = detailed ? SLAB + 0.03 + lift[tone] * 0.05 : blockHeight(model.storey, s.flat, lift[tone]);
     }
     if (walls.current) {
-      walls.current.visible = detailed;
+      walls.current.visible = detailed && !solidNow;
       walls.current.position.y = SLAB;
       walls.current.scale.y = wallHeight(model.storey, s.flat);
     }
-    if (edges.current) edges.current.visible = !detailed;
+    if (edges.current) edges.current.visible = !detailed && !solidNow;
     if (doors.current) {
       // Blocks: doors only on an opened floor (on the block tops); detailed: wherever the floor is shown.
       doors.current.visible = s.opacity > 0.5 && (detailed || s.flat > 0.3);
@@ -491,7 +494,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       hazardLayer.current.visible = s.opacity > 0.3;
     }
     if (furniture.current) {
-      furniture.current.visible = detailed && s.opacity > 0.5;
+      furniture.current.visible = detailed && s.opacity > 0.5 && !solidNow;
       furniture.current.position.y = SLAB;
     }
     applyFade(materials, assets, s, overview, blockHeight(model.storey, s.flat, lift.secondary) + 0.02);
@@ -512,7 +515,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     <group ref={group} position-y={pose.y}>
       <group ref={blocks} scale-y={blockHeight(model.storey, pose.flat)}>
         {plain.map(m => (
-          <mesh key={m.space.id} geometry={m.geometry} material={detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
+          <mesh key={m.space.id} geometry={m.geometry} material={solid ? SOLID_MATERIALS : detailed ? floorMaterial(materials, m.space) : materials[surfaceFor(m.space.type)]} castShadow receiveShadow onClick={tap(m.space.id)} onPointerOver={hover(m.space.id)} onPointerOut={hover(null)} />
         ))}
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
@@ -558,6 +561,29 @@ function hazardMaterial(kind: HazardKind, level: number) {
   }
   return material;
 }
+
+/** Facade texture: wall panels with a window band per storey (v runs 0 → 1 up one storey, u in metres). */
+function facadeTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#e9e6df'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#5d6e80'; g.fillRect(10, 22, 108, 58);           // glass (top part of the storey)
+  g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(10, 22, 108, 14);
+  g.fillStyle = '#d8d4cb'; g.fillRect(0, 118, 128, 10);           // slab edge between storeys
+  g.fillStyle = '#c9c5bc'; g.fillRect(62, 22, 4, 58);             // mullion
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(1 / 3, 1);                                   // one window bay every 3 m
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+/** ExtrudeGeometry groups: 0 = caps (roof), 1 = sides (facade). Shared by every floor in the overview. */
+const SOLID_MATERIALS: THREE.Material[] = typeof document === 'undefined' ? [] : [
+  new THREE.MeshStandardMaterial({ color: '#cfccc4', roughness: 0.95 }),
+  new THREE.MeshStandardMaterial({ map: facadeTexture(), roughness: 0.7 }),
+];
 
 /** Water shimmers and a power cut flickers: the shared tint materials breathe a little every frame. */
 function HazardPulse() {
