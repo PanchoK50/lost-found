@@ -20,15 +20,9 @@ interface UploadResult {
   questions: string[];
 }
 
-/** All buildings (dataset + uploaded plans) with search ('pick'), or "Add a building" from a building.json or floor plans ('add'). */
-export function BuildingsSheet({ buildings, currentId, mode = 'pick', onClose }: { buildings: BuildingRow[]; currentId: string; mode?: 'pick' | 'add'; onClose(): void }) {
-  const router = useRouter();
+/** All buildings (dataset + uploaded plans) with search. */
+export function BuildingsSheet({ buildings, currentId, onClose }: { buildings: BuildingRow[]; currentId: string; onClose(): void }) {
   const [query, setQuery] = useState('');
-  const [name, setName] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const [result, setResult] = useState<UploadResult>();
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -37,6 +31,34 @@ export function BuildingsSheet({ buildings, currentId, mode = 'pick', onClose }:
       .filter(b => !q || `${b.name} ${b.id} ${sourceLabel[b.source] ?? b.source}`.toLowerCase().includes(q))
       .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [buildings, query]);
+
+  return (
+    <Sheet title="Buildings" onClose={onClose}>
+      <input className="buildings-search" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={`Search ${buildings.length} buildings`} aria-label="Search buildings" />
+      <ul className="buildings-list">
+        {shown.slice(0, MAX_ROWS).map(b => (
+          <li key={b.id}>
+            <Link href={`/?building=${b.id}`} className={b.id === currentId ? 'active' : ''} aria-current={b.id === currentId ? 'page' : undefined} onClick={onClose}>
+              <strong>{b.name}</strong>
+              <small>{sourceLabel[b.source] ?? b.source} · {b.floors} floor{b.floors === 1 ? '' : 's'} · {b.spaces} spaces</small>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {shown.length > MAX_ROWS && <p className="sheet-hint">{shown.length - MAX_ROWS} more; type to narrow down.</p>}
+      {!shown.length && <p className="sheet-hint">No building matches “{query}”.</p>}
+    </Sheet>
+  );
+}
+
+/** "Add a building" in the right panel (in place of the chat): a building.json or floor plans, read into a new building. */
+export function AddBuildingPanel({ onClose }: { onClose(): void }) {
+  const router = useRouter();
+  const [name, setName] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const [result, setResult] = useState<UploadResult>();
 
   async function upload(event: FormEvent) {
     event.preventDefault();
@@ -52,7 +74,8 @@ export function BuildingsSheet({ buildings, currentId, mode = 'pick', onClose }:
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Upload failed.');
       setResult(data);
-      router.refresh();
+      // Straight to the new building: it builds up floor by floor, and the chat checks what was uncertain.
+      router.push(`/?building=${encodeURIComponent(data.id)}&check=1&reveal=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
@@ -63,24 +86,12 @@ export function BuildingsSheet({ buildings, currentId, mode = 'pick', onClose }:
   const fields = result ? Object.entries(result.issues.by_field).map(([field, n]) => `${n} ${field.replace('_', ' ')}`).join(', ') : '';
 
   return (
-    <Sheet title={mode === 'add' ? 'Add a building' : 'Buildings'} onClose={onClose}>
-      {mode === 'pick' && <>
-      <input className="buildings-search" type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={`Search ${buildings.length} buildings`} aria-label="Search buildings" />
-      <ul className="buildings-list">
-        {shown.slice(0, MAX_ROWS).map(b => (
-          <li key={b.id}>
-            <Link href={`/?building=${b.id}`} className={b.id === currentId ? 'active' : ''} aria-current={b.id === currentId ? 'page' : undefined} onClick={onClose}>
-              <strong>{b.name}</strong>
-              <small>{sourceLabel[b.source] ?? b.source} · {b.floors} floor{b.floors === 1 ? '' : 's'} · {b.spaces} spaces</small>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {shown.length > MAX_ROWS && <p className="sheet-hint">{shown.length - MAX_ROWS} more; type to narrow down.</p>}
-      {!shown.length && <p className="sheet-hint">No building matches “{query}”.</p>}
-      </>}
-
-      {mode === 'add' && <section className="buildings-upload buildings-upload--solo">
+    <section className="add-panel" aria-label="Add a building">
+      <div className="chat-head">
+        <span>Add a building</span>
+        <button type="button" className="chat-new" onClick={onClose}>Close</button>
+      </div>
+      <div className="buildings-upload buildings-upload--solo">
         <p className="sheet-hint"><strong>Best: upload a <code>building.json</code>.</strong> It is imported exactly as it is, with nothing to guess.</p>
         <p className="sheet-hint">No JSON? Upload one plan per floor, named <code>floor_0</code>, <code>floor_1</code>, … (basements <code>floor_-1</code>), or select all files of a building folder. Prefer SVG over PNG: images are traced and their scale and room numbers estimated, so they need more checking. Rooms, doors, stairs, room numbers and room types are read from the plans. Anything uncertain is checked with you in the chat.</p>
         <form onSubmit={upload}>
@@ -94,10 +105,10 @@ export function BuildingsSheet({ buildings, currentId, mode = 'pick', onClose }:
             <p><strong>{result.name}</strong>: {result.floors} floor{result.floors === 1 ? '' : 's'}, {result.spaces} spaces, {result.doors} doors, {result.connectors} stairs/lifts.</p>
             {result.issues.issues > 0 && <p className="sheet-hint">To check: {fields}.</p>}
             {result.questions.map(q => <p key={q} className="sheet-hint">• {q}</p>)}
-            <Link className="button button--primary" href={`/?building=${result.id}&check=1`} onClick={onClose}>Open {result.name} and check it</Link>
+            <Link className="button button--primary" href={`/?building=${result.id}&check=1&reveal=1`} onClick={onClose}>Open {result.name} and check it</Link>
           </div>
         )}
-      </section>}
-    </Sheet>
+      </div>
+    </section>
   );
 }

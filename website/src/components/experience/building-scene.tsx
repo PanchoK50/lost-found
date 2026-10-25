@@ -74,6 +74,8 @@ interface Props {
   onSelectObject?(kind: 'asset' | 'opening', id: string): void;
   /** The object selected as chat context, highlighted on the model. */
   selectedObject?: { kind: 'asset' | 'opening' | 'space'; id: string } | null;
+  /** A just-created building: the floors build up once, one after another from the bottom to the top. */
+  buildUp?: boolean;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -89,7 +91,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject, emergency = false }: Props) {
+export default function BuildingScene({ building, site, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject, emergency = false, buildUp = false }: Props) {
   const model = useMemo(() => {
     const members = [...(site?.values() ?? [])];
     const placed = members.length > 1 || (members.length === 1 && members[0].building.building.id !== building.building.id)
@@ -103,6 +105,8 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
     for (const floor of model.floors) bound.set(floor.floor.id, (point: [number, number]) => model.toWorld(point, floor.floor.id));
     return bound;
   }, [model]);
+  // Build-up: each floor starts a beat after the one below it (read once, when the floors mount).
+  const riseDelay = useMemo(() => new Map([...model.floors].sort((a, b) => a.floor.level - b.floor.level).map((f, i) => [f.floor.id, 0.4 + i * 0.35])), [model]);
   const sceneSpan = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
@@ -188,7 +192,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={framedRoom} />
         {model.floors.map(floor => (
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
-            onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} facade={facadeKind(building)} night={emergency} />
+            onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} facade={facadeKind(building)} night={emergency} rise={buildUp ? riseDelay.get(floor.floor.id) : undefined} />
         ))}
         <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency}
           buildingId={building.building.id} toWorld={sceneryToWorld} footprint={footprint} />
@@ -432,6 +436,8 @@ interface FloorViewProps {
   /** Facade family for the solid exterior, and night (emergency) textures. */
   facade?: FacadeKind;
   night?: boolean;
+  /** Build-up: seconds until this floor grows into place from below (once, on mount); undefined = already there. */
+  rise?: number;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
@@ -439,7 +445,7 @@ interface FloorViewProps {
   onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect, onPickObject, selectedDoor, facade = 'campus', night = false }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect, onPickObject, selectedDoor, facade = 'campus', night = false, rise }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
@@ -453,7 +459,9 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   // Objects and doors can be picked on the floor that is opened, not in the whole-building overview.
   const pickObject: PickObject | undefined = onPickObject && pose.interactive && !overview ? (kind, id) => onPickObject(kind, id) : undefined;
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
-  const state = useRef({ opacity: pose.opacity, flat: pose.flat, y: pose.y });
+  const state = useRef(rise === undefined
+    ? { opacity: pose.opacity, flat: pose.flat, y: pose.y, grow: 1, wait: 0 }
+    : { opacity: 0, flat: pose.flat, y: pose.y - 1.5, grow: 0.02, wait: rise });
   const materials = useMemo((): FloorMaterials => {
     const surface = (color: string) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0, transparent: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
     return {
@@ -482,11 +490,19 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
 
   useFrame((_, delta) => {
     const s = state.current;
+    if (s.wait > 0) {
+      // Build-up: this floor waits for the ones below, then grows up from its base.
+      s.wait -= delta;
+      if (group.current) group.current.visible = false;
+      return;
+    }
     s.opacity = damp(s.opacity, pose.opacity, delta, 5);
     s.flat = damp(s.flat, pose.flat, delta, 3.5);
     s.y = damp(s.y, pose.y, delta, 3.5);
+    s.grow = s.grow > 0.999 ? 1 : damp(s.grow, 1, delta, 4.5);
     if (!group.current || !blocks.current) return;
     group.current.position.y = s.y;
+    group.current.scale.y = s.grow;
     group.current.visible = s.opacity > 0.01;
     // Detailed: rooms are thin slabs (highlights a little thicker) with walls standing on them.
     // Whole-building view: one solid building (storeys flush, facade with windows, closed roof), not cut floors.

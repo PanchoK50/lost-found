@@ -75,7 +75,7 @@ def main() -> None:
         "name": "Lost & Found fire co-pilot",
         "conversation_config": {
             "agent": {
-                "first_message": "Fire co-pilot here. Ask me where the fire is, which entrance to take, or the nearest exit.",
+                "first_message": "What's the emergency?",
                 "language": "en",
                 "prompt": {"prompt": PROMPT, "tools": [{"type": "client", **tool} for tool in TOOLS]},
             },

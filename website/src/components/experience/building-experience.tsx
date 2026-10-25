@@ -14,7 +14,7 @@ import type { SceneStyle } from './scene-detail';
 import { detectCategory } from '@/lib/world/mode';
 import { saveProfile, useProfile } from '@/lib/world/profile';
 import { LocationSheet } from '@/components/world/location-sheet';
-import { BuildingsSheet, type BuildingRow } from '@/components/world/buildings-sheet';
+import { AddBuildingPanel, BuildingsSheet, type BuildingRow } from '@/components/world/buildings-sheet';
 import { DemoLoginSheet, useSignedIn } from '@/components/auth/demo-login';
 import { authHeader, supabaseBrowser } from '@/lib/supabase/browser';
 import { useWorld } from '@/lib/world/use-world';
@@ -128,7 +128,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const hideDemo = settings?.demoPlayers === false;
   const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings' | 'add-building' | 'damage' | 'readiness'>();
+  // "+" in the top bar: the right panel shows the add-a-building form instead of the chat.
+  const [adding, setAdding] = useState(false);
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings' | 'damage' | 'readiness'>();
   // Emergencies: a what-if simulation or a live incident, shown on the map with its side panel.
   const hazard = useHazard(building);
   const incidents = useIncidents(building.building.id);
@@ -461,7 +463,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     <main className={`experience shell${started ? ' experience--started' : ''}${hazard.view ? ' experience--hazard' : ''}${broll ? ' shell--broll' : ''}${emergency && !brigade ? ' shell--emergency' : ''}${brigade ? ' shell--brigade' : ''}`}>
       <header className="shell-top" ref={header}>
         <Link className="brand" href={`/?building=${building.building.id}`} aria-label="lost & found: back to overview" onClick={event => { event.preventDefault(); startOver(); }}>◈ <span>lost & found</span></Link>
-        <button type="button" className="shell-add-building" onClick={() => setSheet('add-building')} aria-label="Add a building" title="Add a building">+</button>
+        <button type="button" className="shell-add-building" onClick={() => setAdding(open => !open)} aria-label="Add a building" aria-pressed={adding} title="Add a building">+</button>
         <button type="button" className="shell-building" onClick={() => setSheet('buildings')} aria-label={`Building: ${buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}. Choose another`}>
           {buildings.find(b => b.id === building.building.id)?.name ?? building.building.name}<span aria-hidden>▾</span>
         </button>
@@ -503,7 +505,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
 
       <section className="shell-main">
-        <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => {
+        <div className="scene"><BuildingScene building={building} site={site} buildUp={params.get('reveal') === '1'} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => {
             if (brigade) { router.push(`/?view=brigade&building=${encodeURIComponent(building.building.id)}&alarm=fire:${encodeURIComponent(spaceId)}&t=0&eta=${eta}&open=1`); return; }
             setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind);
           }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
@@ -534,7 +536,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         {!broll && <VoiceAgent actions={voiceActions} />}
       </section>
 
-      <aside className="shell-panel" aria-label="Assistant">
+      <aside className={`shell-panel${adding ? ' shell-panel--adding' : ''}`} aria-label="Assistant">
+        {adding && <AddBuildingPanel onClose={() => setAdding(false)} />}
         {brigade && hazard.view && (
           <BrigadePanel briefing={brigadeData.briefing} people={brigadeData.people} routes={brigadeData.routes} tab={brigadeTab} onTab={setBrigadeTab}
             onRoom={spaceId => setHazardRoom(spaceId)} onRescue={spaceId => { setRescueTarget(spaceId); setBrigadeTab('routes'); }} />
@@ -680,7 +683,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
       {sheet === 'buildings' && <BuildingsSheet buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
-      {sheet === 'add-building' && <BuildingsSheet mode="add" buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
       {toast && (
         <button type="button" className="incident-toast" onClick={() => { openIncident(toast); setToast(null); }}>
           <i className={`hazard-dot hazard-dot--${toast.hazard}`} />
