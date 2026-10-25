@@ -1,3 +1,93 @@
+# Lost & Found: talk to your building
+
+Team Lost & Found, Industrial Agents Hackathon 2026, Track 01 "Talk to Your Building".
+
+You give it a building in the kit format. People ask in plain language (typed or spoken), and every answer is computed
+exactly from the plan and shown on a 3D model of the building:
+- where things are
+- routes: step-free, for a wide load or a forklift, around closures, tours
+- areas, rooms above and below, shared walls
+- what-if changes and emergencies
+
+**The benchmark submission is in [`SUBMISSION/`](SUBMISSION/):** [`BENCHMARK.md`](SUBMISSION/BENCHMARK.md) holds the
+run command; `answers.json` holds the answers to the 145 test questions (Claude Opus 5.5, effort low).
+
+## Architecture
+
+```
+ browser ── Next.js web app (website/) ─────────── /api/* routes (server side: keys never reach the browser)
+              3D building, chat, voice                      │
+                                                            ▼
+            Python agent API (lostfound/api, FastAPI) ── Claude Opus 5.5 (Anthropic API, tool use)
+                                                            │  Claude only picks a tool and fills in its arguments
+                                                            ▼
+            deterministic core (lostfound/core) ─── building.json (kit format; any building, nothing hard-coded)
+              route graph · geometry · reach · edits     route model = the kit's starter_agent/building_map.py
+```
+
+- **Claude understands, the code computes.** Room, floor and item mentions are resolved to ids in code. Claude Opus 5.5
+  then picks one of 15 typed tools: route, nearest, largest room, total area, errand, delivery and step-free
+  reach, above/below, shared walls, 3D distance, what-if door, search, find and count items. Every number, room and route comes from
+  the tool. For questions no tool covers, Claude writes a short Python snippet against the same library. The final
+  `Answer:` line is copied from the tool result.
+- **One route model.** Routing uses exactly the kit's distance model: door to door 15 cm off the walls, around corners,
+  stairs 2 m per metre climbed, lifts 15 m plus 1 m per metre. On top of it come the organizers' rules: step-free
+  routes, closures, minimum door width, forklifts (openings of 3 m or more, no stairs or lifts, production bays only
+  as start or destination), and "no route" when none exists.
+- **The building can change by conversation.** Edits are kept per session and replayed the same way in Python and
+  TypeScript: close or reopen, add or move a door, door width, rename, room type, move an item, storey height,
+  rescale.
+- **New buildings from plans** (`lostfound/ingest`): SVG or PNG floor plans become a `building.json`. Raster outlines
+  are straightened, the scale is estimated from typical room sizes, and storey heights are set by building type.
+- **Emergencies** (`lostfound/hazards`): the spread of fire, water and electrical incidents, the people affected,
+  evacuation routes and fire-brigade attack routes. All of it is derived from `building.json` alone.
+- **Across buildings:** journeys from a room in one building to a room in another, through the best exit and
+  entrance. These use real OpenStreetMap positions or a placement the user gives in chat.
+
+| Part | Path | Tech |
+|---|---|---|
+| Core: graph, routing, geometry, reach, edits | `lostfound/core` | Python 3.12, NetworkX, Shapely |
+| Agent: tools, prompts, answer format | `lostfound/agent` | Anthropic SDK, Claude Opus 5.5 (Sonnet/Haiku selectable) |
+| Benchmark runner | `lostfound/run_benchmark.py` | one command: building + questions → `answers.json` |
+| Agent API | `lostfound/api` | FastAPI, Uvicorn |
+| Plan import | `lostfound/ingest` | OpenCV, Pillow, Shapely |
+| Emergencies | `lostfound/hazards` | Python |
+| Web app | `website/` | Next.js 16, React 19, Tailwind 4, three.js (React Three Fiber) |
+| Voice | `website/src/app/api/voice`, `/transcribe` | ElevenLabs (conversational agent, Scribe speech to text) |
+| Accounts, shared world, uploads | `website/src/lib/supabase` | Supabase |
+| Evals | `lostfound/evals`, `evals/` | official scorer (`benchmark/score.py`), paraphrased, novel and hard probes |
+
+## Run it
+
+```sh
+uv sync
+cp .env.example .env                       # ANTHROPIC_API_KEY (also ELEVENLABS_*, SUPABASE_* for the web app)
+
+# benchmark: building folder (or folder of buildings) + questions -> answers.json
+uv run --env-file .env python -m lostfound.run_benchmark data/test data/test/questions.csv answers.json
+
+# agent API on :8000, then the web app on :3000 (web keys go in website/.env.local)
+uv run --env-file .env uvicorn lostfound.api.server:app --port 8000
+cd website && npm install && npm run dev
+```
+
+## Checks
+
+- `uv run pytest`: over 6,400 tests. They include:
+  - every labelled train/dev answer through the official scorer
+  - warm-up routes to the centimetre
+  - disguised copies of buildings (new ids, moved, reordered) to catch overfitting
+  - all 40 test buildings checked against the kit's router
+  - an independent reimplementation of the geometry rules from this README
+  - forklift and bay rules
+  - the submission format
+- Dev benchmark with the Opus agent: 138/138. Paraphrased dev questions: 276/276. Results are in
+  [`evals/results/summary.md`](evals/results/summary.md).
+
+The challenge kit's own README follows unchanged: data, route model, question kinds, submission format.
+
+---
+
 # Track 01 — Google Maps for Every Building: student kit
 
 Build a conversational agent that knows a building as well as its facility manager does. You give it a building, and people just ask it things:

@@ -1,6 +1,8 @@
 # Benchmark: team Lost & Found
 
-`answers.json` in this folder is produced by one command, with no manual steps between input and output.
+`answers.json` in this folder is produced by one command, with no manual steps between input and output. It holds
+the answers to the kit's 145 test questions (`data/test/questions.csv`), from Claude Opus 5.5 (`claude-opus-5-5`)
+at effort low. A fresh rerun on the final code gave the same 145 answers.
 
 ## Command
 
@@ -8,8 +10,8 @@
 uv sync
 # put ANTHROPIC_API_KEY in .env at the repo root (see .env.example); it is loaded automatically
 
-# The Sunday building: its folder (with building.json) and its questions file
-uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions.json> SUBMISSION/answers.json
+# The secret building: its folder (with building.json) and its questions file (JSON, JSON lines or CSV)
+uv run --env-file .env python -m lostfound.run_benchmark <building_dir> <questions_file> answers.json
 
 # The kit's test set: a folder of building folders; each question names its folder in building_id
 uv run --env-file .env python -m lostfound.run_benchmark data/test data/test/questions.csv SUBMISSION/answers.json
@@ -18,6 +20,10 @@ uv run --env-file .env python -m lostfound.run_benchmark data/test data/test/que
 Options: `--model opus|sonnet|haiku` (default `opus`, Claude Opus 5.5), `--effort low|medium|high` (default `low`),
 `--workers N` (default 6), `--csv out.csv` (also write the kit's `question_id,answer` CSV),
 `--details details.json` (full replies and routes).
+
+Needs Python 3.12+ and [uv](https://docs.astral.sh/uv/). The 145 test questions take about 1.5 minutes with 6
+workers and cost about $2 with Claude Opus 5.5 (`claude-opus-5-5`). If the key is missing, the run stops at once with
+a clear message. A question that fails gets an empty answer; the other questions are not affected.
 
 ## Input
 
@@ -51,8 +57,9 @@ A list with one entry per question, in question order, as the organizers specifi
    shared walls, 3D distance, what-if door) and fills in its arguments. Every number and route is computed in code
    (`lostfound/core`); the tool returns a ready-made `Answer:` line. For questions no tool covers, Claude runs a
    short Python snippet against the same library.
-3. **answers.json is filled from the tool call the reply committed to**, so a fallback the agent explored after
-   its answer never replaces the answered route.
+3. **The answer is the reply's last `Answer:` line**, copied from the tool result. With `--details`, the route and
+   other details come from the tool call that the reply's answer belongs to. A fallback the agent tried after
+   answering never replaces it.
 
 Nothing is specific to any building; the same code runs on every building in the kit format.
 
@@ -74,9 +81,20 @@ By default the bay rule applies to forklift routes; `LOSTFOUND_BAY_RULE=always` 
 ## Checks
 
 ```sh
-uv run pytest    # oracle tests: every labelled train/dev answer, warm-up routes, forklift and bay rules
+uv run pytest    # over 6,400 tests, no API key needed
 ```
 
-- Dev benchmark questions: 138/138 with the official scorer (deterministic core; the Opus agent run is in `evals/results/summary.md`).
-- Dev warm-up routes: 229/229 valid and optimal, with the same space sequence as the labels.
-- Forklift routes on the dev factories match an independent rule checker.
+- **Dev benchmark questions:** 138/138 with the official scorer, both for the deterministic core and for the Opus
+  agent (`evals/results/summary.md`).
+- **Train benchmark questions:** 515/517. The two misses name a room ("Büro") that several rooms on that floor share.
+- **Dev warm-up routes:** 229/229 valid and optimal, with the same space sequence as the labels.
+- **Unseen buildings** (`tests/test_level4.py`):
+  - disguised copies of dev buildings (new ids, moved and turned, lists reordered) give the labelled answers;
+  - on all 40 test buildings, routes, step-free routes, closures, tours and errands match the kit's router and a
+    brute force;
+  - each part of a multi-part building cannot be reached from another part, because there is no way round the
+    outside;
+  - every test question is parsed, and all 145 submitted answers agree with the deterministic path.
+- **Independent reference** (`tests/test_reference_geometry.py`): the geometry and reach rules are reimplemented
+  from the kit README, and they agree with ours on every train, dev and test building.
+- **Forklift routes** on the dev and test factories match an independent rule checker.
