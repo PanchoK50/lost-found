@@ -347,3 +347,82 @@
 .shell--emergency .floor-hazard--fire { background: var(--alarm); }
 .shell--emergency .floor-hazard--water { background: #2f8bff; }
 .shell--emergency .shell-credit { color: var(--muted); }
+
+/* ==========================================================================
+   Design language after ChatGPT: soft neutral surfaces without hard borders, a grey sidebar with rounded rows,
+   plain assistant text and soft user bubbles, a large rounded composer, black pill buttons, generous spacing.
+   (Emergency mode further down the cascade keeps its dark palette.)
+   ========================================================================== */
+.shell:not(.shell--emergency) {
+  --ink: #0d0d0d; --text: #1f1f1f; --muted: #6b6b6b; --line: #ececec; --paper: #ffffff; --surface-2: #f4f4f4;
+  --primary: #0d0d0d; --primary-hover: #2f2f2f; --primary-soft: #f0f0f0; --radius: 12px;
+  font-family: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #ffffff;
+}
+.shell:not(.shell--emergency) .shell-top { background: #ffffff; box-shadow: none; border-bottom: 1px solid #f0f0f0; padding-right: 14px; }
+.shell:not(.shell--emergency) .shell-top .brand { border-right: 0; padding-right: 6px; }
+.shell:not(.shell--emergency) .shell-top .brand::before { width: 34px; height: 34px; margin: 0 10px 0 14px; border-radius: 10px; background-color: #0d0d0d; background-size: 18px; }
+.shell:not(.shell--emergency) .shell-top .brand span { font-weight: 600; font-size: 15px; }
+.shell:not(.shell--emergency) .shell-top .brand span::after { display: none; }
+.shell:not(.shell--emergency) .shell-building { border: 0; border-radius: 10px; font-weight: 600; font-size: 15px; }
+.shell:not(.shell--emergency) .shell-building:hover { background: #f4f4f4; }
+.shell:not(.shell--emergency) .shell-button { height: 36px; padding: 0 16px; border: 1px solid #e5e5e5; border-radius: 999px; background: #fff; color: #0d0d0d; font-weight: 500; }
+.shell:not(.shell--emergency) .shell-button:hover { background: #f4f4f4; border-color: #e5e5e5; }
+.shell:not(.shell--emergency) .shell-button--primary { background: #0d0d0d; border-color: #0d0d0d; color: #fff; }
+.shell:not(.shell--emergency) .shell-button--primary:hover { background: #2f2f2f; }
+.shell:not(.shell--emergency) .shell-lamp { height: 32px; border: 0; border-radius: 999px; background: #f4f4f4; font-weight: 500; }
+.shell:not(.shell--emergency) .shell-lamp i { border-radius: 50%; }
+.shell:not(.shell--emergency) .shell-account { width: 34px; height: 34px; background: #e8e3fb; color: #5b45c7; font-weight: 600; }
+
+.shell:not(.shell--emergency) .shell-side { background: #f9f9f9; border-right: 0; padding: 14px 10px; gap: 22px; }
+.shell:not(.shell--emergency) .shell-side h2 { margin: 0 10px 6px; font-size: 13px; font-weight: 500; color: #8f8f8f; }
+.shell:not(.shell--emergency) .shell-floors button, .shell:not(.shell--emergency) .shell-list button { border-left: 0; border-radius: 10px; padding-left: 10px; min-height: 38px; font-size: 14px; }
+.shell:not(.shell--emergency) .shell-floors button:hover, .shell:not(.shell--emergency) .shell-list button:hover { background: #ececec; }
+.shell:not(.shell--emergency) .shell-floors button.active, .shell:not(.shell--emergency) .shell-list button.active { background: #e8e8e8; color: #0d0d0d; font-weight: 500; }
+.shell:not(.shell--emergency) .shell-segmented { margin: 0 6px; border: 0; border-radius: 999px; background: #ececec; padding: 3px; }
+.shell:not(.shell--emergency) .shell-segmented button { border-radius: 999px; height: 30px; font-weight: 500; color: #6b6b6b; }
+.shell:not(.shell--emergency) .shell-segmented button[aria-pressed="true"] { background: #fff; color: #0d0d0d; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.shell:not(.shell--emergency) .shell-empty, .shell:not(.shell--emergency) .shell-hint { margin: 0 10px; color: #8f8f8f; }
+
+.shell:not(.shell--emergency) .shell-panel { border-left: 1px solid #f0f0f0; }
+.shell:not(.shell--emergency) .shell-chat { padding: 20px 20px 12px; }
+.shell:not(.shell--emergency) .shell-intro h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.shell:not(.shell--emergency) .shell-examples { gap: 8px; }
+.shell:not(.shell--emergency) .shell-examples button { border: 1px solid #ececec; border-radius: 16px; padding: 12px 14px; color: #1f1f1f; font-size: 14px; }
+.shell:not(.shell--emergency) .shell-examples button:hover { background: #f9f9f9; border-color: #e0e0e0; color: #0d0d0d; }
+.shell:not(.shell--emergency) .bubble--user { margin-left: auto; padding: 10px 16px; border-radius: 22px; background: #f4f4f4; color: #0d0d0d; font-size: 15px; }
+.shell:not(.shell--emergency) .reply, .shell:not(.shell--emergency) .bubble--assistant p { font-size: 15px; line-height: 1.65; color: #0d0d0d; }
+.shell:not(.shell--emergency) .answer-card { border: 1px solid #ececec; border-left: 1px solid #ececec; border-radius: 16px; background: #fff; }
+.shell:not(.shell--emergency) .answer-card::before { content: ""; display: block; width: 6px; height: 6px; margin-bottom: 6px; border-radius: 50%; background: #f26a1b; }
+.shell:not(.shell--emergency) .answer-actions button, .shell:not(.shell--emergency) .directions-overview { border-radius: 999px; }
+
+.shell:not(.shell--emergency) .shell-ask { padding: 10px 14px 16px; border-top: 0; }
+.shell:not(.shell--emergency) .ask { min-height: 56px; padding: 8px 8px 8px 18px; border: 1px solid #e5e5e5; border-radius: 26px; background: #fff; box-shadow: 0 4px 16px rgba(0, 0, 0, .06); }
+.shell:not(.shell--emergency) .ask input { font-size: 15px; }
+.shell:not(.shell--emergency) .ask button[type="submit"] { width: 36px; height: 36px; border-radius: 50%; background: #0d0d0d; }
+.shell:not(.shell--emergency) .ask button[type="submit"]:disabled { background: #d7d7d7; }
+.shell:not(.shell--emergency) .ask .mic-button { border-radius: 50%; }
+.shell:not(.shell--emergency) .ask-chip { border: 0; border-radius: 999px; background: #f0f0f0; padding: 0 6px 0 10px; }
+.shell:not(.shell--emergency) .ask-actions button { border: 1px solid #ececec; border-radius: 999px; color: #0d0d0d; }
+.shell:not(.shell--emergency) .ask-actions button:hover { background: #f4f4f4; }
+
+.shell:not(.shell--emergency) .hazard-head { border-bottom: 0; padding: 18px 20px 6px; }
+.shell:not(.shell--emergency) .hazard-head h2 { font-size: 19px; font-weight: 600; }
+.shell:not(.shell--emergency) .hazard-close { border: 0; border-radius: 50%; background: #f4f4f4; }
+.shell:not(.shell--emergency) .hazard-tabs { border-bottom: 0; gap: 4px; padding: 6px 16px 4px; }
+.shell:not(.shell--emergency) .hazard-tabs button { flex: none; padding: 6px 12px; border: 0; border-radius: 999px; }
+.shell:not(.shell--emergency) .hazard-tabs button[aria-selected="true"] { background: #f0f0f0; color: #0d0d0d; }
+.shell:not(.shell--emergency) .hz-section { margin: 8px 16px; padding: 14px 16px; border: 1px solid #f0f0f0; border-radius: 16px; }
+.shell:not(.shell--emergency) .hz-key { border: 0; border-radius: 12px; background: #f6f6f6; }
+.shell:not(.shell--emergency) .hazard-foot { border-top: 0; padding: 12px 16px 14px; }
+.shell:not(.shell--emergency) .hazard-run { border-radius: 999px; background: #0d0d0d; }
+.shell:not(.shell--emergency) .hazard-secondary { border-radius: 999px; border-color: #e5e5e5; color: #0d0d0d; }
+.shell:not(.shell--emergency) .hz-floors button { border-radius: 999px; color: #0d0d0d; }
+.shell:not(.shell--emergency) .shell-main .hazard-playback { border-top: 1px solid #f0f0f0; }
+.shell:not(.shell--emergency) .hazard-playback .hazard-play { border-radius: 50%; background: #0d0d0d; }
+.shell:not(.shell--emergency) .room-card { border: 0; border-radius: 16px; box-shadow: 0 8px 28px rgba(0, 0, 0, .12); }
+.shell:not(.shell--emergency) .room-card-actions button { border-radius: 999px; }
+.shell:not(.shell--emergency) .scene-label { border-radius: 999px; }
+.shell:not(.shell--emergency) .incident-toast { border-radius: 16px; border-left-width: 1px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14); }
+.sheet { border-radius: 20px 20px 0 0; }
+@media (min-width: 900px) { .sheet { border-radius: 20px; } }
