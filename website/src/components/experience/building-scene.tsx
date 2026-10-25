@@ -162,6 +162,12 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
   const detailed = style === 'detailed';
   const textures = useTextures(detailed);
   const models = useAssetModels(useMemo(() => building.assets.map(asset => asset.type), [building]), detailed);
+  // Scenery in the main building's frame, and its ground outlines (so trees and streets keep clear of it).
+  const sceneryToWorld = useCallback((p: [number, number]) => model.toWorld(p), [model]);
+  const footprint = useMemo(() => {
+    const ground = model.floors.filter(f => f.floor.level <= 0).sort((a, b) => b.floor.level - a.floor.level)[0] ?? model.floors[0];
+    return (ground?.spaces ?? []).map(m => m.space.polygon.map(p => model.toWorld(p, ground.floor.id)));
+  }, [model]);
   // Where people stand on a floor: on the slab (detailed) or on the block tops (blocks).
   const floorBase = useCallback((floorId: string | null) => {
     if (floorId === null) return SLAB;  // the campus ground between buildings
@@ -174,7 +180,7 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
     <div className="scene-root">
       <Canvas shadows="percentage" dpr={coarse ? [1, 1.5] : [1, 2]} onPointerMissed={() => { inspect(null); setSelected(null); setCameraRoom(null); }} camera={{ fov: 32, near: 0.5, far: 4000, position: [120, 110, 160] }} gl={{ antialias: true }}>
         <color attach="background" args={[emergency ? '#05080e' : '#dfe7ee']} />
-        <fog attach="fog" args={[emergency ? '#05080e' : '#dfe7ee', Math.max(400, sceneSpan), Math.max(1400, sceneSpan * 3)]} />
+        <fog attach="fog" args={[emergency ? '#05080e' : '#dfe7ee', Math.max(700, sceneSpan * 2.5), Math.max(3200, sceneSpan * 8)]} />
         {/* Studio light with a clear key direction, so the model gets soft but visible shadows. */}
         <ambientLight intensity={emergency ? 0.22 : 0.3} />
         <hemisphereLight args={emergency ? ['#7d8db0', '#0b0f18', 0.55] : ['#fff6ea', '#dfe3ea', 0.95]} />
@@ -184,8 +190,9 @@ export default function BuildingScene({ building, site, directive, insets, onFoc
           <FloorView key={floor.floor.id} model={floor} toWorld={floorToWorld.get(floor.floor.id)!} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
             onPickObject={onSelectObject ? (kind, id) => { setSelected(null); onSelectObject(kind, id); } : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
-        <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency} />
-        <Podium model={model} />
+        <Scenery box={model.box} y={Math.min(...model.floors.map(f => f.floor.elevation_m), 0) - 0.02} night={emergency}
+          buildingId={building.building.id} toWorld={sceneryToWorld} footprint={footprint} />
+        <Plinth model={model} />
         {directive.hazards?.length ? <HazardEffects model={model} poses={poses} hazards={directive.hazards} floorBase={floorBase} /> : null}
         <HazardPulse />
         {directive.evacuees && <People model={model} poses={poses} evacuees={directive.evacuees} minute={directive.minute ?? 0} speed={directive.walkMPerMin ?? 60} floorBase={floorBase} />}
@@ -383,7 +390,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   });
   // A campus can span kilometres (far pairs route too): let the camera reach as far as the scene does.
   const span = Math.max(model.box.maxX - model.box.minX, model.box.maxZ - model.box.minZ);
-  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.max(1500, span * 4)} maxPolarAngle={Math.PI / 2 - 0.35} />;
+  return <CameraControls ref={controls} makeDefault smoothTime={0.85} minDistance={4} maxDistance={Math.min(Math.max(900, span * 3), Math.max(3200, span * 8) * 0.55)} maxPolarAngle={Math.PI / 2 - 0.35} />;
 }
 
 /** A room and a little of its surroundings, at least 9 m across so small rooms keep some context. */
@@ -669,6 +676,18 @@ function colorAssets(mesh: THREE.InstancedMesh, model: FloorModel, lit: Set<stri
 
 
 /** Base plate under the building, like a plinth under a scale model; its top sits just under the slab tops. */
+/** A low plinth that follows the building's own ground outline (not a rectangle), so nature reaches the walls. */
+function Plinth({ model }: { model: BuildingModel }) {
+  const ground = model.floors.find(f => f.floor.level === 0) ?? model.floors[0];
+  if (!ground) return null;
+  return (
+    <group position-y={ground.floor.elevation_m - 0.14} scale-y={0.14}>
+      {ground.spaces.map(m => <mesh key={m.space.id} geometry={m.geometry} receiveShadow raycast={() => null}><meshStandardMaterial color="#e9e5dd" roughness={0.95} /></mesh>)}
+    </group>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for reference: the old rectangular base
 function Podium({ model }: { model: BuildingModel }) {
   const base = (model.floors[0]?.floor.elevation_m ?? 0) - 0.02;
   const width = model.box.maxX - model.box.minX + 6, depth = model.box.maxZ - model.box.minZ + 6;
