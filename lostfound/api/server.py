@@ -365,3 +365,67 @@ def import_building_json(content: str, name: str, created_by: str | None) -> dic
         "doors": len(building["openings"]), "connectors": len(building["vertical_connectors"]),
         "issues": {"issues": 0, "by_field": {}, "high": 0}, "questions": [], "assumptions": ["imported from building.json as it is"],
     }
+
+
+# ---------- hazards: fire, water, electrical ----------
+
+from lostfound.hazards import classify as hazard_classify  # noqa: E402
+from lostfound.hazards import evacuation as hazard_evacuation  # noqa: E402
+from lostfound.hazards import impact as hazard_impact  # noqa: E402
+from lostfound.hazards import playbooks as hazard_playbooks  # noqa: E402
+from lostfound.hazards import readiness as hazard_readiness  # noqa: E402
+from lostfound.hazards import spread as hazard_spread  # noqa: E402
+from lostfound.hazards.model import HAZARDS, sensors as hazard_sensors  # noqa: E402
+
+
+class SimulateRequest(BaseModel):
+    building_id: str
+    hazard: str
+    space_id: str
+    minutes: float = 30.0
+    severity: int = 2
+    evacuate_at_min: float = 3.0
+    contacts: list[dict] | None = None
+
+
+@app.post("/hazards/simulate")
+def simulate_hazard(request: SimulateRequest) -> dict:
+    """What happens if `hazard` starts in `space_id`: spread over time, rooms and assets hit, evacuation (fire)
+    and the response playbook. Pure computation: nothing is stored, nobody is called."""
+    if request.hazard not in HAZARDS:
+        raise HTTPException(400, f"hazard must be one of {', '.join(HAZARDS)}")
+    building = load(request.building_id)
+    if request.space_id not in building.spaces:
+        raise HTTPException(400, f"Unknown room '{request.space_id}'.")
+    minutes = max(1.0, min(request.minutes, 120.0))
+    result = hazard_spread.simulate(building, request.hazard, request.space_id, minutes)
+    summary = hazard_impact.impact(building, result)
+    evacuation = hazard_evacuation.evacuate(building, result, request.evacuate_at_min) if request.hazard == "fire" else None
+    return {
+        "building_id": request.building_id, "simulation": result, "impact": summary, "evacuation": evacuation,
+        "playbook": hazard_playbooks.plan(building, summary, evacuation, request.severity, request.contacts),
+    }
+
+
+class ClassifyRequest(BaseModel):
+    photo: str | None = None  # data URL
+    text: str | None = None
+
+
+@app.post("/hazards/classify")
+def classify_damage(request: ClassifyRequest) -> dict:
+    """Damage recognition from an employee's photo and/or words (one Claude vision call)."""
+    try:
+        return hazard_classify.classify(request.photo, request.text)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@app.get("/hazards/readiness")
+def building_readiness(building_id: str) -> dict:
+    return hazard_readiness.readiness(load(building_id))
+
+
+@app.get("/hazards/sensors")
+def building_sensors(building_id: str) -> dict:
+    return {"building_id": building_id, "sensors": hazard_sensors(load(building_id)), "contacts": hazard_playbooks.DEFAULT_CONTACTS}

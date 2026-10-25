@@ -32,6 +32,12 @@ import { unreadCount, useSentHistory } from '@/lib/world/history';
 import { settingsFor } from '@/lib/world/profile';
 import type { WorldState } from '@/lib/world/types';
 import { PinCard } from '@/components/world/pin-card';
+import { HazardPanel } from '@/components/hazards/hazard-panel';
+import { ReportDamage } from '@/components/hazards/report-damage';
+import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
+import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
+import { playAlarm, useIncidents } from '@/lib/hazards/incidents';
+import { hazardMeta, type Incident } from '@/lib/hazards/types';
 
 const BuildingScene = dynamic(() => import('./building-scene'), { ssr: false, loading: () => <div className="scene-loading">Building the model…</div> });
 
@@ -80,7 +86,24 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const hideDemo = settings?.demoPlayers === false;
   const world = useMemo(() => hideDemo && fullWorld ? withoutDemo(fullWorld) : fullWorld, [fullWorld, hideDemo]);
   const category = useMemo(() => detectCategory(building), [building]);
-  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings'>();
+  const [sheet, setSheet] = useState<'settings' | 'report' | 'account' | 'messages' | 'location' | 'buildings' | 'damage' | 'readiness'>();
+  // Emergencies: a what-if simulation or a live incident, shown on the map with its side panel.
+  const hazard = useHazard(building);
+  const incidents = useIncidents(building.building.id);
+  const [hazardRoom, setHazardRoom] = useState<string | null>(null);
+  const [hazardFloor, setHazardFloor] = useState<string | null>(null);
+  const hazardPanel = useRef<HTMLElement>(null);
+  const hazardOpen = hazard.view !== null;
+  const openIncident = useCallback((incident: Incident) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(incident.spaceId, incident.hazard, 'incident', incident); }, [hazard]);
+  // An incident raised on another screen: sound the alarm and show it.
+  const { arrived, clearArrived } = incidents;
+  useEffect(() => {
+    if (!arrived || arrived.buildingId !== building.building.id) return;
+    playAlarm();
+    openIncident(arrived);
+    clearArrived();
+  }, [arrived, building.building.id, openIncident, clearArrived]);
+  const shownDirective = useMemo(() => (hazard.view ? hazardDirective(building, hazard.view, hazardRoom, hazardFloor) : directive), [hazard.view, building, hazardRoom, hazardFloor, directive]);
   const signedIn = useSignedIn();
   // Chat history in Supabase: one conversation per thread, started on the first message.
   const conversationId = useRef<string | undefined>(undefined);
@@ -105,9 +128,9 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const latestQuestion = useRef<HTMLParagraphElement>(null);
   const started = messages.length > 0;
   // The start block ("Ask me anything", suggestions) gives way once someone explores a floor, so the map gets the screen.
-  const intro = !started && directive.focus.mode === 'building';
+  const intro = !started && directive.focus.mode === 'building' && !hazard.view;
   const floors = [...building.floors].sort((a, b) => a.level - b.level);
-  const focusedFloor = directive.focus.mode === 'floor' ? directive.focus.floorId : undefined;
+  const focusedFloor = shownDirective.focus.mode === 'floor' ? shownDirective.focus.floorId : undefined;
   // On phones the sheet shows only the latest exchange until expanded.
   const showAll = wide || expanded;
   const lastUser = messages.findLastIndex(m => m.role === 'user');
@@ -120,18 +143,19 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       const top = header.current?.getBoundingClientRect().bottom ?? 0;
       const dockTop = dock.current?.getBoundingClientRect().top ?? h;
       const sheet = transcript.current?.getBoundingClientRect();
+      const panel = hazardPanel.current?.getBoundingClientRect();
       const next = wide
-        ? { top, left: sheet ? sheet.right : 0, bottom: h - dockTop }
-        : { top, left: 0, bottom: h - Math.min(dockTop, sheet?.top ?? h) };
+        ? { top, left: Math.max(sheet ? sheet.right : 0, panel ? panel.right : 0), bottom: h - dockTop }
+        : { top, left: 0, bottom: h - Math.min(dockTop, sheet?.top ?? h, panel?.top ?? h) };
       const round = (v: number) => Math.round(v / 8) * 8;
       setInsets(prev => (round(prev.top) === round(next.top) && round(prev.left) === round(next.left) && round(prev.bottom) === round(next.bottom) ? prev : next));
     };
     measure();
     const observer = new ResizeObserver(measure);
-    [header, transcript, dock].forEach(ref => ref.current && observer.observe(ref.current));
+    [header, transcript, dock, hazardPanel].forEach(ref => ref.current && observer.observe(ref.current));
     window.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
-  }, [wide, started, intro]);
+  }, [wide, started, intro, hazardOpen]);
   useEffect(() => {
     const list = floorList.current;
     if (!list) return;
@@ -161,6 +185,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   useEffect(() => {
     // Esc: first back to the whole building, then (pressed again) back to the start screen.
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && hazard.view) { hazard.close(); return; }
       // Arrow up/down (or Page up/down) step one floor at a time, unless the user is typing.
       const step = { ArrowUp: 1, PageUp: 1, ArrowDown: -1, PageDown: -1 }[event.key];
       const typing = event.target instanceof HTMLElement && (event.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
@@ -176,7 +201,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor]);
+  }, [showOverview, startOver, directive.focus.mode, floors, focusedFloor, focusFloor, hazard]);
 
   async function ask(text: string, skillId?: string) {
     const message = text.trim();
@@ -235,7 +260,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
 
   return (
     <main className={`experience${started ? ' experience--started' : ''}`}>
-      <div className="scene"><BuildingScene building={building} directive={directive} insets={insets} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+      <div className="scene"><BuildingScene building={building} directive={shownDirective} insets={insets} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={world} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
 
       <div className="hud-top" ref={header}>
         <header className="hud-bar">
@@ -247,6 +272,10 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             </button>
             <button type="button" onClick={() => setSheet('buildings')}>{buildings.length} buildings</button>
           </nav>
+          <nav className="emergency-actions" aria-label="Emergencies">
+            <button type="button" className="emergency-report" onClick={() => setSheet('damage')}>🚨 Report damage</button>
+            <button type="button" onClick={() => setSheet('readiness')}>🛡 Readiness</button>
+          </nav>
           <WorldHud world={world} playerId={profile?.id} unread={unread} onOpen={() => setSheet('settings')} onMessages={() => setSheet('messages')}
             location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />
         </header>
@@ -254,7 +283,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           <button type="button" className={directive.focus.mode === 'building' ? 'active' : ''} onClick={showOverview} aria-label="Whole building">⌂</button>
           <div className="floor-list" ref={floorList}>
             {floors.map(floor => (
-              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={floorCounts(world, floor.id)} onClick={() => focusFloor(floor.id)} />
+              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(world, floor.id), incidents.active, building, floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
             ))}
           </div>
         </nav>
@@ -359,6 +388,39 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       {sheet === 'settings' && profile && <SettingsSheet building={building} profile={profile} world={world} category={category} act={act} onClose={closeSheet} onSwitchUser={supabaseBrowser() ? () => setSheet('account') : undefined} />}
       {sheet === 'account' && <DemoLoginSheet profile={profile} onClose={closeSheet} />}
       {sheet === 'buildings' && <BuildingsSheet buildings={buildings} currentId={building.building.id} onClose={closeSheet} />}
+      {incidents.active.length > 0 && (
+        <div className="alarm-banners" style={{ top: insets.top + 8 }}>
+          {incidents.active.slice(-2).map(incident => {
+            const space = building.spaces.find(s => s.id === incident.spaceId);
+            const floor = building.floors.find(f => f.id === space?.floor_id);
+            return (
+              <div key={incident.id} className={`alarm-banner alarm-banner--${incident.hazard}`} role="alert">
+                <span className="alarm-icon" aria-hidden>{hazardMeta[incident.hazard].icon}</span>
+                <span className="alarm-text"><strong>{hazardMeta[incident.hazard].label}</strong> · {space?.name}{floor ? ` · ${floor.name}` : ''} · <Ago at={incident.createdAt} /></span>
+                <button type="button" onClick={() => openIncident(incident)}>View</button>
+                <button type="button" onClick={() => { incidents.setStatus(incident.id, 'resolved'); if (hazard.view?.incident?.id === incident.id) hazard.close(); }}>Resolve</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {hazard.view && (
+        <HazardPanel building={building} view={hazard.view} panelRef={hazardPanel} onT={hazard.setT} onPlay={hazard.togglePlay} onStartResponse={hazard.startResponse}
+          onRoom={spaceId => setHazardRoom(spaceId)} onClose={() => { hazard.close(); setHazardRoom(null); setHazardFloor(null); }}
+          onResolve={hazard.view.incident ? () => { incidents.setStatus(hazard.view!.incident!.id, 'resolved'); hazard.close(); } : undefined} />
+      )}
+      {sheet === 'damage' && <ReportDamage building={building} myRoom={myRoom} reporter={profile?.name} onClose={closeSheet} onRaise={incident => {
+        incidents.raise(incident);
+        closeSheet();
+        playAlarm();
+        openIncident(incident);
+      }} />}
+      {sheet === 'readiness' && <ReadinessSheet building={building} onClose={closeSheet} onShow={finding => {
+        closeSheet();
+        hazard.close();
+        const focus = building.spaces.find(s => s.id === (finding.focus ?? finding.space_ids[0]));
+        setDirective({ focus: focus ? { mode: 'floor', floorId: focus.floor_id } : { mode: 'building' }, highlights: finding.space_ids.map((spaceId, i) => ({ spaceId, tone: spaceId === finding.focus || i === 0 ? 'primary' : 'secondary', label: spaceId === (finding.focus ?? finding.space_ids[0]) ? finding.title : undefined })) });
+      }} />}
       {sheet === 'location' && profile && <LocationSheet building={building} room={myRoom} sharing={settings?.share !== 'off'} onChange={setLocation} onSettings={() => setSheet('settings')} onClose={closeSheet} />}
       {supabaseBrowser() && signedIn === null && sheet !== 'account' && <DemoLoginSheet profile={profile} />}
 
@@ -404,6 +466,20 @@ function AgentAvatar({ thinking = false, size }: { thinking?: boolean; size?: 'l
 /** Benchmark replies end with an "Answer: …" line; the headline card already shows it. */
 function withoutAnswerLine(reply: string) {
   return reply.replace(/\n*^\s*Answer:.*$/gim, '').trim();
+}
+
+/** "2 min ago", refreshed every 20 s. */
+function Ago({ at }: { at: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 20_000); return () => clearInterval(timer); }, []);
+  const minutes = Math.max(0, Math.round((now - at) / 60_000));
+  return <>{minutes < 1 ? 'just now' : `${minutes} min ago`}</>;
+}
+
+/** Live incidents count as alerts on the floor rail. */
+function withIncidents(counts: ReturnType<typeof floorCounts>, active: Incident[], building: Building, floorId: string) {
+  const here = active.filter(i => building.spaces.find(s => s.id === i.spaceId)?.floor_id === floorId).length;
+  return here ? { ...counts, alerts: counts.alerts + here, summary: [counts.summary, `${here} incident${here > 1 ? 's' : ''}`].filter(Boolean).join(' · ') } : counts;
 }
 
 /** A floor on the rail, with fixed badges for alerts (red) and people (blue) instead of chips floating in the model. */

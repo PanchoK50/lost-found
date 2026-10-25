@@ -9,6 +9,7 @@ import type { Building } from '@/lib/buildings/types';
 import type { FloorPoint, SceneDirective, Tone } from '@/lib/chat/contract';
 import { blockHeight, buildModel, focusBox, layoutFloors, type BuildingModel, type FloorModel, type FloorPose } from './scene-model';
 import type { WorldState } from '@/lib/world/types';
+import { hazardMeta, type HazardKind } from '@/lib/hazards/types';
 import { worldAnchors } from '@/components/world/world-anchors';
 import { DetailedAssets, Doors, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
@@ -55,6 +56,8 @@ interface Props {
   onSetLocation?(spaceId: string): void;
   /** The room the player said they are in, if any. */
   myRoom?: string;
+  /** "Simulate here" on a tapped room: what if a fire, a leak or a power fault starts in it? */
+  onSimulate?(spaceId: string, hazard: HazardKind): void;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -70,12 +73,18 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
+  const hazards = useMemo(() => {
+    const map = new Map<string, { kind: HazardKind; level: number }[]>();
+    for (const h of directive.hazards ?? []) if (h.level > 0.02) map.set(h.spaceId, [...(map.get(h.spaceId) ?? []), { kind: h.kind, level: h.level }]);
+    return map;
+  }, [directive.hazards]);
   const overview = directive.focus.mode === 'building';
-  const directiveKey = useMemo(() => JSON.stringify(directive), [directive]);
+  // Hazard levels change every frame while a simulation plays: they must not reset labels, routes or the tapped room.
+  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined }), [directive]);
   const [hovered, setHovered] = useState<string | null>(null);
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
@@ -130,7 +139,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         <directionalLight position={[60, 120, 40]} intensity={1.25} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Overlays key={directiveKey} model={model} poses={poses} directive={directive} />
@@ -145,7 +154,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
       <div className="scene-anchors">
         {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
-      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + 84 }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onClose={() => setSelected(null)} />}
+      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + 84 }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onSimulate={onSimulate} onClose={() => setSelected(null)} />}
       <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
         {(['blocks', 'detailed'] as const).map(option => (
           <button type="button" key={option} className={`scene-style-option scene-style-option--${option}`} aria-pressed={style === option} onClick={() => chooseStyle(option)}>
@@ -257,8 +266,8 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
   const controls = useRef<CameraControls>(null);
   const { size, camera } = useThree();
   // Frame the answer: the spaces it names or counts and its reference room, not the background candidates.
-  const frame = useMemo(() => (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId), [directive.highlights]);
-  const routePoints = useMemo(() => [...(directive.routes ?? []).flatMap(r => r.points ?? []), ...(directive.links ?? []).flatMap(l => [l.from, l.to])], [directive.routes, directive.links]);
+  const frame = useMemo(() => (directive.frameAll ? [] : (directive.highlights ?? []).filter(h => h.tone !== 'muted').map(h => h.spaceId)), [directive.highlights, directive.frameAll]);
+  const routePoints = useMemo(() => (directive.frameAll ? [] : [...(directive.routes ?? []).flatMap(r => r.points ?? []), ...(directive.links ?? []).flatMap(l => [l.from, l.to])]), [directive.routes, directive.links, directive.frameAll]);
   const focusKey = JSON.stringify([directive.focus, frame, routePoints.length, room]);
   const first = useRef(true);
   useEffect(() => {
@@ -316,6 +325,8 @@ interface FloorViewProps {
   style: SceneStyle;
   textures: ReturnType<typeof useTextures>;
   models: ReturnType<typeof useAssetModels>;
+  /** Spaces on fire, flooded or without power, with their level right now. */
+  hazards: Map<string, { kind: HazardKind; level: number }[]>;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
@@ -323,12 +334,13 @@ interface FloorViewProps {
   onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, onPick, onInspect, onSelect }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
   const doors = useRef<THREE.Group>(null);
   const furniture = useRef<THREE.Group>(null);
+  const hazardLayer = useRef<THREE.Group>(null);
   const edges = useRef<THREE.LineSegments>(null);
   const detailed = style === 'detailed';
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -385,6 +397,11 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       doors.current.visible = s.opacity > 0.5 && (detailed || s.flat > 0.3);
       doors.current.position.y = detailed ? SLAB + 0.03 + lift.primary * 0.05 : top + 0.01;
     }
+    if (hazardLayer.current) {
+      // Just over the floor's top (slabs or blocks), so the tint reads from above and from the side.
+      hazardLayer.current.scale.y = (detailed ? SLAB + 0.04 + lift.primary * 0.05 : blockHeight(model.storey, s.flat, lift.primary)) + 0.06;
+      hazardLayer.current.visible = s.opacity > 0.3;
+    }
     if (furniture.current) {
       furniture.current.visible = detailed && s.opacity > 0.5;
       furniture.current.position.y = SLAB;
@@ -413,6 +430,11 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       </group>
       <mesh ref={walls} geometry={detail.walls} material={materials.wall} visible={detailed} castShadow receiveShadow raycast={() => null} />
       <group ref={doors}><Doors doors={detail.doors} /></group>
+      <group ref={hazardLayer}>
+        {model.spaces.flatMap(m => (hazards.get(m.space.id) ?? []).map(h => (
+          <mesh key={`${m.space.id}-${h.kind}`} geometry={m.geometry} material={hazardMaterial(h.kind, h.level)} renderOrder={3} raycast={() => null} scale-y={h.kind === 'electrical' ? 1.02 : 1} />
+        )))}
+      </group>
       {detailed && <group ref={furniture}><DetailedAssets floor={model} toWorld={toWorld} models={models} litAssets={litAssets} /></group>}
       {(['primary', 'secondary', 'muted'] as const).map(tone => (
         <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
@@ -426,6 +448,22 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       {assets && !detailed && <primitive object={assets} />}
     </group>
   );
+}
+
+const HAZARD_STEPS = 8;
+const hazardMaterials = new Map<string, THREE.MeshBasicMaterial>();
+/** Shared translucent tints per hazard and level step (fire red, water blue, power yellow). */
+function hazardMaterial(kind: HazardKind, level: number) {
+  const step = Math.max(1, Math.min(HAZARD_STEPS, Math.round(level * HAZARD_STEPS)));
+  const key = `${kind}-${step}`;
+  let material = hazardMaterials.get(key);
+  if (!material) {
+    // A power cut is a light wash, so water and fire stay readable where they overlap.
+    const [base, range] = kind === 'electrical' ? [0.08, 0.22] : [0.35, 0.55];
+    material = new THREE.MeshBasicMaterial({ color: hazardMeta[kind].color, transparent: true, opacity: base + range * (step / HAZARD_STEPS), depthWrite: false, toneMapped: false });
+    hazardMaterials.set(key, material);
+  }
+  return material;
 }
 
 /** Per-frame fade of a floor's shared materials (three.js objects are mutated imperatively). */
@@ -564,9 +602,10 @@ function roomContents(model: BuildingModel, spaceId: string) {
 }
 
 /** Details of the tapped room, docked in the corner instead of floating over the model. */
-function RoomCard({ model, spaceId, style, onRoute, onSetLocation, myRoom, onClose }: {
+function RoomCard({ model, spaceId, style, onRoute, onSetLocation, myRoom, onSimulate, onClose }: {
   model: BuildingModel; spaceId: string; style: React.CSSProperties;
-  onRoute?: (spaceId: string) => void; onSetLocation?: (spaceId: string) => void; myRoom?: string; onClose(): void;
+  onRoute?: (spaceId: string) => void; onSetLocation?: (spaceId: string) => void; myRoom?: string;
+  onSimulate?: (spaceId: string, hazard: HazardKind) => void; onClose(): void;
 }) {
   const m = model.spaces.get(spaceId);
   if (!m) return null;
@@ -582,6 +621,14 @@ function RoomCard({ model, spaceId, style, onRoute, onSetLocation, myRoom, onClo
         <div className="room-card-actions">
           {onRoute && !here && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}
           {onSetLocation && (here ? <span className="scene-tip-here">📍 You are here</span> : <button type="button" onClick={() => onSetLocation(spaceId)}>I&apos;m here</button>)}
+        </div>
+      )}
+      {onSimulate && (
+        <div className="room-card-simulate" role="group" aria-label="Simulate here">
+          <span>Simulate here</span>
+          {(['fire', 'water', 'electrical'] as const).map(kind => (
+            <button type="button" key={kind} className={`hazard-chip hazard-chip--${kind}`} onClick={() => onSimulate(spaceId, kind)}>{hazardMeta[kind].icon} {kind === 'electrical' ? 'Power' : hazardMeta[kind].label.split(' ')[0]}</button>
+          ))}
         </div>
       )}
     </aside>

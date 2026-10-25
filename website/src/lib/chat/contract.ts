@@ -120,4 +120,8 @@ export interface SceneDirective {
   assets?: string[];
   /** Opening or vertical-connector ids to mark as closed. */
   closed?: string[];
+  /** Spaces hit by a fire, leak or power cut, with how strongly right now (0–1): tinted red, blue or yellow. */
+  hazards?: { spaceId: string; kind: 'fire' | 'water' | 'electrical'; level: number }[];
+  /** Frame the whole focused floor(s) instead of the highlights and routes (emergency views). */
+  frameAll?: boolean;
 }
