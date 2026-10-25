@@ -61,7 +61,7 @@ interface Props {
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
 /** The fixed cross-building example: always offered as the fourth chip, on every building. */
-const CAMPUS_TRIP = { label: 'To another building', question: 'How do I get from N2301 to N0839 in N8?' };
+const CAMPUS_TRIP = { label: 'To another building', question: 'How do I get from N2301 in N3 to N0839 in N8?' };
 /** Matches the desktop breakpoint in globals.css. Phone layout is the default. */
 const wideQuery = '(min-width: 900px)';
 
