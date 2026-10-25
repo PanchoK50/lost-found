@@ -18,7 +18,7 @@ from pathlib import Path
 
 from lostfound.agent.format import answer_line
 from lostfound.api import scene
-from lostfound.core import directions, geometry, skills
+from lostfound.core import campus, directions, geometry, skills
 from lostfound.core.edits import apply_edits
 from lostfound.core.building import Building, MapError
 from lostfound.core.resolve import Resolver
@@ -197,8 +197,38 @@ EDIT_TOOLS = [
     },
 ]
 
-PYTHON_TOOL = {
-    "name": "run_python",
+CROSS_TOOLS = [
+    {
+        "name": "cross_route",
+        "description": "Route from a place in THIS building to a place in ANOTHER building — use it whenever the person names a "
+        "destination outside this building (a building name, 'the other building', a campus). Routes out of the best exit here, "
+        "across between the buildings, and through the other building to the destination. The distance between the buildings "
+        "comes from real positions or a saved layout when known; when the tool reports need_distance, ask the person one short "
+        "question (how far, roughly), remember the answer with set_building_placement, then call cross_route again.",
+        "input_schema": _schema(
+            {
+                "start": PLACE,
+                "destination": _string("The destination, as the person wrote it (room in the other building)."),
+                "building": _string("The other building, as the person named it, e.g. 'N8', 'Fertigung Ost 27', or its id."),
+                "step_free": {"type": "boolean"},
+            }
+        ),
+    },
+    {
+        "name": "set_building_placement",
+        "description": "Remember for this conversation where another building is, from what the person just said "
+        "(after cross_route reported need_distance). Distance from this building, roughly; which way, if they said.",
+        "input_schema": _schema(
+            {
+                "building": _string("The other building, as in cross_route."),
+                "distance_m": {"type": "number", "description": "Distance between the buildings in metres, as the person said."},
+                "bearing": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "Which way the other building lies; default 'east'."},
+            }
+        ),
+    },
+]
+
+PYTHON_TOOL = {    "name": "run_python",
     "description": textwrap.dedent(
         """\
         Run Python against this building with our verified library and print the result (stdout is returned).
@@ -243,7 +273,13 @@ def infer_room_types() -> list[str]:
 class Toolbox:
     """Executes tool calls for one building. `last_answer_line` holds the most recent formatted answer."""
 
-    def __init__(self, building: Building, design: str, excluded_kinds: frozenset[str] = frozenset()) -> None:
+    def __init__(
+        self,
+        building: Building,
+        design: str,
+        excluded_kinds: frozenset[str] = frozenset(),
+        catalog: campus.Catalog | None = None,
+    ) -> None:
         self.building = building
         self.resolver = Resolver(building)
         self.excluded_kinds = excluded_kinds
@@ -256,6 +292,11 @@ class Toolbox:
             "chat": [*typed, *EDIT_TOOLS, PYTHON_TOOL],
         }[design]
         self.chat = design == "chat"
+        # Cross-building routing: the catalog knows every building, and placements learned in conversation.
+        self.catalog = catalog
+        if self.chat and catalog is not None:
+            self.schemas = [*self.schemas, *CROSS_TOOLS]
+        self.placements: dict[str, dict] = {}
         self.last_answer_line: str | None = None
         self.last_result: dict | None = None  # structured result of the last answering tool (for answers.json)
         self.resolutions: list[dict] = []
@@ -479,6 +520,113 @@ class Toolbox:
         result = skills.count_assets(self.building, kind, floor_id)
         self._scene(lambda: scene.count_assets(self.building, kind, floor_id, result))
         return self._answer("count", result)
+
+    # ---------- other buildings (chat) ----------
+
+    def _placement_for(self, other_id: str) -> dict | None:
+        """Where the other building is, relative to this one: curated campus, learned in chat, or measured."""
+        curated = campus.curated_placement(self.building.id, other_id)
+        if curated is not None:
+            return curated
+        learned = self.placements.get(other_id)
+        if learned is not None:
+            return learned
+        geo = campus.geo_placement(self.building.id, other_id)
+        if geo is not None and geo["distance_m"] > campus.TOO_FAR_TO_WALK_M:
+            return {**geo, "too_far": True}
+        return geo
+
+    def tool_cross_route(self, start: str, destination: str, building: str, step_free: bool = False) -> dict:
+        if self.catalog is None:
+            raise MapError("No other buildings are known here.")
+        matches = [match for match in self.catalog.search(building) if match["id"] != self.building.id]
+        if not matches:
+            raise MapError(f"No building called '{building}'. Ask which building they mean.")
+        other = matches[0]
+        other_building = self.catalog.load(other["id"])
+        other_resolver = Resolver(other_building)
+        destination_id = self._resolve_elsewhere(other_building, other_resolver, destination)
+        if destination_id is None:
+            return {
+                "need_clarify": destination,
+                "what_to_ask": f"Ask which room in {other['name']} they mean (a room number or name); the tools cannot resolve '{destination}' there.",
+            }
+        placement = self._placement_for(other["id"])
+        if placement is None:
+            return {
+                "need_distance": True,
+                "building": other,
+                "what_to_ask": (
+                    f"Ask one short question: roughly how far is {other['name']} from "
+                    f"{self.building.data['building']['name']} (metres), and which way? Then remember it with "
+                    "set_building_placement and call cross_route again."
+                ),
+            }
+        if placement.get("too_far"):
+            return {
+                "too_far": True,
+                "building": other,
+                "distance_m": placement["distance_m"],
+                "note": f"{other['name']} is {placement['distance_m'] / 1000:.1f} km away (real distance, from OpenStreetMap) — not a walk. Say so; offer the indoor parts if useful.",
+            }
+        start_id = self._space(start)
+        site = campus.Campus(
+            [campus.CampusMember(self.building, (0, 0), "here"), campus.CampusMember(other_building, tuple(placement["offset"]), placement["source"])],
+            placement.get("walkways", []),
+        )
+        result = site.cross_route((self.building.id, start_id), (other["id"], destination_id), step_free)
+        self._highlight(start_id)
+        self._scene(lambda: scene.cross_route(site, result))
+        self.last_result = {"kind": "cross_route", **{k: result[k] for k in ("length_m", "minutes", "steps", "distance_source")}}
+        return {
+            "length_m": result["length_m"],
+            "minutes": result["minutes"],
+            "steps": result["steps"],
+            "from": result["from"],
+            "to": result["to"],
+            "distance_source": result["distance_source"],
+        }
+
+    def _resolve_elsewhere(self, other_building: Building, resolver: Resolver, text: str) -> str | None:
+        """Resolve a place in another building: by name, or by superlative ('the largest generic room')."""
+        try:
+            resolution = resolver.space(text)
+            if resolution.candidates and not resolution.ambiguous:
+                return resolution.best
+        except MapError:
+            pass
+        superlative = re.search(r"\b(largest|biggest)\s+(.+?)(?:\s+on\s+(.+))?$", text, re.IGNORECASE)
+        if not superlative:
+            return None
+        try:
+            kind = resolver.room_type(superlative.group(2))
+        except MapError:
+            return None
+        floor_ids = [resolver.floor(superlative.group(3))] if superlative.group(3) else list(other_building.floors)
+        best: tuple[float, str] | None = None
+        for floor_id in floor_ids:
+            for space in other_building.rooms_on_floor(floor_id, kind):
+                area = other_building.polygon(space["id"]).area
+                if best is None or area > best[0]:
+                    best = (area, space["id"])
+        return best[1] if best else None
+
+    def tool_set_building_placement(self, building: str, distance_m: float, bearing: str = "east") -> dict:
+        if self.catalog is None:
+            raise MapError("No other buildings are known here.")
+        matches = [match for match in self.catalog.search(building) if match["id"] != self.building.id]
+        if not matches:
+            raise MapError(f"No building called '{building}'.")
+        if not 3 <= distance_m <= 100_000:
+            raise MapError("The distance should be between 3 m and 100 km — check what the person said.")
+        direction = {"north": (0, 1), "east": (1, 0), "south": (0, -1), "west": (-1, 0)}[bearing]
+        other = matches[0]
+        self.placements[other["id"]] = {
+            "offset": [round(direction[0] * distance_m, 1), round(direction[1] * distance_m, 1)],
+            "distance_m": round(distance_m, 1),
+            "source": "assumed",
+        }
+        return {"building": other, "distance_m": round(distance_m, 1), "bearing": bearing, "remembered": True}
 
     # ---------- edits (chat) ----------
 

@@ -20,9 +20,10 @@ import anthropic
 from benchmark.score import committed_answer
 from lostfound.agent import rules
 from lostfound.agent.format import answer_line
-from lostfound.agent.prompts import BATCH_INSTRUCTIONS, CHAT_INSTRUCTIONS, building_summary
+from lostfound.agent.prompts import BATCH_INSTRUCTIONS, CHAT_INSTRUCTIONS, building_summary, other_buildings_block
 from lostfound.agent.tools import Toolbox
 from lostfound.core.building import Building, MapError
+from lostfound.core.campus import Catalog
 from lostfound.core.resolve import Resolver
 from lostfound.evals.variants import Outcome
 
@@ -193,14 +194,27 @@ def import_checks(building: Building) -> list[dict]:
 
 
 class ChatSession:
-    """Chat mode: one conversation about one building, with edits that persist for the session."""
+    """Chat mode: one conversation about one building, with edits that persist for the session.
 
-    def __init__(self, building: Building, config: AgentConfig | None = None, client: anthropic.Anthropic | None = None) -> None:
+    With a building catalogue, the session can also route to other buildings (cross_route): the session's
+    building stays the anchor; others are loaded on demand and placed from real positions, curated campus
+    files, or what the person says in the conversation."""
+
+    def __init__(
+        self,
+        building: Building,
+        config: AgentConfig | None = None,
+        client: anthropic.Anthropic | None = None,
+        catalog: Catalog | None = None,
+    ) -> None:
         self.config = config or AgentConfig(design="hybrid", effort="low")
         self.loop = ClaudeLoop(self.config, client)
-        self.toolbox = Toolbox(building, "chat")
+        self.toolbox = Toolbox(building, "chat", catalog=catalog)
+        self.catalog = catalog
         self.messages: list[dict] = []
         self.system = system_blocks(CHAT_INSTRUCTIONS, building) + import_checks(building)
+        if catalog is not None:
+            self.system += other_buildings_block(building, catalog)
         self.usage: Counter = Counter()
         self.last_scene: dict = {"focus": {"mode": "building"}}
         self.world_closed: set[str] = set()  # closures reported by people in the building (web world layer)

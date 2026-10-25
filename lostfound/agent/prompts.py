@@ -67,3 +67,37 @@ def building_summary(building: Building) -> str:
         "asset_types": sorted({asset["type"] for asset in building.assets.values()}),
     }
     return json.dumps(summary, ensure_ascii=False, sort_keys=True)
+
+
+def other_buildings_block(building: Building, catalog) -> list[dict]:
+    """System block for cross-building questions: the nearby buildings, how far they really are, and how to
+    place one that is not in the data (ask the person, like the plan import does)."""
+    nearby = []
+    table = catalog.names or {}
+    for other_id, geo in _geo_table().items():
+        if other_id == building.id:
+            continue
+        distance = catalog.geo_distance(building.id, other_id)
+        if distance is None:
+            continue
+        nearby.append({"id": other_id, "name": table.get(other_id, geo.get("name", other_id)), "distance_m": distance})
+    nearby.sort(key=lambda item: item["distance_m"])
+    text = [
+        "Other buildings: when a destination is in another building, use cross_route (never route within this "
+        "building to somewhere else). It knows the real distance where we have it:",
+    ]
+    for item in nearby[:8]:
+        text.append(f"- {item['name']} ({item['id']}): {item['distance_m']:.0f} m away")
+    text.append(
+        "Other buildings of the catalogue can be routed to as well: call cross_route with the building name. "
+        "When it returns need_distance, ask the person one short question (roughly how far, and which way), "
+        "remember it with set_building_placement, then call cross_route again — never invent a distance. "
+        "When it returns too_far, say the real distance and that it is not a walk."
+    )
+    return [{"type": "text", "text": "\n".join(text)}]
+
+
+def _geo_table() -> dict:
+    from lostfound.core.campus import geo_table
+
+    return geo_table()
