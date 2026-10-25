@@ -2,6 +2,7 @@
 import type { Building } from './types';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import n3 from '@/data/buildings/osm-way22744230.json';
+import n8 from '@/data/buildings/osm-way43035346.json';
 import factory from '@/data/buildings/proc-factory-dev-003.json';
 
 /** A suggestion chip: short label, full question sent when tapped. */
@@ -37,6 +38,17 @@ const showcase: CatalogEntry[] = [
       { label: 'Room below', question: 'Which room is directly below N2324?' },
       { label: 'Errand', question: 'I\'m in N2301. I need to grab a coat rack from the room that has one closest to me, then carry it to the largest generic room on floor 5.' },
       { label: '3D distance', question: 'What is the straight-line distance between N0304 and N2323?' },
+      { label: 'To another building', question: 'How do I get from N2301 to the largest generic room in N8?' },
+    ],
+  },
+  {
+    id: 'osm-way43035346',
+    name: 'N8',
+    building: n8 as unknown as Building,
+    suggestions: [
+      { label: 'Find something', question: 'Where is the nearest toilet?' },
+      { label: 'Directions', question: 'How do I get from the entrance to the largest room on floor 2?' },
+      { label: 'To another building', question: 'How do I get from N0839 to N2301 in N3?' },
     ],
   },
   {

@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (spent >= DAILY_LIMIT_USD) {
       // Over the day's budget: answer with the free offline resolver rather than spend more credits.
       const demo = resolveDemo(entry.building, message, { closed: worldClosed });
-      return Response.json(withRoutePoints(entry.building, { ...demo, source: 'demo', reply: `${demo.reply}\n\n(The AI agent reached today's budget, so this is the simple offline answer.)` }));
+      return Response.json(await withRoutePoints(entry.building, { ...demo, source: 'demo', reply: `${demo.reply}\n\n(The AI agent reached today's budget, so this is the simple offline answer.)` }));
     }
     const location = typeof body.location === 'string' && entry.building.spaces.some(s => s.id === body.location) ? body.location : undefined;
     const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location);
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     : resolved;
   // Draw routes on the plan as it is now (doors added by conversation), including this turn's edits.
   const current = applyEdits(entry.building, [...(await loadEdits(entry.id)), ...((response.edits ?? []) as Parameters<typeof applyEdits>[1])]).building;
-  const finished = withRoutePoints(current, response);
+  const finished = await withRoutePoints(current, response);
   const conversationId = user ? await saveTurn(user.id, entry.id, body.conversationId, message, finished).catch(() => undefined) : undefined;
   return Response.json({ ...finished, conversationId });
 }
@@ -156,21 +156,33 @@ async function askAgent(buildingId: string, message: string, sessionId: string |
 
 /**
  * Backends may return routes as a space list only (what the route check scores). Fill in the drawn path and
- * turn-by-turn steps with the walking model.
+ * turn-by-turn steps with the walking model. Cross-building routes name spaces of several buildings: each
+ * leg is measured against the building its spaces belong to (the outdoor leg already brings points).
  */
-function withRoutePoints(building: Building, response: ChatResponse): ChatResponse {
+const otherBuildings = new Map<string, Building | null>();
+
+async function withRoutePoints(building: Building, response: ChatResponse): Promise<ChatResponse> {
   const routes = response.scene.routes;
   if (!routes?.some(r => r.spacePath && (!r.points || !r.steps))) return response;
-  const graph = new WalkGraph(building, { closed: response.scene.closed });
-  return {
-    ...response,
-    scene: {
-      ...response.scene,
-      routes: routes.map(r => {
-        if (!r.spacePath || (r.points && r.steps)) return r;
-        const leg = graph.measure(r.spacePath);
-        return { ...r, points: r.points ?? leg?.points ?? [], steps: r.steps ?? (leg ? turnByTurn(building, leg.segments, r.spacePath) : []) };
-      }),
-    },
-  };
+  const filled = await Promise.all(routes.map(async r => {
+    if (!r.spacePath || (r.points && r.steps)) return r;
+    const legBuilding = await buildingFor(r.spacePath, building);
+    if (!legBuilding) return r;
+    const graph = new WalkGraph(legBuilding, { closed: response.scene.closed });
+    const leg = graph.measure(r.spacePath);
+    return { ...r, points: r.points ?? leg?.points ?? [], steps: r.steps ?? (leg ? turnByTurn(legBuilding, leg.segments, r.spacePath) : []) };
+  }));
+  return { ...response, scene: { ...response.scene, routes: filled } };
+}
+
+/** The building a space list belongs to: space ids start with the building id ('osm-…-F0-S001'). */
+async function buildingFor(spacePath: string[], primary: Building): Promise<Building | null> {
+  const first = spacePath[0] ?? '';
+  const prefix = first.slice(0, first.indexOf('-F'));
+  if (!prefix || prefix === primary.building.id) return primary;
+  if (!otherBuildings.has(prefix)) {
+    const entry = await getCatalogEntry(prefix).catch(() => undefined);
+    otherBuildings.set(prefix, entry?.building ?? null);
+  }
+  return otherBuildings.get(prefix) ?? null;
 }

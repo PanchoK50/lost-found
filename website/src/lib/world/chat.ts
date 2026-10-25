@@ -450,8 +450,8 @@ export function markBroken(building: Building, response: ChatResponse, world: Wo
   const assets = new Map(building.assets.map(a => [a.id, a]));
   const brokenAssets = broken.map(p => p.assetId && assets.get(p.assetId)).filter(a => !!a);
   const brokenSpaces = new Set(broken.filter(p => !p.assetId).map(p => p.spaceId));
-  const assetAt = (m: { floorId: string; position: [number, number] }) => building.assets.find(a => a.floor_id === m.floorId && a.position[0] === m.position[0] && a.position[1] === m.position[1]);
-  const isBroken = (m: { floorId: string; position: [number, number] }) => {
+  const assetAt = (m: { floorId: string | null; position: [number, number] }) => m.floorId === null ? undefined : building.assets.find(a => a.floor_id === m.floorId && a.position[0] === m.position[0] && a.position[1] === m.position[1]);
+  const isBroken = (m: { floorId: string | null; position: [number, number] }) => {
     const asset = assetAt(m);
     return !!asset && (brokenAssets.some(b => b.id === asset.id) || brokenSpaces.has(asset.space_id));
   };
