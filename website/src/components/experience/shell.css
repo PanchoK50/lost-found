@@ -426,3 +426,45 @@
 .shell:not(.shell--emergency) .incident-toast { border-radius: 16px; border-left-width: 1px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14); }
 .sheet { border-radius: 20px 20px 0 0; }
 @media (min-width: 900px) { .sheet { border-radius: 20px; } }
+
+/* ==========================================================================
+   No fixed left column: floors as a slim picker on the model's edge (Google Maps indoors), the map style as a
+   small switch in its corner, scenarios in a header menu. The model gets the full width.
+   ========================================================================== */
+.shell { grid-template-columns: minmax(0, 1fr) 400px; grid-template-areas: "top top" "main panel"; }
+.shell-side { display: none; }
+.floor-picker { position: absolute; z-index: 3; right: 14px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 2px; padding: 4px; max-height: calc(100% - 120px); overflow-y: auto; scrollbar-width: none; border-radius: 16px; background: rgba(255, 255, 255, .94); box-shadow: 0 4px 18px rgba(0, 0, 0, .12); }
+.floor-picker button { position: relative; min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 12px; background: none; font-size: 13px; font-weight: 600; color: #3d3d3d; }
+.floor-picker button:hover { background: #f1f1f1; }
+.floor-picker button.active { background: #0d0d0d; color: #fff; }
+.floor-picker .floor-button-name { display: none; }
+.floor-picker .floor-button-short { display: inline; }
+.floor-picker .floor-hazard, .floor-picker .floor-badge { position: absolute; top: 2px; right: -4px; min-width: 16px; height: 16px; margin: 0; padding: 0 4px; border-radius: 999px; font-size: 10px; line-height: 16px; box-shadow: 0 0 0 2px #fff; }
+.view-switch { position: absolute; z-index: 3; left: 14px; bottom: 14px; display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, .94); box-shadow: 0 4px 18px rgba(0, 0, 0, .12); }
+.experience--hazard .view-switch { bottom: 84px; }
+.view-switch button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; font-size: 13px; font-weight: 500; color: #6b6b6b; }
+.view-switch button[aria-pressed="true"] { background: #0d0d0d; color: #fff; }
+.model-credit { position: absolute; z-index: 2; right: 14px; bottom: 8px; max-width: 50%; font-size: 10px; color: #6b6b6b; text-align: right; }
+.experience--hazard .model-credit { bottom: 78px; }
+.simulate-menu { position: relative; }
+.simulate-menu summary { list-style: none; display: inline-flex; align-items: center; cursor: pointer; }
+.simulate-menu summary::-webkit-details-marker { display: none; }
+.simulate-menu summary::after { content: "▾"; margin-left: 6px; font-size: 10px; color: #8f8f8f; }
+.simulate-list { position: absolute; right: 0; top: 42px; z-index: 30; width: 270px; padding: 6px; border-radius: 16px; background: #fff; box-shadow: 0 12px 32px rgba(0, 0, 0, .16); }
+.simulate-list button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px; background: none; text-align: left; }
+.simulate-list button:hover { background: #f4f4f4; }
+.simulate-list .hazard-dot { flex: none; width: 8px; height: 8px; margin-top: 6px; }
+.simulate-list span { display: flex; flex-direction: column; }
+.simulate-list strong { font-size: 14px; font-weight: 600; color: #0d0d0d; }
+.simulate-list em { font-style: normal; font-size: 12px; color: #6b6b6b; }
+.simulate-list p { margin: 4px 10px 6px; font-size: 12px; color: #8f8f8f; }
+.shell--emergency .floor-picker, .shell--emergency .view-switch, .shell--emergency .simulate-list { background: rgba(15, 21, 32, .94); }
+.shell--emergency .floor-picker button { color: #dfe6ee; }
+.shell--emergency .floor-picker button.active, .shell--emergency .view-switch button[aria-pressed="true"] { background: #ff3b4e; color: #fff; }
+.shell--emergency .simulate-list strong { color: #f2f5f9; }
+@media (max-width: 899px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) auto; grid-template-areas: "top" "main" "panel"; }
+  .floor-picker { right: 8px; top: 8px; transform: none; max-height: calc(100% - 70px); }
+  .view-switch { left: 8px; bottom: 8px; }
+  .simulate-menu { display: none; }
+}

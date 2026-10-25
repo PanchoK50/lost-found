@@ -135,6 +135,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   const [hazardFloor, setHazardFloor] = useState<string | null>(null);
   const hazardPanel = useRef<HTMLElement>(null);
   const [mapStyle, setMapStyle] = useMapStyle();
+  const simulateMenu = useRef<HTMLDetailsElement>(null);
   // Emergency mode: while a live incident is open and not yet fixed, the whole platform turns dark and vivid.
   const emergency = incidents.active.some(i => !i.fixedAt);
   // The room selected on the model: a report starts there.
@@ -396,6 +397,17 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
             );
           })}
         </div>
+        <details className="simulate-menu" ref={simulateMenu}>
+          <summary className="shell-button">Simulate</summary>
+          <div className="simulate-list" role="menu">
+            {demoScenarios.map(scenario => (
+              <button type="button" role="menuitem" key={scenario.hazard} onClick={() => { simulateMenu.current?.removeAttribute('open'); setHazardRoom(null); setHazardFloor(null); void hazard.open(scenario.spaceId, scenario.hazard); }}>
+                <i className={`hazard-dot hazard-dot--${scenario.hazard}`} /><span><strong>{scenario.hazard === 'fire' ? 'Fire' : 'Water leak'}</strong><em>{building.spaces.find(sp => sp.id === scenario.spaceId)?.name}</em></span>
+              </button>
+            ))}
+            <p>Or select any room on the model and pick Fire, Water or Power.</p>
+          </div>
+        </details>
         <button type="button" className="shell-button" onClick={() => setSheet('readiness')}>Readiness</button>
         <button type="button" className="shell-button shell-button--primary" onClick={() => setSheet('damage')}>Report incident</button>
         <button type="button" className="shell-account" onClick={() => setSheet('account')} aria-label={profile ? `Signed in as ${profile.name}. Switch account` : 'Sign in'}>{profile ? initials(profile.name) : 'Sign in'}</button>
@@ -403,58 +415,20 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
           location={profile ? building.spaces.find(s => s.id === myRoom)?.name ?? null : undefined} onLocation={() => setSheet('location')} />}
       </header>
 
-      <aside className="shell-side" aria-label="Building navigation">
-        <section>
-          <h2>Floors</h2>
-          <nav className="shell-floors" ref={floorList} aria-label="Floors">
-            <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }}>Whole building</button>
-            {[...floors].reverse().map(floor => (
-              <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} hazard={hazardByFloor.get(floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
-            ))}
-          </nav>
-        </section>
-        <section>
-          <h2>View</h2>
-          <div className="shell-segmented" role="group" aria-label="Map style">
-            {(['blocks', 'detailed'] as const).map(option => <button type="button" key={option} aria-pressed={mapStyle === option} onClick={() => setMapStyle(option)}>{option === 'blocks' ? 'Blocks' : 'Detailed'}</button>)}
-          </div>
-        </section>
-        <section>
-          <h2>Incidents</h2>
-          {incidents.active.length ? (
-            <ul className="shell-list">
-              {incidents.active.map(incident => {
-                const space = building.spaces.find(s => s.id === incident.spaceId);
-                return (
-                  <li key={incident.id}>
-                    <button type="button" className={hazard.view?.incident?.id === incident.id ? 'active' : ''} onClick={() => openIncident(incident)}>
-                      <i className={`hazard-dot hazard-dot--${incident.hazard}`} /><span><strong>{hazardMeta[incident.hazard].label}</strong><em>{space?.name} · <Ago at={incident.createdAt} /></em></span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <p className="shell-empty">No active incidents.</p>}
-        </section>
-        <section>
-          <h2>Simulate</h2>
-          <ul className="shell-list">
-            {demoScenarios.map(scenario => (
-              <li key={scenario.hazard}>
-                <button type="button" className={hazard.view?.mode === 'simulation' && hazard.view.spaceId === scenario.spaceId ? 'active' : ''} onClick={() => { setHazardRoom(null); setHazardFloor(null); void hazard.open(scenario.spaceId, scenario.hazard); }}>
-                  <i className={`hazard-dot hazard-dot--${scenario.hazard}`} /><span><strong>{scenario.hazard === 'fire' ? 'Fire' : 'Water leak'}</strong><em>{building.spaces.find(s => s.id === scenario.spaceId)?.name}</em></span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="shell-hint">Or select any room on the model.</p>
-        </section>
-        {/* Credit where the licence asks for it (CC BY, ODbL); public-domain (CC0) plans need none. */}
-        {building.building.license !== 'CC0-1.0' && <footer className="shell-credit">{building.building.attribution} · {building.building.license}</footer>}
-      </aside>
 
       <section className="shell-main">
         <div className="scene"><BuildingScene building={building} site={site} directive={shownDirective} insets={insets} mapStyle={mapStyle} emergency={emergency} onSelectRoom={selectRoom} onSelectObject={selectObject} selectedObject={chatContext} onSimulate={(spaceId, kind) => { setHazardRoom(null); setHazardFloor(null); void hazard.open(spaceId, kind); }} onFocusFloor={focusFloor} world={SHOW_MULTIPLAYER ? world : undefined} onPin={setPinId} onPerson={setPersonId} onRoute={routeTo} onSetLocation={profile ? setLocation : undefined} myRoom={myRoom} /></div>
+        {/* Floor picker on the model's edge (as in Google Maps indoors): short labels, live counts as badges. */}
+        <nav className="floor-picker" ref={floorList} aria-label="Floors">
+          <button type="button" className={(hazard.view ? hazardFloor === ALL_FLOORS : directive.focus.mode === 'building') ? 'active' : ''} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(ALL_FLOORS); } else showOverview(); }} aria-label="Whole building" title="Whole building">⌂</button>
+          {[...floors].reverse().map(floor => (
+            <FloorButton key={floor.id} floor={floor} active={focusedFloor === floor.id} counts={withIncidents(floorCounts(SHOW_MULTIPLAYER ? world : undefined, floor.id), incidents.active, building, floor.id)} hazard={hazardByFloor.get(floor.id)} onClick={() => { if (hazard.view) { setHazardRoom(null); setHazardFloor(floor.id); } else focusFloor(floor.id); }} />
+          ))}
+        </nav>
+        <div className="view-switch" role="group" aria-label="Map style">
+          {(['blocks', 'detailed'] as const).map(option => <button type="button" key={option} aria-pressed={mapStyle === option} onClick={() => setMapStyle(option)}>{option === 'blocks' ? 'Blocks' : 'Detailed'}</button>)}
+        </div>
+        {building.building.license !== 'CC0-1.0' && <footer className="model-credit">{building.building.attribution} · {building.building.license}</footer>}
         {hazard.view && <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />}
       </section>
 
@@ -787,14 +761,6 @@ function useFade(since?: number) {
     return () => cancelAnimationFrame(frame);
   }, [since]);
   return since ? Math.max(0, 1 - (now - since) / 1000) : 1;
-}
-
-/** "2 min ago", refreshed every 20 s. */
-function Ago({ at }: { at: number }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 20_000); return () => clearInterval(timer); }, []);
-  const minutes = Math.max(0, Math.round((now - at) / 60_000));
-  return <>{minutes < 1 ? 'just now' : `${minutes} min ago`}</>;
 }
 
 /** Live incidents count as alerts on the floor rail. */
