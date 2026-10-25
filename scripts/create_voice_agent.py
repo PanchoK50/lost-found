@@ -77,6 +77,8 @@ def main() -> None:
                 "language": "en",
                 "prompt": {"prompt": PROMPT, "tools": [{"type": "client", **tool} for tool in TOOLS]},
             },
+            # Full-band audio and light latency optimisation: the defaults (16 kHz, level 3) sound like a phone line.
+            "tts": {"agent_output_audio_format": "pcm_44100", "optimize_streaming_latency": 1},
         },
     }
     existing = os.environ.get("ELEVENLABS_AGENT_ID")
