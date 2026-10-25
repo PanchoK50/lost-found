@@ -19,13 +19,15 @@ import math
 import sys
 from pathlib import Path
 
+import networkx as nx
 import pytest
 
 from benchmark.score import committed_answer, score_reply
 from lostfound import run_benchmark
 from lostfound.agent import rules
 from lostfound.agent.format import answer_line
-from lostfound.core import skills
+from lostfound.agent.tools import Toolbox
+from lostfound.core import reach, skills
 from lostfound.core.building import ROOMISH_TYPES, Building
 from lostfound.core.campus import Campus, CampusMember
 from lostfound.evals.variants import Outcome
@@ -538,3 +540,60 @@ def test_stacking_takes_the_next_floor_that_exists(split, building_id, level, di
     roof = next(space["id"] for space in building.spaces.values() if building.space_level(space["id"]) == top)
     with pytest.raises(MapError, match="No floor above"):
         skills.room_stacked(building, roof, "above")
+
+
+# ---------- several buildings in one plan ----------
+# In the kit, "several buildings" are parts of one building.json: wings or houses joined by corridors, bridges or
+# walkways where the plan has them, and otherwise only outside. Routes never go round the outside, so between parts
+# that only meet outside the expected answer is reachable: false (233 warm-up labels say so).
+
+
+def parts(building: Building) -> list[set[str]]:
+    """The building's parts with at least three rooms each, as the kit's own graph joins them."""
+    graph = kit_map_of(building).graph(step_free=False)
+    found = []
+    for component in nx.connected_components(graph):
+        spaces = {node for node in component if node in building.spaces}
+        if sum(building.spaces[s]["type"] in ROOMISH_TYPES for s in spaces) >= 3:
+            found.append(spaces)
+    return sorted(found, key=lambda part: min(part))
+
+
+def kit_map_of(building: Building) -> BuildingMap:
+    return BuildingMap.load(Path(building.directory))
+
+
+MULTI_PART = [("dev", name) for name in ("osm-way360544293", "swiss-1689", "swiss-2211")] + [
+    ("test", name) for name in ("osm-way50299584", "osm-way50300147", "swiss-100", "swiss-1195", "swiss-6128")
+]
+
+
+@pytest.mark.parametrize(("split", "building_id"), MULTI_PART)
+def test_no_route_between_parts_that_only_meet_outside(split, building_id):
+    """Between two parts: no route (also step-free and as a tour), the tool answers 'no route', and reach counts
+    from one part never include rooms of another."""
+    building = Building.load(DATA / split / building_id)
+    found = parts(building)
+    assert len(found) >= 2, "the building should consist of several parts"
+    for here, there in itertools.combinations(found, 2):
+        start = min(s for s in here if building.spaces[s]["type"] in ROOMISH_TYPES)
+        goal = min(s for s in there if building.spaces[s]["type"] in ROOMISH_TYPES)
+        for step_free in (False, True):
+            assert skills.route(building, start, goal, step_free=step_free)["reachable"] is False
+        middle = max(s for s in here if building.spaces[s]["type"] in ROOMISH_TYPES and s != start)
+        assert skills.route(building, start, goal, via=[middle])["reachable"] is False  # a tour that ends in the other part
+        text, is_error = Toolbox(building, "hybrid").call(
+            "route", {"start": start, "destination": goal, "via": [], "step_free": False, "closed": [], "min_door_width_m": 0, "forklift": False})
+        assert not is_error and json.loads(text)["answer_line"] == "Answer: no route", text
+        assert not reach.reachable_spaces(building, start, step_free=False) & there
+    for part in found:  # inside one part, routes work as usual
+        inside = sorted(s for s in part if building.spaces[s]["type"] in ROOMISH_TYPES)
+        assert skills.route(building, inside[0], inside[-1])["reachable"]
+
+
+def test_the_benchmark_agent_never_routes_between_separate_buildings():
+    """Routing between separate building files needs placement data the kit format doesn't have, so the batch
+    agent that answers the benchmark has no cross-building tool; only the chat with a catalogue does."""
+    building = Building.load(DATA / "dev" / "proc-factory-dev-003")
+    for design in ("typed", "code", "hybrid"):
+        assert "cross_route" not in {tool["name"] for tool in Toolbox(building, design).definitions()}
