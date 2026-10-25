@@ -16,14 +16,22 @@ import re
 import uuid
 from pathlib import Path
 
+from benchmark.score import numbers_in
 from lostfound.agent.format import answer_line
 from lostfound.api import scene
 from lostfound.core import directions, geometry, skills
 from lostfound.core.edits import apply_edits
-from lostfound.core.building import Building, MapError
+from lostfound.core.building import Building, MapError, NoRouteError
 from lostfound.core.resolve import Resolver
 
 REPO = Path(__file__).resolve().parents[2]
+NO_ROUTE = re.compile(r"\bno\b\W*(?:\w+\W+){0,3}?(?:route|path|way)\b|not reachable|unreachable|cannot be reached|can't be reached", re.IGNORECASE)
+MATCH_TOLERANCE = 0.01  # a committed number rounded differently from the tool line still identifies its call
+
+
+def _plain(text: str) -> str:
+    """Answer text without markdown, a final full stop and case: '**84.16 m**.' -> '84.16 m'."""
+    return re.sub(r"[*`_]", "", text).strip().rstrip(".").strip().casefold()
 PYTHON_TIMEOUT_S = 60
 MAX_TOOL_OUTPUT_CHARS = 6000
 
@@ -119,15 +127,18 @@ TYPED_TOOLS = [
     },
     {
         "name": "route",
-        "description": "Shortest walking route (metres, rooms passed, steps). Optional stops in order, step-free, closures. "
-        "Reports when no route exists.",
+        "description": "Shortest route (metres, rooms passed, steps). Optional stops in order, step-free, closures, minimum "
+        "opening width, forklift. Reports when no route exists under the rules; then the answer is that there is no route.",
         "input_schema": _schema(
             {
                 "start": PLACE,
                 "destination": PLACE,
                 "via": {"type": "array", "items": {"type": "string"}, "description": "Stops in order between start and destination (can be empty)."},
-                "step_free": {"type": "boolean"},
-                "closed": {"type": "array", "items": {"type": "string"}, "description": "Closed lifts/stairs/doors/rooms (can be empty)."},
+                "step_free": {"type": "boolean", "description": "No stairs or steps (wheelchair, pram, trolley, 'without stairs'): lifts, ramps and doors only."},
+                "closed": {"type": "array", "items": {"type": "string"}, "description": "Closed or blocked lifts/stairs/doors/rooms/aisles (can be empty)."},
+                "min_door_width_m": {"type": "number", "description": "Every door and opening at least this wide (a wide load); 0 for no limit."},
+                "forklift": {"type": "boolean", "description": "Route for a forklift or other industrial vehicle: forklift aisles and openings of 3 m or "
+                             "more only, no stairs or lifts, production bays only as start or destination (never driven through)."},
             }
         ),
     },
@@ -141,6 +152,7 @@ TYPED_TOOLS = [
                 "start": PLACE,
                 "what": _string("Room type or asset type, as the person said it, e.g. 'toilet', 'meeting room', 'printer'."),
                 "step_free": {"type": "boolean"},
+                "closed": {"type": "array", "items": {"type": "string"}, "description": "Closed lifts/stairs/doors/rooms (can be empty)."},
             }
         ),
     },
@@ -207,7 +219,7 @@ PYTHON_TOOL = {
           R.space(text).best -> space id;  R.floor('floor 2') -> floor id;  R.room_type('meeting room');  R.asset_type('desk')
           b.spaces / b.floors / b.openings / b.connectors / b.assets (dicts by id; see building.json format)
           b.spaces_by_floor[floor_id] -> list of spaces;  b.polygon(space_id) -> shapely Polygon;  b.label(space_id)
-          b.distances_from(space_id, step_free=False, min_width=None) -> {node: metres};  b.route(a, b2, step_free, via)
+          b.distances_from(space_id, step_free=False, min_width=None) -> {node: metres};  b.route(a, b2, step_free, via, min_width, forklift)
           b.temporarily_closed(*ids) / b.temporary_opening(opening_dict) -> context managers for what-ifs
           geometry.area / centroid_3d / distance_3d / stacked(b, id, 'above'|'below') / shared_walls / shared_wall_midpoint
           reach.reachable_spaces(b, start, step_free, min_width) / reach.exit_distances(b) / reach.rooms_reached(...)
@@ -258,6 +270,7 @@ class Toolbox:
         self.chat = design == "chat"
         self.last_answer_line: str | None = None
         self.last_result: dict | None = None  # structured result of the last answering tool (for answers.json)
+        self.answered: list[tuple[str, dict]] = []  # (answer line, structured result) of every answering call, in order
         self.resolutions: list[dict] = []
         self.edits: list[dict] = []
         self.reset_turn()
@@ -307,10 +320,39 @@ class Toolbox:
     def _closed(self, names: list[str]) -> list[str]:
         return [self.building.find_element(name) for name in names]
 
-    def _answer(self, kind: str, result: dict, ambiguous: list[str] | None = None) -> dict:
+    def _remember(self, line: str | None, record: dict) -> None:
+        if line is not None:
+            self.last_answer_line = line
+        self.last_result = record
+        self.answered.append((line or "", record))
+
+    def result_for(self, committed: str | None) -> dict | None:
+        """The structured result behind the answer the reply committed to (the agent may explore a fallback after the
+        answer it gives): the latest call whose answer line says the same, ignoring markdown, units and a final full
+        stop; else the call whose numbers match within 1% (closest, then latest); for a "no route" answer the latest
+        call without a route; else the latest answering call."""
+        if committed is None:
+            return self.last_result
+        wanted = _plain(committed)
+        records = [(_plain(line.removeprefix("Answer:")), record) for line, record in self.answered if line]
+        for line, record in reversed(records):
+            if line == wanted:
+                return record
+        values = numbers_in(wanted)
+        if not values and NO_ROUTE.search(wanted):
+            return next((record for _, record in reversed(records) if record.get("reachable") is False), self.last_result)
+        best, best_gap = None, MATCH_TOLERANCE
+        for line, record in reversed(records):
+            found = numbers_in(line)
+            if values and len(found) == len(values):
+                gap = max(abs(a - b) / max(abs(b), 1.0) for a, b in zip(values, found))
+                if gap < best_gap or (best is None and gap <= best_gap):
+                    best, best_gap = record, gap
+        return best if best is not None else self.last_result
+
+    def _answer(self, kind: str, result: dict, ambiguous: list[str] | None = None, record: dict | None = None) -> dict:
         line = answer_line(self.building, kind, result)
-        self.last_answer_line = line
-        self.last_result = {"kind": kind, **result}
+        self._remember(line, record or {"kind": kind, **result})
         output = {**result, "answer_line": line}
         if ambiguous:
             output["warning"] = f"Ambiguous room mention(s): {ambiguous}. Picked the best match; say so."
@@ -356,14 +398,17 @@ class Toolbox:
 
     def tool_errand_distance(self, start, asset_type, target_floor, target_room_type, can_use_stairs) -> dict:
         start_id = self._space(start)
-        result = skills.errand(
-            self.building,
-            start_id,
-            self.resolver.asset_type(asset_type),
-            self._floor(target_floor),
-            self.resolver.room_type(target_room_type),
-            step_free=not can_use_stairs,
-        )
+        try:
+            result = skills.errand(
+                self.building,
+                start_id,
+                self.resolver.asset_type(asset_type),
+                self._floor(target_floor),
+                self.resolver.room_type(target_room_type),
+                step_free=not can_use_stairs,
+            )
+        except NoRouteError as error:
+            return self._no_route({"kind": "errand", "start": start_id, "step_free": not can_use_stairs}, str(error))
         self._scene(lambda: scene.errand(self.building, start_id, not can_use_stairs, result))
         return self._answer("errand", result, self._ambiguous(start))
 
@@ -403,45 +448,55 @@ class Toolbox:
         self._scene(lambda: scene.what_if_door(self.building, first_id, second_id, floor_id, result))
         return self._answer("what_if_door", result, self._ambiguous(first, second))
 
-    def tool_route(self, start, destination, via, step_free, closed) -> dict:
+    def _no_route(self, record: dict, reason: str) -> dict:
+        line = "Answer: no route"
+        self._remember(line, {**record, "reachable": False, "reason": reason})
+        return {"reachable": False, "reason": reason, "answer_line": line}
+
+    def tool_route(self, start, destination, via, step_free, closed, min_door_width_m=0, forklift=False) -> dict:
         stops = [self._space(start), *[self._space(v) for v in via], self._space(destination)]
         closed_ids = self._closed(closed)
-        result = skills.route(self.building, stops[0], stops[-1], step_free, closed_ids, stops[1:-1])
-        # The agent sometimes also works out a fallback (e.g. "if staircase 1 is blocked too") after the route it
-        # recommends. Within one answer, the route shown and stored is the one for the real situation: fewest extra
-        # closures from the same start, then the shortest. A route from another start always replaces it.
-        rank = (len(closed_ids), result["length_m"] if result["reachable"] else float("inf"))
-        kept = self.turn.get("route_rank") if isinstance(getattr(self, "turn", None), dict) else None
-        # Same start (the agent may also try a second exit as a fallback): keep the better of the two.
-        keep_previous = bool(kept and kept[0] == (stops[0], step_free) and kept[1] <= rank)
-        if not keep_previous:
-            if isinstance(getattr(self, "turn", None), dict):
-                self.turn["route_rank"] = ((stops[0], step_free), rank)
-            self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result))
-            self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
+        min_width = min_door_width_m if min_door_width_m and min_door_width_m > 0 else None
+        result = skills.route(self.building, stops[0], stops[-1], step_free, closed_ids, stops[1:-1], min_width, forklift)
+        record = {"kind": "route", "stops": stops, **result}
+        keep_previous = False
+        if self.chat:
+            # The agent sometimes also works out a fallback (e.g. "if staircase 1 is blocked too") after the route it
+            # recommends. Within one chat turn, the route shown is the one for the real situation: fewest extra
+            # closures from the same start, then the shortest. A route from another start always replaces it.
+            # Batch answers instead store every call and pick the one the reply commits to (result_for).
+            rank = (len(closed_ids), result["length_m"] if result["reachable"] else float("inf"))
+            kept = self.turn.get("route_rank")
+            key = (stops[0], step_free, min_width, forklift)
+            keep_previous = bool(kept and kept[0] == key and kept[1] <= rank)
+            if not keep_previous:
+                self.turn["route_rank"] = (key, rank)
+                self._scene(lambda: scene.route(self.building, stops, step_free, closed_ids, result, min_width, forklift))
         if not result["reachable"]:
-            self.last_answer_line = "Answer: no route"
-            return {**result, "answer_line": "Answer: no route"}
+            if keep_previous:
+                return {**result, "answer_line": "Answer: no route"}
+            return {**self._no_route(record, result["reason"]), **result}
         if self.chat:
             # Directions with turns and landmarks for the reply; the viewer draws the route itself.
             with self.building.temporarily_closed(*closed_ids):
-                details = directions.route_details(self.building, stops[0], stops[-1], step_free, stops[1:-1])
+                details = directions.route_details(self.building, stops[0], stops[-1], step_free, stops[1:-1], min_width, forklift)
             if not keep_previous:
                 self.turn["route"] = details
+                self.last_result = record
             return {
                 "length_m": result["length_m"],
                 "steps": details["steps"],
                 "rooms": [self.building.label(s) for s in details["space_path"] if s in self.building.spaces],
             }
         labelled = {**result, "space_path": [self.building.label(s) if s in self.building.spaces else s for s in result["space_path"]]}
-        output = self._answer("route", labelled)
-        if not keep_previous:
-            self.last_result = {"kind": "route", "stops": stops, "step_free": step_free, "closed": closed_ids, **result}
-        return output
+        return self._answer("route", labelled, record=record)
 
-    def tool_nearest(self, start: str, what: str, step_free: bool) -> dict:
+    def tool_nearest(self, start: str, what: str, step_free: bool, closed: list[str] | None = None) -> dict:
         start_id = self._space(start)
-        distances = self.building.distances_from(start_id, step_free)
+        closed_ids = self._closed(closed or [])
+        with self.building.temporarily_closed(*closed_ids):
+            # The same rules as the route computed below, so the nearest target is one that route can reach.
+            distances = self.building.route_distances(start_id, step_free)
         targets: dict[str, str] = {}  # space id -> what was found there
         try:
             room_type = self.resolver.room_type(what)
@@ -459,9 +514,10 @@ class Toolbox:
             raise MapError(f"I don't know '{what}' in this building. Room types: {', '.join(self.resolver.room_types)}.")
         reachable = [space_id for space_id in targets if space_id in distances]
         if not reachable:
-            raise MapError(f"No reachable {what} from {self.building.label(start_id)}.")
+            reason = f"No reachable {what} from {self.building.label(start_id)}."
+            return self._no_route({"kind": "route", "stops": [start_id], "step_free": step_free, "closed": closed_ids}, reason)
         best = min(reachable, key=lambda space_id: distances[space_id])
-        result = self.tool_route(start_id, best, [], step_free, [])
+        result = self.tool_route(start_id, best, [], step_free, closed_ids)
         return {"found": targets[best], "in": self.building.label(best), "distance_m": round(distances[best], 1), **result}
 
     def tool_find_assets(self, asset_type, floor) -> dict:
@@ -471,7 +527,7 @@ class Toolbox:
             result["matches"] = [match for match in result["matches"] if match["floor"] == floor_name]
         result["matches"] = result["matches"][:25]
         self._scene(lambda: scene.locate(self.building, result["matches"]))
-        self.last_result = {"kind": "locate", **result}
+        self._remember(None, {"kind": "locate", **result})
         return result
 
     def tool_count_assets(self, asset_type, floor) -> dict:

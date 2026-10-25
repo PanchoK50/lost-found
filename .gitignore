@@ -55,3 +55,6 @@ next-env.d.ts
 
 # Screen recordings for the pitch video (large binaries; share them outside git)
 video/out/
+
+# local editor tooling
+.zcode/
