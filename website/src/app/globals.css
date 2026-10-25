@@ -174,7 +174,15 @@ button:disabled { cursor: default; }
 .scene-tip { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; padding: 8px 11px; background: #fff; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; box-shadow: var(--shadow); pointer-events: none; animation: rise .2s ease both; }
 .scene-tip strong { color: var(--ink); font-weight: 600; }
 .scene-tip span { color: var(--muted); }
-.scene-tip .scene-tip-contents { max-width: 260px; white-space: normal; color: var(--text); line-height: 1.35; }
+/* Tapped room: details docked under the map style switch, so the room itself stays in view. */
+.room-card { position: absolute; z-index: 2; display: flex; flex-direction: column; gap: 4px; width: 240px; padding: 12px 14px; background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); font-size: 13px; animation: rise .2s ease both; }
+.room-card strong { color: var(--ink); font-size: 15px; padding-right: 22px; }
+.room-card-meta { color: var(--muted); font-size: 12px; }
+.room-card-contents { color: var(--text); line-height: 1.4; }
+.room-card-actions { display: flex; gap: 6px; margin-top: 6px; }
+.room-card-actions button { flex: 1; height: 34px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 600; }
+.room-card-close { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; }
+.room-card-close:hover { background: var(--line); }
 /* The floor strip covers floor picking on phones; 3D floor tags are a desktop extra. */
 .floor-tag-3d { display: none; }
 

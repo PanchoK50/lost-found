@@ -73,7 +73,6 @@ export interface Anchor {
 export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
-  const tones = useMemo(() => new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone])), [directive.highlights]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
   const overview = directive.focus.mode === 'building';
   const directiveKey = useMemo(() => JSON.stringify(directive), [directive]);
@@ -81,12 +80,17 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
   const picked = selected && selected.directive === directiveKey && !overview ? selected.id : null;
+  // The answer's rooms keep their colours; a tapped room is tinted light blue instead of being covered by a label.
+  const tones = useMemo(() => {
+    const map = new Map((directive.highlights ?? []).map(h => [h.spaceId, h.tone]));
+    if (picked && !map.has(picked)) map.set(picked, 'secondary');
+    return map;
+  }, [directive.highlights, picked]);
   const anchors = useMemo(() => [
     ...answerAnchors(model, poses, directive),
     ...(overview ? floorAnchors(model, poses, onFocusFloor) : []),
     ...(hovered && !overview && hovered !== picked ? hoverAnchor(model, poses, hovered) : []),
-    ...(picked ? hoverAnchor(model, poses, picked, onRoute, onSetLocation, myRoom) : []),
-  ], [model, poses, directive, overview, onFocusFloor, hovered, picked, onRoute, onSetLocation, myRoom]);
+  ], [model, poses, directive, overview, onFocusFloor, hovered, picked]);
   const persistent = useMemo(() => world ? worldAnchors(model, poses, directive.focus, world, { onPin, onPerson, onFocusFloor }) : [], [model, poses, directive.focus, world, onPin, onPerson, onFocusFloor]);
   const projected = useMemo(() => [...anchors, ...persistent], [anchors, persistent]);
   const routePaths = useMemo(() => (directive.routes ?? []).map(r => (r.points ?? []).filter(p => shown(poses, p.floorId)).map(p => worldAt(model, poses, p, ROUTE_HEIGHT))), [directive.routes, model, poses]);
@@ -142,6 +146,7 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
       <div className="scene-anchors">
         {persistent.map(anchor => <div key={anchor.key} ref={register(anchor.key)} className={`scene-anchor${anchor.placement === 'above' ? ' scene-anchor--above' : ''}`}>{anchor.content}</div>)}
       </div>
+      {picked && <RoomCard model={model} spaceId={picked} style={{ left: insets.left + 12, top: insets.top + 84 }} onRoute={onRoute} onSetLocation={onSetLocation} myRoom={myRoom} onClose={() => setSelected(null)} />}
       <div className="scene-style" role="group" aria-label="Map style" style={{ left: insets.left + 12, top: insets.top + 12 }}>
         {(['blocks', 'detailed'] as const).map(option => (
           <button type="button" key={option} className={`scene-style-option scene-style-option--${option}`} aria-pressed={style === option} onClick={() => chooseStyle(option)}>
@@ -270,7 +275,7 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
     const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.56 : 0.72);
-    const polar = room ? 0.7 : directive.focus.mode === 'floor' ? 0.62 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
+    const polar = room ? 0.32 : directive.focus.mode === 'floor' ? 0.5 : directive.focus.mode === 'stack' ? 1.1 : 0.95;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
     const smooth = !first.current;
@@ -546,36 +551,52 @@ function floorAnchors(model: BuildingModel, poses: Map<string, FloorPose>, onFoc
   }));
 }
 
-function hoverAnchor(
-  model: BuildingModel,
-  poses: Map<string, FloorPose>,
-  spaceId: string,
-  onRoute?: (spaceId: string) => void,
-  onSetLocation?: (spaceId: string) => void,
-  myRoom?: string,
-): Anchor[] {
+/** Hover: the room's name and area. */
+function hoverAnchor(model: BuildingModel, poses: Map<string, FloorPose>, spaceId: string): Anchor[] {
   const m = model.spaces.get(spaceId);
   const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
   if (!m || !f) return [];
   const pose = poses.get(f.floor.id)!;
-  const actions = onRoute || onSetLocation;
-  const here = myRoom === spaceId;
-  // What is inside, for a tapped room: "4 desks · 2 office chairs · …".
-  const counts = new Map<string, number>();
-  if (actions) for (const asset of f.assets) if (asset.space_id === spaceId) counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
-  const contents = [...counts].sort((a, b) => b[1] - a[1]);
-  const shown = contents.slice(0, 5).map(([type, n]) => `${n} ${type.replaceAll('_', ' ')}${n > 1 && !/(s|sh|ch|x)$/.test(type) ? 's' : n > 1 ? 'es' : ''}`);
-  if (contents.length > 5) shown.push(`+${contents.length - 5} more`);
   return [{ key: `hv-${spaceId}`, placement: 'above', priority: 4, position: [m.centre[0], pose.y + blockHeight(f.storey, pose.flat) + 0.6, m.centre[1]], content: (
-    <div className={`scene-tip${actions ? ' scene-tip--actions' : ''}`}>
-      <strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span>
-      {shown.length > 0 && <span className="scene-tip-contents">{shown.join(' · ')}</span>}
-      {onRoute && !here && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}
-      {onSetLocation && (here
-        ? <span className="scene-tip-here">📍 You are here</span>
-        : <button type="button" onClick={() => onSetLocation(spaceId)}>I&apos;m here</button>)}
-    </div>
+    <div className="scene-tip"><strong>{m.space.name}</strong><span>{m.area.toFixed(1)} m²</span></div>
   ) }];
+}
+
+/** What is inside a room: "4 desks · 2 office chairs · …". */
+function roomContents(model: BuildingModel, spaceId: string) {
+  const m = model.spaces.get(spaceId);
+  const f = m && model.floors.find(floor => floor.floor.id === m.space.floor_id);
+  const counts = new Map<string, number>();
+  for (const asset of f?.assets ?? []) if (asset.space_id === spaceId) counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
+  const contents = [...counts].sort((a, b) => b[1] - a[1]);
+  const shown = contents.slice(0, 6).map(([type, n]) => `${n} ${type.replaceAll('_', ' ')}${n > 1 ? (/(s|sh|ch|x)$/.test(type) ? 'es' : 's') : ''}`);
+  if (contents.length > 6) shown.push(`+${contents.length - 6} more`);
+  return shown;
+}
+
+/** Details of the tapped room, docked in the corner instead of floating over the model. */
+function RoomCard({ model, spaceId, style, onRoute, onSetLocation, myRoom, onClose }: {
+  model: BuildingModel; spaceId: string; style: React.CSSProperties;
+  onRoute?: (spaceId: string) => void; onSetLocation?: (spaceId: string) => void; myRoom?: string; onClose(): void;
+}) {
+  const m = model.spaces.get(spaceId);
+  if (!m) return null;
+  const contents = roomContents(model, spaceId);
+  const here = myRoom === spaceId;
+  return (
+    <aside className="room-card" style={style} aria-label={m.space.name}>
+      <button type="button" className="room-card-close" onClick={onClose} aria-label="Close (Esc)">×</button>
+      <strong>{m.space.name}</strong>
+      <span className="room-card-meta">{m.area.toFixed(1)} m²{m.space.room_type ? ` · ${m.space.room_type.replaceAll('_', ' ')}` : ''}</span>
+      <span className="room-card-contents">{contents.length ? contents.join(' · ') : 'Nothing inside'}</span>
+      {(onRoute || onSetLocation) && (
+        <div className="room-card-actions">
+          {onRoute && !here && <button type="button" onClick={() => onRoute(spaceId)}>Route here</button>}
+          {onSetLocation && (here ? <span className="scene-tip-here">📍 You are here</span> : <button type="button" onClick={() => onSetLocation(spaceId)}>I&apos;m here</button>)}
+        </div>
+      )}
+    </aside>
+  );
 }
 
 /** Routes, link lines and markers, positioned against the target floor poses. */
