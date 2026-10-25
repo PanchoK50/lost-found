@@ -12,7 +12,7 @@ import type { WorldState } from '@/lib/world/types';
 import { hazardMeta, type HazardKind } from '@/lib/hazards/types';
 import { worldAnchors } from '@/components/world/world-anchors';
 import { People } from './scene-people';
-import { DetailedAssets, Doors, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
+import { DetailedAssets, Doors, type PickObject, FLOOR_TEXTURES, SLAB, buildFloorDetail, floorTexture, useAssetModels, useTextures, wallHeight, type FloorTexture, type SceneStyle } from './scene-detail';
 
 /**
  * Archviz-model look: white, studio-lit model on a warm paper ground. Orange marks the answer,
@@ -64,6 +64,10 @@ interface Props {
   mapStyle?: SceneStyle;
   /** The room currently selected on the model (or null), e.g. to prefill a report. */
   onSelectRoom?(spaceId: string | null): void;
+  /** An object (furniture, machine) or a door picked on the model: it becomes the chat's context. */
+  onSelectObject?(kind: 'asset' | 'opening', id: string): void;
+  /** The object selected as chat context, highlighted on the model. */
+  selectedObject?: { kind: 'asset' | 'opening' | 'space'; id: string } | null;
 }
 
 /** A DOM label pinned to a world position; positions are projected every frame without re-rendering. */
@@ -79,7 +83,7 @@ export interface Anchor {
   priority?: number;
 }
 
-export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom }: Props) {
+export default function BuildingScene({ building, directive, insets, onFocusFloor, world, onPin, onPerson, onRoute, onSetLocation, myRoom, onSimulate, mapStyle, onSelectRoom, onSelectObject, selectedObject }: Props) {
   const model = useMemo(() => buildModel(building), [building]);
   const poses = useMemo(() => layoutFloors(model, directive.focus), [model, directive.focus]);
   const litAssets = useMemo(() => new Set(directive.assets ?? []), [directive.assets]);
@@ -90,7 +94,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
   }, [directive.hazards]);
   const overview = directive.focus.mode === 'building';
   // Hazard levels change every frame while a simulation plays: they must not reset labels, routes or the tapped room.
-  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined, minute: undefined, evacuees: undefined }), [directive]);
+  // Lit objects (e.g. the chat's selection) don't make a new answer either: the tapped room and camera stay.
+  const directiveKey = useMemo(() => JSON.stringify({ ...directive, hazards: undefined, minute: undefined, evacuees: undefined, assets: undefined }), [directive]);
   const [hovered, setHovered] = useState<string | null>(null);
   // A tapped room keeps its tip (with "Route here") until the answer changes or the user taps elsewhere.
   const [selected, setSelected] = useState<{ id: string; directive: string } | null>(null);
@@ -153,7 +158,8 @@ export default function BuildingScene({ building, directive, insets, onFocusFloo
         <directionalLight position={[80, 130, 55]} intensity={1.6} castShadow shadow-mapSize={coarse ? [1024, 1024] : [2048, 2048]} shadow-camera-left={-150} shadow-camera-right={150} shadow-camera-top={150} shadow-camera-bottom={-150} shadow-camera-far={500} />
         <CameraRig model={model} poses={poses} directive={directive} insets={insets} room={picked} />
         {model.floors.map(floor => (
-          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select} />
+          <FloorView key={floor.floor.id} model={floor} toWorld={model.toWorld} pose={poses.get(floor.floor.id)!} tones={tones} litAssets={litAssets} overview={overview} style={style} textures={textures} models={models} hazards={hazards} onPick={onFocusFloor} onInspect={inspect} onSelect={select}
+            onPickObject={onSelectObject ? (kind, id) => onSelectObject(kind, id) : undefined} selectedDoor={selectedObject?.kind === 'opening' ? selectedObject.id : null} />
         ))}
         <Ground y={(model.floors[0]?.floor.elevation_m ?? 0) - 0.02} />
         <Podium model={model} />
@@ -312,9 +318,9 @@ function CameraRig({ model, poses, directive, insets, room }: { model: BuildingM
     const freeH = Math.max(0.15, (size.height - insets.top - insets.bottom) / size.height);
     const vfov = THREE.MathUtils.degToRad(camera.fov) * freeH;
     const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect) * freeW;
-    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 1 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
+    const distance = (radius / Math.sin(Math.min(vfov, hfov) / 2)) * (directive.focus.mode === 'building' ? 0.8 : directive.focus.mode === 'xray' ? 0.62 : 0.72);
     // A lower angle, like an archviz dollhouse render, shows the cut walls and interiors better.
-    const polar = room ? 0.4 : directive.focus.mode === 'floor' ? 0.75 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.95;
+    const polar = room ? 0.4 : directive.focus.mode === 'floor' ? 0.75 : directive.focus.mode === 'stack' ? 1.1 : directive.focus.mode === 'xray' ? 0.9 : 0.78;
     const azimuth = first.current ? Math.PI / 5 : c.azimuthAngle;
     const offset = new THREE.Vector3().setFromSphericalCoords(distance, polar, azimuth);
     const smooth = !first.current;
@@ -380,6 +386,8 @@ interface FloorViewProps {
   models: ReturnType<typeof useAssetModels>;
   /** Spaces on fire, flooded or without power, with their level right now. */
   hazards: Map<string, { kind: HazardKind; level: number }[]>;
+  onPickObject?(kind: 'asset' | 'opening', id: string): void;
+  selectedDoor?: string | null;
   onPick(floorId: string): void;
   /** Show a room's name and area: hover with a mouse, tap on touch. */
   onInspect(spaceId: string | null): void;
@@ -387,7 +395,7 @@ interface FloorViewProps {
   onSelect(spaceId: string): void;
 }
 
-function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect }: FloorViewProps) {
+function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, textures, models, hazards, onPick, onInspect, onSelect, onPickObject, selectedDoor }: FloorViewProps) {
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
@@ -396,6 +404,8 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const hazardLayer = useRef<THREE.Group>(null);
   const edges = useRef<THREE.LineSegments>(null);
   const detailed = style === 'detailed';
+  // Objects and doors can be picked on the floor that is opened, not in the whole-building overview.
+  const pickObject: PickObject | undefined = onPickObject && pose.interactive && !overview ? (kind, id) => onPickObject(kind, id) : undefined;
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
   const state = useRef({ opacity: pose.opacity, flat: pose.flat, y: pose.y });
   const materials = useMemo((): FloorMaterials => {
@@ -482,13 +492,13 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
       <mesh ref={walls} geometry={detail.walls} material={materials.wall} visible={detailed} castShadow receiveShadow raycast={() => null} />
-      <group ref={doors}><Doors doors={detail.doors} /></group>
+      <group ref={doors}><Doors doors={detail.doors} selected={selectedDoor} onPick={pickObject} /></group>
       <group ref={hazardLayer}>
         {model.spaces.flatMap(m => (hazards.get(m.space.id) ?? []).map(h => (
           <mesh key={`${m.space.id}-${h.kind}`} geometry={m.geometry} material={hazardMaterial(h.kind, h.level)} renderOrder={3} raycast={() => null} scale-y={h.kind === 'electrical' ? 1.02 : 1} />
         )))}
       </group>
-      {detailed && <group ref={furniture}><DetailedAssets floor={model} toWorld={toWorld} models={models} litAssets={litAssets} /></group>}
+      {detailed && <group ref={furniture}><DetailedAssets floor={model} toWorld={toWorld} models={models} litAssets={litAssets} onPick={pickObject} /></group>}
       {(['primary', 'secondary', 'muted'] as const).map(tone => (
         <group key={tone} ref={g => { raised.current[tone] = g; }} scale-y={blockHeight(model.storey, pose.flat, lift[tone])}>
           {model.spaces.filter(m => tones.get(m.space.id) === tone).map(m => (
@@ -498,7 +508,12 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
           ))}
         </group>
       ))}
-      {assets && !detailed && <primitive object={assets} />}
+      {assets && !detailed && (
+        <primitive object={assets}
+          onClick={pickObject ? (event: ThreeEvent<MouseEvent>) => { if (event.instanceId == null) return; event.stopPropagation(); pickObject('asset', model.assets[event.instanceId].id, event); } : undefined}
+          onPointerOver={pickObject ? () => { document.body.style.cursor = 'pointer'; } : undefined}
+          onPointerOut={pickObject ? () => { document.body.style.cursor = ''; } : undefined} />
+      )}
     </group>
   );
 }
@@ -564,7 +579,7 @@ function buildAssets(model: FloorModel, toWorld: BuildingModel['toWorld']) {
     mesh.setMatrixAt(i, matrix);
   });
   mesh.castShadow = true;
-  mesh.raycast = () => {};
+
   colorAssets(mesh, model, new Set());
   return mesh;
 }

@@ -64,7 +64,8 @@ export async function POST(request: Request) {
       return Response.json(withRoutePoints(entry.building, { ...demo, source: 'demo', reply: `${demo.reply}\n\n(The AI agent reached today's budget, so this is the simple offline answer.)` }));
     }
     const location = typeof body.location === 'string' && entry.building.spaces.some(s => s.id === body.location) ? body.location : undefined;
-    const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location);
+    const selection = body.selection && ['asset', 'opening', 'space'].includes(body.selection.kind) && typeof body.selection.id === 'string' ? body.selection : undefined;
+    const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location, selection);
     if (agent.ok) {
       resolved = markBroken(entry.building, agent.response, input.world);
     } else if (agent.unreachable) {
@@ -134,13 +135,13 @@ type AgentResult =
   | { ok: false; unreachable: true }
   | { ok: false; unreachable: false; error: string };
 
-async function askAgent(buildingId: string, message: string, sessionId: string | undefined, closed: string[], history?: ChatRequest['history'], location?: string): Promise<AgentResult> {
+async function askAgent(buildingId: string, message: string, sessionId: string | undefined, closed: string[], history?: ChatRequest['history'], location?: string, selection?: ChatRequest['selection']): Promise<AgentResult> {
   let agent: Response;
   try {
     agent = await fetch(`${AGENT_URL}/ui/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ buildingId, message, sessionId, closed, history: history ?? [], location }),
+      body: JSON.stringify({ buildingId, message, sessionId, closed, history: history ?? [], location, selection }),
       cache: 'no-store',
       signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
     });
