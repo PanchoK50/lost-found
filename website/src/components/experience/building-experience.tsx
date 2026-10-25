@@ -8,7 +8,7 @@ import type { Building } from '@/lib/buildings/types';
 import { floorCounts } from '@/components/world/world-anchors';
 import { MicButton } from '@/components/mic-button';
 import { DirectionsPanel } from './directions-panel';
-import type { ChatResponse, SceneDirective } from '@/lib/chat/contract';
+import type { ChatRequest, ChatResponse, SceneDirective } from '@/lib/chat/contract';
 import type { SceneInsets } from './building-scene';
 import type { SceneStyle } from './scene-detail';
 import { detectCategory } from '@/lib/world/mode';
@@ -63,7 +63,6 @@ interface Props {
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
 /** The fixed cross-building example: always offered as the fourth chip, on every building. */
-const CAMPUS_TRIP = { label: 'To another building', question: 'How do I get from N2301 in N3 to N0839 in N8?' };
 /** Matches the desktop breakpoint in globals.css. Phone layout is the default. */
 const wideQuery = '(min-width: 900px)';
 
@@ -392,6 +391,15 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
   }, [showOverview, startOver, directive, floors, focusedFloor, focusFloor, hazard, liveIncident, incidents, clearAnswer]);
 
   /** Send a question to the building agent; resolves to its reply (the voice agent reads it back). */
+  // The emergency on screen goes with every question, so "the fire" and "where is it" resolve for the agent.
+  function incidentContext(): ChatRequest['incident'] {
+    const view = hazard.view;
+    if (!view) return undefined;
+    const data = view.data;
+    const affected = data ? data.simulation.spaces.filter(e => e.kind === view.hazard && levelAt(e, view.t, data.simulation.ramp_min) > 0.5).map(e => e.space_id) : [];
+    return { hazard: view.hazard, origin: view.spaceId, t: Math.round(view.t), affected };
+  }
+
   async function ask(text: string, skillId?: string): Promise<string> {
     const message = text.trim();
     if (!message || busy) return busy ? 'I am still working on the previous question.' : '';
@@ -403,7 +411,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     // Close the phone keyboard so the answer and the model are visible.
     if (!wide) input.current?.blur();
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId, location: profile?.rooms[building.building.id], selection: chatContext ? { ...chatContext, view_right: (window as unknown as { __lfViewRight?: [number, number] }).__lfViewRight } : undefined }) });
+      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ buildingId: building.building.id, message, history, sessionId: sessionId.current, conversationId: conversationId.current, playerId: profile?.id, skillId, location: profile?.rooms[building.building.id], selection: chatContext ? { ...chatContext, view_right: (window as unknown as { __lfViewRight?: [number, number] }).__lfViewRight } : undefined, incident: incidentContext() }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Something went wrong.');
       const response = data as ChatResponse;
@@ -548,8 +556,8 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         <section ref={transcript} className={`shell-chat${hazard.view && !brigade ? ' shell-chat--compact' : ''}`} hidden={brigade ? brigadeTab !== 'ask' : Boolean(hazard.view) && !started} aria-label="Conversation" aria-live="polite">
           {!started && !hazard.view && (
             <div className="shell-intro">
-              <h1>Ask about this building</h1>
-              <p>Where things are, how to get there, what is above or below, what happens if something breaks.</p>
+              <h1>Your fire co-pilot</h1>
+              <p>For fire crews: the way in, the fastest route to the fire, the nearest exit, what is above, below and next to it.</p>
               {importIntro && (
                 <div className="import-intro">
                   <strong>Built from your plans.</strong>
@@ -558,12 +566,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                 </div>
               )}
               <div className="shell-examples">
-                {suggestions.slice(0, 3).map(s => <button type="button" key={s.label} onClick={() => void ask(s.question)}>{s.question.replace(/ Finish with.*$/, '')}</button>)}
-                {/* One fixed cross-building example on every building: from N3 it just asks, from anywhere else it opens the campus and asks there. */}
-                <button type="button" className="shell-example--campus" onClick={() => {
-                  if (building.building.id === 'osm-way22744230') void ask(CAMPUS_TRIP.question);
-                  else router.push(`/?campus=stammgelaende&ask=${encodeURIComponent(CAMPUS_TRIP.question)}`);
-                }}>{CAMPUS_TRIP.question}</button>
+                {suggestions.slice(0, 4).map(s => <button type="button" key={s.label} onClick={() => void ask(s.question)}>{s.question}</button>)}
               </div>
             </div>
           )}
@@ -658,7 +661,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
               </div>
             )}
             {SHOW_MULTIPLAYER && <button type="button" className="ask-plus" onClick={() => { setReportDraft(undefined); setSheet('report'); }} disabled={!profile} aria-label="Report something">+</button>}
-            <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={contextChip ? `Ask about this ${chatContext!.kind === 'opening' ? 'door' : chatContext!.kind === 'space' ? 'room' : 'object'}…` : hazard.view ? 'Ask or coordinate…' : started ? 'Ask a follow-up…' : 'Where is…? How do I get to…?'} aria-label="Ask about the building" />
+            <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1000} enterKeyHint="send" autoComplete="off" placeholder={contextChip ? `Ask about this ${chatContext!.kind === 'opening' ? 'door' : chatContext!.kind === 'space' ? 'room' : 'object'}…` : hazard.view ? 'Ask or coordinate…' : started ? 'Ask a follow-up…' : 'Where is the fire? Which entrance? Nearest exit?'} aria-label="Ask about the building" />
             <MicButton onTranscript={addTranscript} onError={setVoiceError} />
             <button type="submit" disabled={busy || !draft.trim()} aria-label="Send">{busy ? '…' : '↑'}</button>
           </form>

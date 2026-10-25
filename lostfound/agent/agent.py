@@ -215,6 +215,23 @@ def selection_note(building, selection: dict | None) -> str:
     return ""
 
 
+def incident_note(building, incident: dict | None) -> str:
+    """The emergency on screen (a fire drill or live incident), so "the fire", "the fire room" and "where is it" resolve."""
+    if not isinstance(incident, dict) or incident.get("origin") not in building.spaces:
+        return ""
+    hazard = str(incident.get("hazard") or "fire")
+    origin = incident["origin"]
+    try:
+        minute = f" {max(0, int(float(incident.get('t') or 0)))} min since the alarm."
+    except (TypeError, ValueError):
+        minute = ""
+    affected = [s for s in incident.get("affected") or [] if isinstance(s, str) and s in building.spaces and s != origin][:40]
+    hit = f" Rooms now affected ({hazard}): {', '.join(building.label(s) for s in affected)} (ids {', '.join(affected)})." if affected else ""
+    return (f"[Active {hazard} emergency. Origin: {building.label(origin)} (space id {origin}).{minute}{hit} 'The fire', "
+            "'the fire room' and 'there' mean the origin. Routes for crews and people should avoid the affected rooms "
+            "and the origin (pass them as closed) unless they are the start or the destination; lifts are off in a fire.]\n")
+
+
 class ChatSession:
     """Chat mode: one conversation about one building, with edits that persist for the session.
 
@@ -266,19 +283,19 @@ class ChatSession:
         self.world_closed = valid
         b.closed = agent_closed | valid
 
-    def ask(self, text: str, location: str | None = None, selection: dict | None = None) -> dict:
+    def ask(self, text: str, location: str | None = None, selection: dict | None = None, incident: dict | None = None) -> dict:
         outcome = Outcome(reply="", path="chat")
         hints = mention_hints(self.building, text)
         where = (
             f"[The person says they are in {self.building.label(location)} (space id {location}). Use it as the start for "
             "'here', 'nearest', 'from me' and routes without a start; don't ask where they are.]\n"
             if location in self.building.spaces
-            else "[The person has not set their location. If you need a start, ask for their room, or tell them to tap a room "
-            "on the map and choose \"I'm here\".]\n"
+            else "[The person has not set their location. They are usually a firefighter arriving from outside: when a route has "
+            "no start, start from the best entrance (the one closest to the destination) and say which one.]\n"
         )
         view = selection.get("view_right") if isinstance(selection, dict) else None
         self.toolbox.view_right = tuple(view) if isinstance(view, (list, tuple)) and len(view) == 2 else None
-        self.messages.append({"role": "user", "content": where + selection_note(self.building, selection) + text + (f"\n\n{hints}" if hints else "")})
+        self.messages.append({"role": "user", "content": where + incident_note(self.building, incident) + selection_note(self.building, selection) + text + (f"\n\n{hints}" if hints else "")})
         self.toolbox.reset_turn()
         reply = self.loop.run(self.system, self.messages, self.toolbox, outcome)
         self.usage.update(outcome.usage)

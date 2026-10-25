@@ -193,6 +193,8 @@ class UIChatRequest(BaseModel):
     location: str | None = None  # the room the person picked as "I'm here"
     # What the person selected on the model (a chip in the chat): {"kind": "asset" | "opening" | "space", "id": "..."}.
     selection: dict | None = None
+    # The emergency on screen: {"hazard": "fire", "origin": space id, "t": minutes, "affected": [space ids]}.
+    incident: dict | None = None
     model: str = DEFAULT_CHAT_MODEL
     effort: str = "low"
 
@@ -209,7 +211,7 @@ def ui_chat(request: UIChatRequest) -> dict:
     if session.building.id != request.buildingId:
         raise HTTPException(400, "Session belongs to another building.")
     session.set_world_closures(request.closed)
-    turn = session.ask(request.message, request.location, request.selection)
+    turn = session.ask(request.message, request.location, request.selection, request.incident)
     ui = turn["ui"]
     return {
         "kind": ui["kind"],

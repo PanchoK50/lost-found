@@ -70,7 +70,11 @@ export async function POST(request: Request) {
     const selection = body.selection && ['asset', 'opening', 'space'].includes(body.selection.kind) && typeof body.selection.id === 'string'
       ? { kind: body.selection.kind, id: body.selection.id, view_right: Array.isArray(body.selection.view_right) && body.selection.view_right.length === 2 ? body.selection.view_right.map(Number) as [number, number] : undefined }
       : undefined;
-    const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location, selection);
+    const spaceIds = new Set(entry.building.spaces.map(s => s.id));
+    const incident = body.incident && ['fire', 'water', 'electrical'].includes(body.incident.hazard) && spaceIds.has(body.incident.origin)
+      ? { hazard: body.incident.hazard, origin: body.incident.origin, t: Number(body.incident.t) || 0, affected: (Array.isArray(body.incident.affected) ? body.incident.affected : []).filter(id => typeof id === 'string' && spaceIds.has(id)).slice(0, 60) }
+      : undefined;
+    const agent = await askAgent(entry.id, message, body.sessionId, worldClosed, input.history, location, selection, incident);
     if (agent.ok) {
       resolved = markBroken(entry.building, agent.response, input.world);
     } else if (agent.unreachable) {
@@ -140,13 +144,13 @@ type AgentResult =
   | { ok: false; unreachable: true }
   | { ok: false; unreachable: false; error: string };
 
-async function askAgent(buildingId: string, message: string, sessionId: string | undefined, closed: string[], history?: ChatRequest['history'], location?: string, selection?: ChatRequest['selection']): Promise<AgentResult> {
+async function askAgent(buildingId: string, message: string, sessionId: string | undefined, closed: string[], history?: ChatRequest['history'], location?: string, selection?: ChatRequest['selection'], incident?: ChatRequest['incident']): Promise<AgentResult> {
   let agent: Response;
   try {
     agent = await fetch(`${AGENT_URL}/ui/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ buildingId, message, sessionId, closed, history: history ?? [], location, selection }),
+      body: JSON.stringify({ buildingId, message, sessionId, closed, history: history ?? [], location, selection, incident }),
       cache: 'no-store',
       signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
     });

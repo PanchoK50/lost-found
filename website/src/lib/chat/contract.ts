@@ -35,6 +35,8 @@ export interface ChatRequest {
   location?: string;
   /** What is selected on the model and shown as a chip in the chat: "this", "it", "this door" refer to it. */
   selection?: { kind: 'asset' | 'opening' | 'space'; id: string; view_right?: [number, number] };
+  /** The emergency on screen (fire drill or live incident): origin room, minutes since the alarm, rooms hit by now. */
+  incident?: { hazard: 'fire' | 'water' | 'electrical'; origin: string; t: number; affected: string[] };
 }
 
 /** A world change the agent suggests. Shown as a preview card; nothing is written until the user taps Confirm (U8). */

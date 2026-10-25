@@ -239,12 +239,15 @@ export function BrigadePanel({ briefing, people, routes, onRoom, onRescue, tab, 
   );
 }
 
-/** F6: firefighter starter questions with the real room names. */
+/** F6: fire co-pilot questions for the crew, with the real room names (the first four show, the rest under More). */
 export function brigadeChips(briefing: Briefing | undefined, people: People | undefined): { label: string; question: string }[] {
   if (!briefing) return [];
   const o = briefing.origin.name;
   const lea = people?.cannot_self_evacuate?.find(p => p.demo);
   return [
+    { label: 'Which entrance gets us to the fire fastest?', question: `Which entrance gets us fastest to ${o}, and what is the route from there without lifts, avoiding the rooms on fire?` },
+    { label: 'Nearest exit from the fire room', question: `How do I get from ${o} to the nearest exit, avoiding the rooms on fire?` },
+    { label: 'How big is the fire room?', question: `How big is ${o} in m²?` },
     { label: "What's directly above and below the fire?", question: `What is directly above and directly below ${o}?` },
     { label: 'Which rooms share a wall with the fire room?', question: `Which rooms share a wall with ${o}?` },
     { label: 'Any labs, chemicals or server rooms near the fire?', question: `Are there labs with chemical cabinets or fume hoods, or server rooms, on ${briefing.origin.floor} or the floors directly above and below ${o}?` },

@@ -17,57 +17,15 @@ const LIST_TTL_MS = 60_000;
 const MAX_CACHED = 40;
 
 /**
- * Hand-written suggestions for the two showcase buildings (also bundled, so the app works without Supabase).
- * Every other building, including uploaded ones, gets suggestions generated from its rooms and equipment.
+ * The showcase buildings are bundled, so the app works without Supabase. Every building, including uploaded ones,
+ * gets fire co-pilot suggestions generated from its rooms and equipment.
  */
 const showcase: CatalogEntry[] = [
-  {
-    id: 'osm-way22744230',
-    name: 'N3',
-    building: n3 as unknown as Building,
-    // The two everyday questions first, then one example per benchmark kind (docs/answer-types.md).
-    suggestions: [
-      { label: 'Find something', question: 'Where is the projector?' },
-      { label: 'Directions', question: 'How do I get from N2301 to N5325?' },
-      { label: 'Largest room', question: 'Which is the largest generic room on floor 5, and how big is it in m²?' },
-      { label: 'Total area', question: 'What is the total area of all generic rooms on floor 4?' },
-      { label: 'Shared walls', question: 'We\'re soundproofing Generic room -1364. How many rooms share a wall with it?' },
-      { label: 'Wide delivery', question: 'A 0.8 m wide trolley arrives through the entrance into Corridor -1328. Into how many rooms on floor 2 can it be delivered?' },
-      { label: 'Step-free reach', question: 'Lift 1 is out of service. A wheelchair user comes in through the entrance into Stairwell N0320A. How many rooms on floor 2 can they still reach?' },
-      { label: 'What-if door', question: 'What if we add a door between Corridor -1328 and Corridor -1351? How many rooms on basement 1 get a shorter walk out?' },
-      { label: 'Room below', question: 'Which room is directly below N2324?' },
-      { label: 'Errand', question: 'I\'m in N2301. I need to grab a coat rack from the room that has one closest to me, then carry it to the largest generic room on floor 5.' },
-      { label: '3D distance', question: 'What is the straight-line distance between N0304 and N2323?' },
-    ],
-  },
-  {
-    id: 'osm-way43035346',
-    name: 'N8',
-    building: n8 as unknown as Building,
-    suggestions: [
-      { label: 'Find something', question: 'Where is the nearest toilet?' },
-      { label: 'Directions', question: 'How do I get from the entrance to the largest room on floor 2?' },
-    ],
-  },
-  {
-    id: 'proc-factory-dev-003',
-    name: 'Fertigung Ost 27',
-    building: factory as unknown as Building,
-    suggestions: [
-      { label: 'Find something', question: 'Where is the coordinate measuring machine?' },
-      { label: 'Directions', question: 'How do I get from Office 0.23 to Kitchen 1.08?' },
-      { label: 'Largest room', question: 'Which is the largest kitchen on floor 1, and how big is it?' },
-      { label: 'Total area', question: 'What is the total area of all meeting rooms on the ground floor?' },
-      { label: 'Shared walls', question: 'We\'re soundproofing Assembly zone H-A2. How many rooms share a wall with it?' },
-      { label: 'Wide delivery', question: 'A 1.1 m wide cleaning machine arrives through the entrance into Warehouse zone H-C3. Into how many rooms on floor 1 can it be delivered?' },
-      { label: 'Step-free reach', question: 'A wheelchair user comes in through the entrance into Office corridor 0.16. How many rooms on floor 1 can they reach?' },
-      { label: 'What-if door', question: 'What if we add a door between Production zone H-A1 and Meeting room 0.20? How many rooms on the ground floor get a shorter walk out?' },
-      { label: 'Room above', question: 'Which room is directly above Office 0.23?' },
-      { label: 'Errand', question: 'I\'m in Office 0.38. I need to grab a stove from the room that has one closest to me, then carry it to the largest kitchen on floor 1.' },
-      { label: '3D distance', question: 'What is the straight-line distance between Office 0.23 and Kitchen 1.14?' },
-    ],
-  },
+  { id: 'osm-way22744230', name: 'N3', building: n3 as unknown as Building, suggestions: [] },
+  { id: 'osm-way43035346', name: 'N8', building: n8 as unknown as Building, suggestions: [] },
+  { id: 'proc-factory-dev-003', name: 'Fertigung Ost 27', building: factory as unknown as Building, suggestions: [] },
 ];
+for (const entry of showcase) entry.suggestions = fireSuggestionsFor(entry.building);
 
 export const defaultBuildingId = showcase[0].id;
 
@@ -102,7 +60,7 @@ export async function getCatalogEntry(id: string | undefined): Promise<CatalogEn
   const { data: file, error } = await db.storage.from('buildings').download(row.storage_path);
   if (error || !file) return undefined;
   const building = JSON.parse(await file.text()) as Building;
-  const entry: CatalogEntry = { id, name: row.name, building, suggestions: suggestionsFor(building) };
+  const entry: CatalogEntry = { id, name: row.name, building, suggestions: fireSuggestionsFor(building) };
   if (cache.size >= MAX_CACHED) cache.delete(cache.keys().next().value!);
   cache.set(id, entry);
   return entry;
@@ -144,4 +102,45 @@ export function suggestionsFor(building: Building): Suggestion[] {
     if (upper && lower) suggestions.push({ label: '3D distance', question: `What is the straight-line distance between ${named(lower)} and ${named(upper)}?` });
   }
   return suggestions;
+}
+
+function area(polygon: [number, number][]) {
+  let sum = 0;
+  for (let i = 0; i < polygon.length; i++) {
+    const [x1, y1] = polygon[i], [x2, y2] = polygon[(i + 1) % polygon.length];
+    sum += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(sum) / 2;
+}
+
+/**
+ * Fire co-pilot chips for firefighters and emergency crews, with this building's real room names: getting in, the way
+ * out, the size of the room, what is above and below, extinguishers and electrical panels. Built around one likely
+ * fire room (an upper-floor lab, kitchen or technical room when there is one), so every chip works on any building.
+ */
+export function fireSuggestionsFor(building: Building): Suggestion[] {
+  // Rooms where a fire is most likely to start or matters most (inside the function: the showcase calls this at load).
+  const FIRE_PRONE = ['lab', 'laboratory', 'kitchen', 'server_room', 'technical_room', 'workshop', 'storage', 'seminar_room', 'lecture_hall', 'office'];
+  const floors = [...building.floors].sort((a, b) => a.level - b.level);
+  const level = new Map(floors.map(f => [f.id, f.level]));
+  const rooms = building.spaces.filter(s => (s.type === 'room' || s.type === 'hall') && s.name && !s.synthetic);
+  if (!rooms.length) return suggestionsFor(building);
+  const rank = (s: (typeof rooms)[number]) => {
+    const prone = FIRE_PRONE.indexOf(s.room_type);
+    return (prone < 0 ? FIRE_PRONE.length : prone) * 10 + ((level.get(s.floor_id) ?? 0) > 0 ? 0 : 5);
+  };
+  const room = [...rooms].sort((a, b) => rank(a) - rank(b) || area(b.polygon) - area(a.polygon) || a.id.localeCompare(b.id))[0];
+  const name = room.ref && !room.name.includes(room.ref) ? `${room.name} (${room.ref})` : room.name;
+  const has = (type: string) => building.assets.some(a => a.type === type);
+  const out: Suggestion[] = [
+    { label: 'Get in', question: `Which entrance gets us fastest to ${name}, and what is the route from there without lifts?` },
+    { label: 'Nearest exit', question: `How do I get from ${name} to the nearest exit?` },
+    { label: 'Room size', question: `How big is ${name} in m²?` },
+  ];
+  if (floors.length > 1) out.push({ label: 'Above and below', question: `What is directly above and directly below ${name}?` });
+  if (has('fire_extinguisher')) out.push({ label: 'Extinguisher', question: `Where is the nearest fire extinguisher to ${name}?` });
+  out.push({ label: 'Next door', question: `Which rooms share a wall with ${name}?` });
+  if (floors.length > 1) out.push({ label: 'Step-free out', question: `With all lifts off, is there a step-free way out of ${name}?` });
+  if (has('electrical_panel')) out.push({ label: 'Electrical panel', question: 'Where is the electrical panel?' });
+  return out;
 }
