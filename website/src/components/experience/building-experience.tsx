@@ -146,6 +146,14 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     requestAnimationFrame(() => input.current?.focus());
   }, []);
   const contextChip = chatContext ? describeContext(building, chatContext) : null;
+  // An answer card: show its scene; for a move, fly back to what was moved, in its new place, and select it again.
+  const showAnswer = (response: ChatResponse) => {
+    const edit = (response.edits ?? []).map(e => e as { action?: string; asset_id?: string; opening_id?: string }).find(e => e.action === 'move_door' || e.action === 'move_asset');
+    const target = edit?.action === 'move_door' ? { kind: 'opening' as const, id: edit.opening_id! } : edit?.action === 'move_asset' ? { kind: 'asset' as const, id: edit.asset_id! } : null;
+    if (target) setChatContext(target);
+    const context = target ?? chatContext;
+    setDirective(context ? keepSelectionInView(response, building, context) : response.scene);
+  };
   // One selection at a time: a tapped room replaces an object in the chat, and an object replaces the room.
   const selectRoom = useCallback((spaceId: string | null) => {
     setSelectedRoom(spaceId);
@@ -335,7 +343,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       if (response.edits?.length) router.refresh();
       conversationId.current = response.conversationId ?? conversationId.current;
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: response.reply, response }]);
-      setDirective(response.scene);
+      setDirective(chatContext ? keepSelectionInView(response, building, chatContext) : response.scene);
       setActiveStep(undefined);
     } catch (error) {
       setMessages(current => [...current, { id: nextId.current++, role: 'assistant', content: error instanceof Error ? error.message : 'Something went wrong.', error: true }]);
@@ -494,7 +502,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
                 : <article key={message.id} className={`bubble bubble--assistant${message.error ? ' bubble--error' : ''}`}>
                     <AgentAvatar />
                     {message.response?.answer && (
-                      <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { setDirective(message.response!.scene); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
+                      <button type="button" className={`answer-card${message.response.answer.negative ? ' answer-card--negative' : ''}`} onClick={() => { showAnswer(message.response!); setActiveStep(undefined); }} aria-label={`Show ${message.response.answer.title} on the model`}>
                         <span className="answer-title">{message.response.answer.title}</span>
                         {message.response.answer.value && <span className="answer-value">{message.response.answer.value}</span>}
                         {message.response.answer.detail && <span className="answer-detail">{message.response.answer.detail}</span>}
@@ -688,6 +696,33 @@ function useMapStyle(): [SceneStyle, (style: SceneStyle) => void] {
   );
   const set = useCallback((next: SceneStyle) => { localStorage.setItem(STYLE_KEY, next); styleListeners.forEach(l => l()); }, []);
   return [style as SceneStyle, set];
+}
+
+/**
+ * While something is selected (a chip in the chat), answers about it keep the camera on it: a clarifying question or
+ * an edit doesn't jump back to the whole building, and after a move the camera follows it to where it went.
+ * Answers that show something else on purpose (a route, another room on another floor) keep their own view.
+ */
+function keepSelectionInView(response: ChatResponse, building: Building, context: { kind: 'asset' | 'opening' | 'space'; id: string }): SceneDirective {
+  const scene = response.scene;
+  const moved = (response.edits ?? []).map(e => e as { action?: string; asset_id?: string; opening_id?: string; position?: [number, number] })
+    .find(e => (e.action === 'move_door' && e.opening_id === context.id) || (e.action === 'move_asset' && e.asset_id === context.id));
+  let floorId: string | undefined, position: [number, number] | undefined;
+  if (context.kind === 'asset') {
+    const asset = building.assets.find(a => a.id === context.id);
+    floorId = asset?.floor_id; position = moved?.position ?? asset?.position;
+  } else if (context.kind === 'opening') {
+    const opening = building.openings.find(o => o.id === context.id);
+    floorId = opening?.floor_id; position = moved?.position ?? opening?.position;
+  } else {
+    const space = building.spaces.find(sp => sp.id === context.id);
+    floorId = space?.floor_id;
+    if (space) position = [space.polygon.reduce((a, p) => a + p[0], 0) / space.polygon.length, space.polygon.reduce((a, p) => a + p[1], 0) / space.polygon.length];
+  }
+  if (!floorId || !position) return scene;
+  const ownView = Boolean(scene.routes?.length) || (scene.focus.mode === 'floor' && scene.focus.floorId !== floorId && !response.edits?.length);
+  if (ownView) return scene;
+  return { ...scene, focus: { mode: 'floor', floorId, around: position } };
 }
 
 /** The chat chip for a selection: what it is, where, and the edits that make sense for it. */
