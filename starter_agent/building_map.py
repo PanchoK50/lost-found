@@ -83,9 +83,9 @@ def shortest_lengths(matrix: np.ndarray) -> np.ndarray:
     return matrix
 
 
-def walking_lengths(polygon: Polygon, points: list[Point2]) -> dict[tuple[int, int], float]:
-    """Shortest walks between points inside a space, 15 cm off the walls and round its corners: a
-    visibility graph over the points and the corners of the walkable area."""
+def walkable_area(polygon: Polygon) -> tuple[Polygon, list[Point2]]:
+    """Where a walk inside a space may go (15 cm off the walls, plus a cover tolerance) and the corners it
+    turns round."""
     walkable = polygon.buffer(-WALL_CLEARANCE_M)
     if walkable.is_empty or walkable.geom_type != "Polygon":
         walkable = polygon
@@ -93,6 +93,13 @@ def walking_lengths(polygon: Polygon, points: list[Point2]) -> dict[tuple[int, i
     corners = [
         corner for ring in [walkable.exterior, *walkable.interiors] for corner in list(ring.coords)[:-1]
     ]
+    return allowed, corners
+
+
+def walking_lengths(polygon: Polygon, points: list[Point2]) -> dict[tuple[int, int], float]:
+    """Shortest walks between points inside a space, 15 cm off the walls and round its corners: a
+    visibility graph over the points and the corners of the walkable area."""
+    allowed, corners = walkable_area(polygon)
     walks = shortest_lengths(visibility_matrix(allowed, list(points) + corners))
     lengths = {}
     for source in range(len(points)):
@@ -101,6 +108,36 @@ def walking_lengths(polygon: Polygon, points: list[Point2]) -> dict[tuple[int, i
             fallback = math.dist(points[source], points[target]) * BLOCKED_DETOUR_FACTOR
             lengths[(source, target)] = walk if math.isfinite(walk) else fallback
     return lengths
+
+
+def walking_path(polygon: Polygon, start: Point2, end: Point2) -> list[Point2]:
+    """The corners the shortest walk from start to end turns round inside a space, in order, start and end
+    left out: the walk walking_lengths measures, for drawing it. Empty when the straight line is clear, and
+    when no clear walk exists (walking_lengths then falls back to the straight line too)."""
+    allowed, corners = walkable_area(polygon)
+    matrix = visibility_matrix(allowed, [start, end, *corners])
+    # Dijkstra from start (0) to end (1) over the dense matrix, keeping where each node was reached from.
+    distance = np.full(len(matrix), np.inf)
+    distance[0] = 0.0
+    previous = np.full(len(matrix), -1)
+    done = np.zeros(len(matrix), dtype=bool)
+    while True:
+        current = int(np.argmin(np.where(done, np.inf, distance)))
+        if done[current] or not math.isfinite(distance[current]) or current == 1:
+            break
+        done[current] = True
+        through = distance[current] + matrix[current]
+        better = (through < distance) & ~done
+        distance[better] = through[better]
+        previous[better] = current
+    if not math.isfinite(distance[1]):
+        return []
+    path = []
+    node = int(previous[1])
+    while node > 0:
+        path.append((float(corners[node - 2][0]), float(corners[node - 2][1])))
+        node = int(previous[node])
+    return path[::-1]
 
 
 class MapError(ValueError):

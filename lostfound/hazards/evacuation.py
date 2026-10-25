@@ -54,12 +54,12 @@ def evacuate(building: Building, result: dict, at_min: float = 3.0) -> dict:
             continue
         seen.add(room["space_id"])
         routes.append({"space_id": room["space_id"], "name": room["name"], "exit": room["exit"], "distance_m": room["distance_m"],
-                       "polylines": directions._polylines(building, room["nodes"]), "space_path": building.spaces_passed(graph, room["nodes"])})
+                       "polylines": directions._polylines(building, room["nodes"], graph), "space_path": building.spaces_passed(graph, room["nodes"])})
     # Walkers: every evacuated room's way out as one polyline across floors, for the people animation.
     walkers = []
     for room in sorted(rooms, key=lambda r: -r["people"])[:MAX_WALKERS]:
         start = _start_time(result, room["space_id"]) if not fire else REACTION_MIN
-        path = [[run["floor_id"], *point] for run in directions._polylines(building, room["nodes"]) for point in run["points"]]
+        path = [[run["floor_id"], *point] for run in directions._polylines(building, room["nodes"], graph) for point in run["points"]]
         walkers.append({"space_id": room["space_id"], "people": room["people"], "distance_m": room["distance_m"], "start_min": round(start, 2),
                         "exit": room["exit"], "path": path})
     # Queues at the exits: each door lets EXIT_FLOW people per metre per minute through, first come first served.
