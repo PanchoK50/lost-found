@@ -71,11 +71,10 @@ export function useTextures(enabled: boolean) {
 // ---------- walls and doors ----------
 
 const WALL_THICKNESS = 0.22;
-/** Facades read as load-bearing: thicker than partitions, with a window band between sill and header. */
+/** Facades read as load-bearing: thicker than partitions. */
 const FACADE_THICKNESS = 0.42;
-const GLASS_SILL = 0.95, GLASS_HEAD = 2.35;
-/** Wall tops are drawn dark so the plan reads like a crisp architectural drawing; sides stay light. */
-const WALL_TOP = new THREE.Color('#6b7484').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
+/** Wall tops are a soft grey, like cut foam-board, so the plan reads without heavy black lines; sides stay light. */
+const WALL_TOP = new THREE.Color('#a3adbc').convertSRGBToLinear(), WALL_SIDE = new THREE.Color('#ffffff');
 const WALL_UV_HEIGHT = 2.5;
 const OUTDOOR_WALL_FACTOR = 0.35;
 
@@ -83,8 +82,6 @@ export interface DoorMarker { id: string; x: number; z: number; angle: number; w
 export interface FloorDetail {
   /** Unit-height walls with gaps at the doors; scale Y to set their height. */
   walls: THREE.BufferGeometry;
-  /** Unit-height window band on the facades (between sill and header); scale Y together with the walls. */
-  glass: THREE.BufferGeometry;
   doors: DoorMarker[];
 }
 
@@ -169,13 +166,12 @@ function addWallBox(builder: Builder, a: [number, number], b: [number, number], 
 /** Walls along every space outline (shared edges once), with gaps where the doors sit, plus door markers along the wall. */
 export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWorld']): FloorDetail {
   const walls = new Builder();
-  const glass = new Builder();
   const bySpace = new Map<string, Opening[]>();
   for (const opening of floor.openings) for (const id of opening.space_ids) bySpace.set(id, [...(bySpace.get(id) ?? []), opening]);
   const seen = new Set<string>();
   const angle = new Map<string, number>();
   const key = (p: Point) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`;
-  // Facades are edges with exactly one indoor space on either side; they get a thicker wall and a window band.
+  // Facades are edges with exactly one indoor space on either side; they get a thicker wall than the partitions.
   const edgeSpaces = new Map<string, Space[]>();
   for (const { space } of floor.spaces) {
     const ring = cleanRing(space.polygon);
@@ -184,10 +180,6 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
       edgeSpaces.set(edge, [...(edgeSpaces.get(edge) ?? []), space]);
     }
   }
-  // The window band as a fraction of unit wall height, so it scales with the walls when a floor is cut open.
-  const fullHeight = wallHeight(floor.storey, 0);
-  const sillTop = Math.min(GLASS_SILL / fullHeight, 0.6);
-  const headBottom = Math.min(Math.max(GLASS_HEAD / fullHeight, sillTop + 0.08), 0.98);
   for (const { space } of floor.spaces) {
     const ring = cleanRing(space.polygon);
     const doors = bySpace.get(space.id) ?? [];
@@ -215,14 +207,7 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
       }
       for (const [s, e] of solidIntervals(length, gaps)) {
         const a = toWorld([p[0] + ux * s, p[1] + uy * s]), b = toWorld([p[0] + ux * e, p[1] + uy * e]);
-        if (facade) {
-          // Solid wall below and above the window band; the band itself goes into a translucent mesh.
-          addWallBox(walls, a, b, 0, sillTop, FACADE_THICKNESS);
-          addWallBox(walls, a, b, headBottom, 1, FACADE_THICKNESS);
-          addWallBox(glass, a, b, sillTop, headBottom, FACADE_THICKNESS + 0.04);
-        } else {
-          addWallBox(walls, a, b, 0, height, WALL_THICKNESS);
-        }
+        addWallBox(walls, a, b, 0, height, facade ? FACADE_THICKNESS : WALL_THICKNESS);
       }
     }
   }
@@ -231,7 +216,7 @@ export function buildFloorDetail(floor: FloorModel, toWorld: BuildingModel['toWo
     const color = opening.kind === 'entrance' ? doorColors.entrance : !opening.step_free ? doorColors.step : opening.kind === 'opening' ? doorColors.opening : doorColors.door;
     return { id: opening.id, x, z, angle: angle.get(opening.id) ?? 0, width: opening.width_m, color };
   });
-  return { walls: walls.build(), glass: glass.build(), doors };
+  return { walls: walls.build(), doors };
 }
 
 /** Door thresholds: a coloured strip across the wall, green for entrances, amber where there is a step. */

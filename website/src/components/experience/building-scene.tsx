@@ -330,7 +330,7 @@ function damp(current: number, target: number, delta: number, lambda = 4) {
   return THREE.MathUtils.damp(current, target, lambda, delta);
 }
 
-type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset' | 'wall' | 'glass', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial; floors: Record<FloorTexture, THREE.MeshStandardMaterial> };
+type FloorMaterials = Record<'room' | 'hall' | 'corridor' | 'core' | Tone | 'asset' | 'wall', THREE.MeshStandardMaterial> & { edge: THREE.LineBasicMaterial; floors: Record<FloorTexture, THREE.MeshStandardMaterial> };
 
 /** Base colours multiplied onto the floor textures, so materials read like an archviz plan (warm wood, grey carpet, cool tiles). */
 const FLOOR_TINTS: Record<FloorTexture, string> = { epoxy: '#e9e6e1', carpet: '#e2e5ea', parquet: '#f2e6d4', tiles: '#eaedef', terrazzo: '#e9e7e2' };
@@ -359,7 +359,6 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const group = useRef<THREE.Group>(null);
   const blocks = useRef<THREE.Group>(null);
   const walls = useRef<THREE.Mesh>(null);
-  const glassRef = useRef<THREE.Mesh>(null);
   const doors = useRef<THREE.Group>(null);
   const furniture = useRef<THREE.Group>(null);
   const hazardLayer = useRef<THREE.Group>(null);
@@ -373,8 +372,6 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       room: surface(palette.room), hall: surface(palette.hall), corridor: surface(palette.corridor), core: surface(palette.core),
       primary: surface(palette.primary), secondary: surface(palette.secondary), muted: surface(palette.muted), asset: surface(palette.asset),
       wall: Object.assign(surface('#ffffff'), { vertexColors: true }),
-      // Facade glazing between sill and header; faded with the floor's opacity.
-      glass: new THREE.MeshStandardMaterial({ color: '#b9cfdf', roughness: 0.35, metalness: 0, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
       edge: new THREE.LineBasicMaterial({ color: palette.edge, transparent: true }),
       floors: Object.fromEntries(FLOOR_TEXTURES.map(name => [name, surface(FLOOR_TINTS[name])])) as Record<FloorTexture, THREE.MeshStandardMaterial>,
     };
@@ -391,7 +388,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     assign(materials.wall, textures.get('plaster'));
   }, [materials, textures]);
   const detail = useMemo(() => buildFloorDetail(model, toWorld), [model, toWorld]);
-  useEffect(() => () => { detail.walls.dispose(); detail.glass.dispose(); }, [detail]);
+  useEffect(() => () => detail.walls.dispose(), [detail]);
   const assets = useMemo(() => buildAssets(model, toWorld), [model, toWorld]);
   useEffect(() => { if (assets) colorAssets(assets, model, litAssets); }, [assets, model, litAssets]);
 
@@ -414,11 +411,6 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
       walls.current.visible = detailed;
       walls.current.position.y = SLAB;
       walls.current.scale.y = wallHeight(model.storey, s.flat);
-    }
-    if (glassRef.current) {
-      glassRef.current.visible = detailed;
-      glassRef.current.position.y = SLAB;
-      glassRef.current.scale.y = wallHeight(model.storey, s.flat);
     }
     if (edges.current) edges.current.visible = !detailed;
     if (doors.current) {
@@ -458,7 +450,6 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
         <lineSegments ref={edges} geometry={model.edges} material={materials.edge} renderOrder={1} />
       </group>
       <mesh ref={walls} geometry={detail.walls} material={materials.wall} visible={detailed} castShadow receiveShadow raycast={() => null} />
-      <mesh ref={glassRef} geometry={detail.glass} material={materials.glass} visible={detailed} raycast={() => null} />
       <group ref={doors}><Doors doors={detail.doors} /></group>
       <group ref={hazardLayer}>
         {model.spaces.flatMap(m => (hazards.get(m.space.id) ?? []).map(h => (
@@ -503,7 +494,6 @@ function applyFade(materials: FloorMaterials, assets: THREE.InstancedMesh | null
     material.opacity = s.opacity * (overview ? 0.94 : 1);
     material.depthWrite = !ghost;
   }
-  materials.glass.opacity = 0.5 * s.opacity * (overview ? 0.94 : 1);
   materials.edge.opacity = Math.min(1, s.opacity * 1.6) * 0.85;
   materials.asset.opacity = s.opacity * s.flat;
   if (assets) {
