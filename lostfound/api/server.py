@@ -443,3 +443,53 @@ def building_readiness(building_id: str) -> dict:
 @app.get("/hazards/sensors")
 def building_sensors(building_id: str) -> dict:
     return {"building_id": building_id, "sensors": hazard_sensors(load(building_id)), "contacts": hazard_playbooks.DEFAULT_CONTACTS}
+
+
+# ---------- fire brigade edition (docs/BRIGADE_BRIEF.md) ----------
+
+from lostfound.hazards import brigade as hazard_brigade  # noqa: E402
+
+
+class BriefingRequest(BaseModel):
+    building_id: str
+    origin: str
+    t_now_min: float = 4.0
+    eta_min: float = 8.0
+    horizon_min: float = 30.0
+
+
+@app.post("/brigade/briefing")
+def brigade_briefing(request: BriefingRequest) -> dict:
+    try:
+        return hazard_brigade.briefing(load(request.building_id), request.origin, request.t_now_min, request.eta_min, request.horizon_min)
+    except MapError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@app.get("/brigade/people")
+def brigade_people(building_id: str, origin: str, t: float = 4.0) -> dict:
+    try:
+        return hazard_brigade.people(load(building_id), origin, t)
+    except MapError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+class CrewRoutesRequest(BaseModel):
+    building_id: str
+    origin: str
+    t_arrival: float = 12.0
+    start_opening: str | None = None
+    targets: list[dict]
+
+
+@app.post("/brigade/routes")
+def brigade_routes(request: CrewRoutesRequest) -> dict:
+    try:
+        return hazard_brigade.routes(load(request.building_id), request.origin, request.t_arrival, request.targets, request.start_opening)
+    except MapError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@app.get("/brigade/scenario/default")
+def brigade_scenario() -> dict:
+    return {"building_id": "proc-campus-test-005", "origin": "proc-campus-test-005-F3-S025", "alarm_clock": "10:42", "t_now_min": 4, "eta_min": 8}

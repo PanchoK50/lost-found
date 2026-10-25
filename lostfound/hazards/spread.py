@@ -26,6 +26,7 @@ MIN_OVERLAP = 0.05
 # (delay in minutes, level factor) per way of spreading; door delays add the walk between the room centres.
 FIRE = {"door": (2.0, 0.95), "wall": (28.0, 0.75), "stairs": (4.0, 0.85), "above": (18.0, 0.7)}
 # Fire grows across a room in minutes; smoke runs along corridors and up stairwells at tens of metres a minute.
+STAIR_DOOR_FACTOR = 0.45
 FIRE_M_PER_MIN = {"room": 6.0, "hall": 12.0, "corridor": 30.0, "stair": 30.0, "lift": 30.0, "outdoor": 2.0}
 WATER = {"door": (1.0, 0.38), "wall": (12.0, 0.35), "below": (6.0, 0.8), "stairs": (3.0, 0.5)}
 WATER_M_PER_MIN = 6.0
@@ -144,7 +145,9 @@ def _edges(building: Building, hazard: str, space_id: str, peak: float = 1.0):
     if hazard == "fire":
         for other, walk in s["doors"][space_id]:
             rate = FIRE_M_PER_MIN.get(building.spaces[other]["type"], 6.0)
-            yield other, FIRE["door"][0] + walk / rate, FIRE["door"][1], "door"
+            # Stairwells are behind self-closing fire doors: smoke gets in, the fire itself much later.
+            factor = FIRE["door"][1] * (STAIR_DOOR_FACTOR if building.spaces[other]["type"] == "stair" and building.spaces[space_id]["type"] != "stair" else 1.0)
+            yield other, FIRE["door"][0] + walk / rate, factor, "door"
         for other in s["walls"][space_id]:
             yield other, *FIRE["wall"], "wall"
         for other, rise in s["stairs"][space_id]:
