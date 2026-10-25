@@ -125,6 +125,7 @@ class RouteRequest(BaseModel):
     via: list[str] = []
     step_free: bool = False
     min_width_m: float | None = None
+    forklift: bool = False
     closed: list[str] = []
     session_id: str | None = None
 
@@ -144,6 +145,7 @@ def route(request: RouteRequest) -> dict:
                 request.step_free,
                 [resolver.space(stop).best for stop in request.via],
                 request.min_width_m,
+                request.forklift,
             )
     except MapError as error:
         raise HTTPException(422, str(error)) from error

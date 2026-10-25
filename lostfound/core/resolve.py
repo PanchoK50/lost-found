@@ -89,6 +89,14 @@ class Resolver:
         exact += [s["id"] for s in spaces if (s.get("ref") or "") and fold(s["ref"]) == folded and s["id"] not in exact]
         if exact:
             return Resolution(text, [self._candidate(space_id, 100) for space_id in exact])
+        # A thing named exactly ('CNC mill H-A1-A'): a route to an item ends in the room or bay that holds it.
+        holders = list(dict.fromkeys(
+            a["space_id"] for a in building.assets.values()
+            if fold(a["name"]) == folded and a["space_id"] in building.spaces
+            and (floor_id is None or building.spaces[a["space_id"]]["floor_id"] == floor_id)
+        ))
+        if holders:
+            return Resolution(text, [self._candidate(space_id, 100) for space_id in holders])
         choices = {s["id"]: fold(f"{s['name']} {s.get('ref') or ''}") for s in spaces}
         ranked = process.extract(folded, choices, scorer=fuzz.WRatio, limit=8, score_cutoff=FUZZY_CUTOFF)
         return Resolution(text, [self._candidate(space_id, round(score, 1)) for _, score, space_id in ranked])

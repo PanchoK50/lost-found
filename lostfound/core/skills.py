@@ -4,7 +4,7 @@ facts needed to explain it. Every function is checked against the labelled answe
 from shapely.geometry import Point
 
 from lostfound.core import geometry, reach
-from lostfound.core.building import ROOMISH_TYPES, Building, MapError
+from lostfound.core.building import ROOMISH_TYPES, Building, MapError, NoRouteError
 
 WHAT_IF_DOOR_WIDTH_M = 0.9
 WHAT_IF_MIN_GAIN_M = 1.0
@@ -68,12 +68,12 @@ def errand(
     from_start = building.distances_from(start, step_free)
     reachable = [space_id for space_id in holders if space_id in from_start]
     if not reachable:
-        raise MapError(f"No reachable room holds a {asset_type.replace('_', ' ')}.")
+        raise NoRouteError(f"No reachable room holds a {asset_type.replace('_', ' ')}.")
     pickup = min(reachable, key=lambda space_id: from_start[space_id])
     target = largest_room(building, floor_id, room_type)["space_id"]
     from_pickup = building.distances_from(pickup, step_free)
     if target not in from_pickup:
-        raise MapError(f"No route from {building.label(pickup)} to {building.label(target)}.")
+        raise NoRouteError(f"No route from {building.label(pickup)} to {building.label(target)}.")
     first_leg, second_leg = from_start[pickup], from_pickup[target]
     return {
         "total_m": round(first_leg + second_leg, 2),
@@ -188,19 +188,22 @@ def route(
     step_free: bool = False,
     closed: list[str] | None = None,
     via: list[str] | None = None,
+    min_width: float | None = None,
+    forklift: bool = False,
 ) -> dict:
+    """Shortest route through the stops; `reachable: False` with the reason when the rules leave no route."""
+    rules = {"step_free": step_free, "closed": closed or [], "min_width_m": min_width, "forklift": forklift}
     with building.temporarily_closed(*(closed or [])):
         try:
-            result = building.route(start, destination, step_free, via)
-        except MapError as error:
-            return {"reachable": False, "reason": str(error)}
+            result = building.route(start, destination, step_free, via, min_width, forklift)
+        except NoRouteError as error:
+            return {"reachable": False, "reason": str(error), **rules}
     return {
         "reachable": True,
         "length_m": result.length_m,
         "space_path": result.space_path,
         "steps": result.steps,
-        "step_free": step_free,
-        "closed": closed or [],
+        **rules,
     }
 
 

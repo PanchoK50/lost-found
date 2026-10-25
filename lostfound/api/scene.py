@@ -90,19 +90,29 @@ def floor_area_total(b: Building, floor_id: str, room_type: str, result: dict) -
     }
 
 
-def _route_legs(b: Building, stops: list[str], step_free: bool, closed: list[str]) -> list[dict]:
+def _route_legs(
+    b: Building, stops: list[str], step_free: bool, closed: list[str], min_width: float | None = None, forklift: bool = False
+) -> list[dict]:
     legs = []
     with b.temporarily_closed(*closed):
         for start, end in zip(stops, stops[1:]):
             try:
-                details = directions.route_details(b, start, end, step_free)
+                details = directions.route_details(b, start, end, step_free, None, min_width, forklift)
             except MapError:
                 continue
             legs.append(details)
     return legs
 
 
-def route(b: Building, stops: list[str], step_free: bool, closed: list[str], result: dict) -> dict:
+def route(
+    b: Building,
+    stops: list[str],
+    step_free: bool,
+    closed: list[str],
+    result: dict,
+    min_width: float | None = None,
+    forklift: bool = False,
+) -> dict:
     kind = "route_with_closure" if closed else "route_step_free" if step_free else "route"
     if len(stops) > 2:
         kind = "tour"
@@ -117,11 +127,16 @@ def route(b: Building, stops: list[str], step_free: bool, closed: list[str], res
                 "closed": closed,
             },
         }
-    legs = _route_legs(b, stops, step_free, closed)
+    legs = _route_legs(b, stops, step_free, closed, min_width, forklift)
     passed = [s for leg in legs for s in leg["space_path"] if s in b.spaces and s not in stops]
     floor_ids = [_floor(b, s) for s in stops] + [run["floor_id"] for leg in legs for run in leg["polylines"] if len(run["points"]) >= 2]
     minutes = max(1, round(result["length_m"] / 1.3 / 60))
-    notes = [f"about {minutes} min"] + (["step-free"] if step_free else []) + ([f"{len(closed)} closed"] if closed else [])
+    notes = (
+        [f"about {minutes} min"]
+        + (["forklift"] if forklift else ["step-free"] if step_free else [])
+        + ([f"doors ≥ {min_width:g} m"] if min_width and not forklift else [])
+        + ([f"{len(closed)} closed"] if closed else [])
+    )
     return {
         "kind": kind,
         "answer": {

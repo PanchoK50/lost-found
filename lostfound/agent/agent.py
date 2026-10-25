@@ -161,7 +161,7 @@ class BuildingQA:
             outcome.notes["appended_answer_line"] = True
         outcome.reply = reply
         outcome.notes["resolutions"] = toolbox.resolutions[-4:]
-        outcome.notes["result"] = toolbox.last_result
+        outcome.notes["result"] = toolbox.result_for(committed_answer(reply))
         return outcome
 
 
