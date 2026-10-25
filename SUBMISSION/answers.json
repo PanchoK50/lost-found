@@ -1,1596 +1,582 @@
-{
- "osm-way363805324-H01": {
-  "answer": "1.02, 162.33 m²",
-  "reply": "The largest generic room on Floor 1 is room 1.02, at 162.33 m². The next largest is room 108, at 39.25 m².\n\nAnswer: 1.02, 162.33 m²",
-  "kind": "largest_room",
-  "space_id": "osm-way363805324-F1-S002"
- },
- "osm-way363805324-H02": {
-  "answer": "54.77",
-  "reply": "The ground floor has 5 generic rooms, and their floor areas add up to 54.77 m².\n\nAnswer: 54.77",
-  "kind": "floor_area_total"
- },
- "osm-way363805324-H03": {
-  "answer": "44.9",
-  "reply": "You'll walk 44.9 m in total. The nearest office chair is in the Gemeinschaftsbüro (room 114), 14.84 m from you. Carrying it from there to the largest generic room on Floor 1, room 1.02, is another 30.06 m.\n\nAnswer: 44.9",
-  "kind": "errand",
-  "item_space_id": "osm-way363805324-F1-S011",
-  "space_id": "osm-way363805324-F1-S002",
-  "length_m": 44.9,
-  "route": [
-   "osm-way363805324-F1-S010",
-   "osm-way363805324-F1-S015",
-   "osm-way363805324-F1-S011",
-   "osm-way363805324-F1-S015",
-   "osm-way363805324-F1-S009",
-   "osm-way363805324-F1-S008",
-   "osm-way363805324-F1-S015",
-   "osm-way363805324-F1-S002"
-  ],
-  "route_nodes": [
-   "osm-way363805324-F1-S010",
-   "osm-way363805324-F1-O0018",
-   "osm-way363805324-F1-O0019",
-   "osm-way363805324-F1-S011",
-   "osm-way363805324-F1-O0019",
-   "osm-way363805324-F1-O0020",
-   "osm-way363805324-F1-O0021",
-   "osm-way363805324-F1-O0027",
-   "osm-way363805324-F1-O0017",
-   "osm-way363805324-F1-S002"
-  ],
-  "element_path": [
-   "osm-way363805324-F1-O0018",
-   "osm-way363805324-F1-O0019",
-   "osm-way363805324-F1-O0019",
-   "osm-way363805324-F1-O0020",
-   "osm-way363805324-F1-O0021",
-   "osm-way363805324-F1-O0027",
-   "osm-way363805324-F1-O0017"
-  ],
-  "reachable": true
- },
- "osm-way363805324-H04": {
-  "answer": "E01",
-  "reply": "The room directly below Büchercorner is Großer Saal (room E01) on the ground floor. About 99% of Büchercorner's floor area sits over it, so that's where the water will come through.\n\nAnswer: E01",
-  "kind": "room_stacked",
-  "space_id": "osm-way363805324-F0-S001"
- },
- "osm-way363805324-H07": {
-  "answer": "1.10",
-  "reply": "Room 1.10 on Floor 1 is directly above Kitchen 0.16. It's called \"Generic room 1.10\" in the plan and covers about 64% of the kitchen's floor area. Other rooms may sit over the rest of the kitchen.\n\nAnswer: 1.10",
-  "kind": "room_stacked",
-  "space_id": "osm-way363805324-F1-S010"
- },
- "osm-way363805324-H10": {
-  "answer": "5",
-  "reply": "Five rooms on Basement 1 share at least 1 m of wall with Generic room U20: U13 (Musik- und Tanraum) and rooms -1.10, -1.11, -1.12 and -1.13. Corridors, stairwells and lifts are left out of the count.\n\nAnswer: 5",
-  "kind": "shared_walls_count"
- },
- "osm-way363805324-H11": {
-  "answer": "21.16",
-  "reply": "The straight-line distance between the centre of Generic room -1.11 (Basement 1) and the centre of Büchercorner (room 107, Floor 1) is 21.16 m. Each centre is the room's floor-plan centroid, taken at its floor's elevation.\n\nAnswer: 21.16",
-  "kind": "straight_line_3d"
- },
- "osm-way43035346-H01": {
-  "answer": "N3806, 115.03 m²",
-  "reply": "The largest generic room on Floor 3 is N3806, at 115.03 m². The next largest is N3823, at 98.58 m².\n\nAnswer: N3806, 115.03 m²",
-  "kind": "largest_room",
-  "space_id": "osm-way43035346-F3-S012"
- },
- "osm-way43035346-H02": {
-  "answer": "592.8",
-  "reply": "All 26 generic rooms on Floor 1 add up to 592.8 m² of floor area.\n\nAnswer: 592.8",
-  "kind": "floor_area_total"
- },
- "osm-way43035346-H03": {
-  "answer": "53.98",
-  "reply": "You'll walk about 53.98 m in total. The nearest fire extinguisher is in Stairwell N3834 on Floor 3, which is 21.26 m from you. From there it's 32.73 m, using the stairs, to N1838, the largest generic room on Floor 1.\n\nAnswer: 53.98",
-  "kind": "errand",
-  "item_space_id": "osm-way43035346-F3-S019",
-  "space_id": "osm-way43035346-F1-S002",
-  "length_m": 53.98,
-  "route": [
-   "osm-way43035346-F3-S016",
-   "osm-way43035346-F3-S017",
-   "osm-way43035346-F3-S019",
-   "osm-way43035346-F2-S009",
-   "osm-way43035346-F1-S022",
-   "osm-way43035346-F1-S016",
-   "osm-way43035346-F1-S002"
-  ],
-  "route_nodes": [
-   "osm-way43035346-F3-S016",
-   "osm-way43035346-F3-O0075",
-   "osm-way43035346-F3-O0153",
-   "osm-way43035346-F3-S019",
-   "osm-way43035346-V02",
-   "osm-way43035346-F2-S009",
-   "osm-way43035346-V02",
-   "osm-way43035346-F1-S022",
-   "osm-way43035346-F1-O0038",
-   "osm-way43035346-F1-O0033",
-   "osm-way43035346-F1-S002"
-  ],
-  "element_path": [
-   "osm-way43035346-F3-O0075",
-   "osm-way43035346-F3-O0153",
-   "osm-way43035346-V02",
-   "osm-way43035346-V02",
-   "osm-way43035346-F1-O0038",
-   "osm-way43035346-F1-O0033"
-  ],
-  "reachable": true
- },
- "osm-way43035346-H04": {
-  "answer": "N0806",
-  "reply": "The room directly above Generic room -1.14 is Generic room N0806 on the ground floor. It covers about 85.5% of the basement room's footprint, so it's the likely source of the leak.\n\nAnswer: N0806",
-  "kind": "room_stacked",
-  "space_id": "osm-way43035346-F0-S014"
- },
- "osm-way43035346-H05": {
-  "answer": "6",
-  "reply": "Six rooms on Basement 1 share at least 1 m of wall with N-1840: -1.07, N-1806B, N-1806A, N-1841, N-1842 and -1.26. Corridors, stairwells and lifts are left out of the count.\n\nAnswer: 6",
-  "kind": "shared_walls_count"
- },
- "osm-way43035346-H06": {
-  "answer": "11.85",
-  "reply": "The straight-line distance between the centre of room N-1828 (Basement 1, at −3 m) and the centre of room N2821 (Floor 2, at +6 m) is 11.85 m. Each centre is the room's floor-plan centroid at its floor's height.\n\nAnswer: 11.85",
-  "kind": "straight_line_3d"
- },
- "osm-way43035346-H07": {
-  "answer": "0",
-  "reply": "If a door were added in the middle of the wall between N0808 and N0809 on the ground floor, no room on Floor 3 would get a walk to its nearest entrance that is more than 1 m shorter.\n\nAnswer: 0",
-  "kind": "what_if_door"
- },
- "osm-way50299584-H01": {
-  "answer": "0566, 559.8 m²",
-  "reply": "The largest generic room on the ground floor is room 0566, at 559.8 m². That's almost three times the size of the next largest, room 0583 (189.21 m²).\n\nAnswer: 0566, 559.8 m²",
-  "kind": "largest_room",
-  "space_id": "osm-way50299584-F0-S043"
- },
- "osm-way50299584-H02": {
-  "answer": "959.75",
-  "reply": "I added up the floor areas of all 41 generic rooms on Floor 3, and they come to 959.75 m² in total.\n\nAnswer: 959.75",
-  "kind": "floor_area_total"
- },
- "osm-way50299584-H03": {
-  "answer": "103.36",
-  "reply": "You'd walk 103.36 m in total. The closest coat rack is in Corridor 2591 on Floor 2, which is 56.15 m from room 1508. From there it's another 47.21 m to room 2538, the largest generic room on Floor 2.\n\nAnswer: 103.36",
-  "kind": "errand",
-  "item_space_id": "osm-way50299584-F2-S006",
-  "space_id": "osm-way50299584-F2-S018",
-  "length_m": 103.36,
-  "route": [
-   "osm-way50299584-F1-S020",
-   "osm-way50299584-F1-S018",
-   "osm-way50299584-F1-S016",
-   "osm-way50299584-F1-S065",
-   "osm-way50299584-F1-S064",
-   "osm-way50299584-F2-S027",
-   "osm-way50299584-F2-S006",
-   "osm-way50299584-F2-S037",
-   "osm-way50299584-F2-S085",
-   "osm-way50299584-F2-S018"
-  ],
-  "route_nodes": [
-   "osm-way50299584-F1-S020",
-   "osm-way50299584-F1-O0163",
-   "osm-way50299584-F1-O0188",
-   "osm-way50299584-F1-O0187",
-   "osm-way50299584-F1-O0391",
-   "osm-way50299584-F1-S064",
-   "osm-way50299584-V05",
-   "osm-way50299584-F2-S027",
-   "osm-way50299584-F2-O0394",
-   "osm-way50299584-F2-S006",
-   "osm-way50299584-F2-O0205",
-   "osm-way50299584-F2-O0374",
-   "osm-way50299584-F2-O0371",
-   "osm-way50299584-F2-S018"
-  ],
-  "element_path": [
-   "osm-way50299584-F1-O0163",
-   "osm-way50299584-F1-O0188",
-   "osm-way50299584-F1-O0187",
-   "osm-way50299584-F1-O0391",
-   "osm-way50299584-V05",
-   "osm-way50299584-F2-O0394",
-   "osm-way50299584-F2-O0205",
-   "osm-way50299584-F2-O0374",
-   "osm-way50299584-F2-O0371"
-  ],
-  "reachable": true
- },
- "osm-way50299584-H04": {
-  "answer": "0583",
-  "reply": "The room directly above Generic room -1517 is Generic room 0583 on the ground floor. It covers about 98% of the basement room's footprint, so it's the most likely place the water is coming from.\n\nAnswer: 0583",
-  "kind": "room_stacked",
-  "space_id": "osm-way50299584-F0-S013"
- },
- "osm-way50299584-H06": {
-  "answer": "-1530",
-  "reply": "The water will reach Generic room -1530 on Basement 1. It sits directly below Generic room 0520 and lies entirely under its floor area.\n\nAnswer: -1530",
-  "kind": "room_stacked",
-  "space_id": "osm-way50299584-F-1-S037"
- },
- "osm-way50299584-H11": {
-  "answer": "1530",
-  "reply": "The room directly above Generic room 0523 is Generic room 1530 on Floor 1. It covers about 89% of 0523's floor area, so it's the most likely source of the leak.\n\nAnswer: 1530",
-  "kind": "room_stacked",
-  "space_id": "osm-way50299584-F1-S033"
- },
- "osm-way50299584-H12": {
-  "answer": "4",
-  "reply": "Four rooms on Floor 2 share at least 1 m of wall with Generic room 2522: 2522A (4.51 m), 2523 (2.96 m), 2530 (2.74 m) and 2523A (2.25 m). Corridors, stairwells and lifts aren't counted.\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "osm-way50299584-H13": {
-  "answer": "62.01",
-  "reply": "The straight-line distance between the centres of room 3580.2 on Floor 3 and room 1561 on Floor 1 is 62.01 m. Each centre is the room's floor-plan centroid at its floor's height.\n\nAnswer: 62.01",
-  "kind": "straight_line_3d"
- },
- "osm-way50300147-H01": {
-  "answer": "0219, 530.16 m²",
-  "reply": "Room 0219 is the largest generic room on the ground floor, at 530.16 m². The next largest is room 0220, at 174.63 m².\n\nAnswer: 0219, 530.16 m²",
-  "kind": "largest_room",
-  "space_id": "osm-way50300147-F0-S047"
- },
- "osm-way50300147-H02": {
-  "answer": "1699.55",
-  "reply": "The 43 generic rooms on Floor 1 add up to 1699.55 m² of floor area.\n\nAnswer: 1699.55",
-  "kind": "floor_area_total"
- },
- "osm-way50300147-H03": {
-  "answer": "78.24",
-  "reply": "You'd walk 78.24 m in total. The nearest desk is in Generic room 1211B, 2.71 m from you. From there it's 75.53 m, using the stairs, to Generic room 2221, the largest generic room on Floor 2.\n\nAnswer: 78.24",
-  "kind": "errand",
-  "item_space_id": "osm-way50300147-F1-S037",
-  "space_id": "osm-way50300147-F2-S003",
-  "length_m": 78.24,
-  "route": [
-   "osm-way50300147-F1-S057",
-   "osm-way50300147-F1-S037",
-   "osm-way50300147-F1-S057",
-   "osm-way50300147-F1-S016",
-   "osm-way50300147-F1-S049",
-   "osm-way50300147-F1-S005",
-   "osm-way50300147-F2-S013",
-   "osm-way50300147-F2-S001",
-   "osm-way50300147-F2-S003"
-  ],
-  "route_nodes": [
-   "osm-way50300147-F1-S057",
-   "osm-way50300147-F1-O0108",
-   "osm-way50300147-F1-S037",
-   "osm-way50300147-F1-O0108",
-   "osm-way50300147-F1-O0106",
-   "osm-way50300147-F1-O0089",
-   "osm-way50300147-F1-O0268",
-   "osm-way50300147-F1-S005",
-   "osm-way50300147-V05",
-   "osm-way50300147-F2-S013",
-   "osm-way50300147-F2-O0276",
-   "osm-way50300147-F2-O0218",
-   "osm-way50300147-F2-S003"
-  ],
-  "element_path": [
-   "osm-way50300147-F1-O0108",
-   "osm-way50300147-F1-O0108",
-   "osm-way50300147-F1-O0106",
-   "osm-way50300147-F1-O0089",
-   "osm-way50300147-F1-O0268",
-   "osm-way50300147-V05",
-   "osm-way50300147-F2-O0276",
-   "osm-way50300147-F2-O0218"
-  ],
-  "reachable": true
- },
- "osm-way50300147-H04": {
-  "answer": "0260",
-  "reply": "Room 0260 on the ground floor is directly above Generic room -1284, so that's where the water is most likely coming from. It sits over 98.7% of the basement room's floor area.\n\nAnswer: 0260",
-  "kind": "room_stacked",
-  "space_id": "osm-way50300147-F0-S019"
- },
- "osm-way50300147-H05": {
-  "answer": "0219",
-  "reply": "The room directly below Generic room 1271C is Generic room 0219 on the ground floor, so that's where the water will come through. It sits fully underneath 1271C.\n\nAnswer: 0219",
-  "kind": "room_stacked",
-  "space_id": "osm-way50300147-F0-S047"
- },
- "osm-way50300147-H06": {
-  "answer": "0209",
-  "reply": "The room directly above Generic room -1216 is Generic room 0209 on the ground floor. It covers 93% of the basement room's floor plan.\n\nAnswer: 0209",
-  "kind": "room_stacked",
-  "space_id": "osm-way50300147-F0-S054"
- },
- "osm-way50300147-H07": {
-  "answer": "6",
-  "reply": "Six other rooms on Basement 1 share at least 1 m of wall with Generic room -1208: -1206, -1202, -1247c, -1247d, -1247e and -1247f.\n\nAnswer: 6",
-  "kind": "shared_walls_count"
- },
- "osm-way50300147-H08": {
-  "answer": "45.49",
-  "reply": "I measured from the centre of room 2231 on Floor 2 (at 6 m) to the centre of room -1248 in Basement 1 (at −3 m). The straight-line distance between them is 45.49 m.\n\nAnswer: 45.49",
-  "kind": "straight_line_3d"
- },
- "osm-way50300147-H09": {
-  "answer": "47",
-  "reply": "With a new door in the middle of the wall between Corridor 0263 and Corridor 0244 on the ground floor, 47 rooms in Basement 1 would have a walk to their nearest entrance that is more than 1 m shorter.\n\nAnswer: 47",
-  "kind": "what_if_door"
- },
- "osm-way50300147-H10": {
-  "answer": "47",
-  "reply": "With a new door in the middle of the wall between Lobby 0.01 and Generic room 0293 on the ground floor, 47 rooms in Basement 1 would have a walk to their nearest entrance that is more than 1 m shorter.\n\nAnswer: 47",
-  "kind": "what_if_door"
- },
- "proc-campus-test-000-H01": {
-  "answer": "1.25, 34.02 m²",
-  "reply": "The largest toilet on Floor 1 is Toilet 1.25, at 34.02 m². The next largest is Toilet 1.29, at 23.94 m².\n\nAnswer: 1.25, 34.02 m²",
-  "kind": "largest_room",
-  "space_id": "proc-campus-test-000-F1-S025"
- },
- "proc-campus-test-000-H02": {
-  "answer": "105.42",
-  "reply": "The four server rooms on Basement 1 add up to 105.42 m² of floor area.\n\nAnswer: 105.42",
-  "kind": "floor_area_total"
- },
- "proc-campus-test-000-H03": {
-  "answer": "21",
-  "reply": "Starting from the entrance into the Main lobby on the ground floor, the trolley can reach 21 rooms on Floor 1. That count uses only lifts, never stairs or steps, and only doors at least 1.0 m wide.\n\nAnswer: 21",
-  "kind": "wide_delivery_count"
- },
- "proc-campus-test-000-H04": {
-  "answer": "128.24",
-  "reply": "The nearest coffee machine is in Kitchen 4.41, which is 45.3 m from Office 4.27. Carrying it from there to the largest meeting room on Floor 2, Meeting room 2.09, is another 82.94 m using the stairs, so you'll walk about 128 m in total.\n\nAnswer: 128.24",
-  "kind": "errand",
-  "item_space_id": "proc-campus-test-000-F4-S041",
-  "space_id": "proc-campus-test-000-F2-S009",
-  "length_m": 128.24,
-  "route": [
-   "proc-campus-test-000-F4-S027",
-   "proc-campus-test-000-F4-S001",
-   "proc-campus-test-000-F4-S002",
-   "proc-campus-test-000-F4-S041",
-   "proc-campus-test-000-F4-S002",
-   "proc-campus-test-000-F4-S001",
-   "proc-campus-test-000-F4-S010",
-   "proc-campus-test-000-F3-S010",
-   "proc-campus-test-000-F2-S010",
-   "proc-campus-test-000-F2-S001",
-   "proc-campus-test-000-F2-S009"
-  ],
-  "route_nodes": [
-   "proc-campus-test-000-F4-S027",
-   "proc-campus-test-000-F4-O0236",
-   "proc-campus-test-000-F4-O0211",
-   "proc-campus-test-000-F4-O0250",
-   "proc-campus-test-000-F4-S041",
-   "proc-campus-test-000-F4-O0250",
-   "proc-campus-test-000-F4-O0211",
-   "proc-campus-test-000-F4-O0219",
-   "proc-campus-test-000-F4-S010",
-   "proc-campus-test-000-V03",
-   "proc-campus-test-000-F3-S010",
-   "proc-campus-test-000-V03",
-   "proc-campus-test-000-F2-S010",
-   "proc-campus-test-000-F2-O0135",
-   "proc-campus-test-000-F2-O0134",
-   "proc-campus-test-000-F2-S009"
-  ],
-  "element_path": [
-   "proc-campus-test-000-F4-O0236",
-   "proc-campus-test-000-F4-O0211",
-   "proc-campus-test-000-F4-O0250",
-   "proc-campus-test-000-F4-O0250",
-   "proc-campus-test-000-F4-O0211",
-   "proc-campus-test-000-F4-O0219",
-   "proc-campus-test-000-V03",
-   "proc-campus-test-000-V03",
-   "proc-campus-test-000-F2-O0135",
-   "proc-campus-test-000-F2-O0134"
-  ],
-  "reachable": true
- },
- "proc-campus-test-000-H05": {
-  "answer": "41.31",
-  "reply": "The straight-line distance from the centre of Lab 2.23 on Floor 2 to the centre of Storage 0.36 on the ground floor is 41.31 m. This uses each room's floor-plan centre at its floor's height, so it includes the 7.6 m height difference between the two floors.\n\nAnswer: 41.31",
-  "kind": "straight_line_3d"
- },
- "proc-campus-test-004-H01": {
-  "answer": "0.15, 35.46 m²",
-  "reply": "Meeting room 0.15 is the largest meeting room on the ground floor, at 35.46 m². The next largest is Meeting room 0.21, at 26.52 m².\n\nAnswer: 0.15, 35.46 m²",
-  "kind": "largest_room",
-  "space_id": "proc-campus-test-004-F0-S015"
- },
- "proc-campus-test-004-H02": {
-  "answer": "184.14",
-  "reply": "The 6 offices on Floor 1 add up to 184.14 m² of floor area.\n\nAnswer: 184.14",
-  "kind": "floor_area_total"
- },
- "proc-campus-test-004-H03": {
-  "answer": "13",
-  "reply": "The trolley can reach 13 rooms on Floor 2. This counts a step-free route from the Main lobby on the ground floor, going up by lift, where every door is at least 1.0 m wide.\n\nAnswer: 13",
-  "kind": "wide_delivery_count"
- },
- "proc-campus-test-004-H04": {
-  "answer": "74.29",
-  "reply": "You'll walk 33.56 m from Storage 0.12 to get the stove in Kitchen 0.05, the closest room that has one. From there it's 40.73 m, using the stairs, to Lab 1.17, the largest lab on Floor 1. That makes 74.29 m in total.\n\nAnswer: 74.29",
-  "kind": "errand",
-  "item_space_id": "proc-campus-test-004-F0-S005",
-  "space_id": "proc-campus-test-004-F1-S017",
-  "length_m": 74.29,
-  "route": [
-   "proc-campus-test-004-F0-S012",
-   "proc-campus-test-004-F0-S001",
-   "proc-campus-test-004-F0-S005",
-   "proc-campus-test-004-F0-S001",
-   "proc-campus-test-004-F0-S002",
-   "proc-campus-test-004-F1-S004",
-   "proc-campus-test-004-F1-S001",
-   "proc-campus-test-004-F1-S017"
-  ],
-  "route_nodes": [
-   "proc-campus-test-004-F0-S012",
-   "proc-campus-test-004-F0-O0011",
-   "proc-campus-test-004-F0-O0004",
-   "proc-campus-test-004-F0-S005",
-   "proc-campus-test-004-F0-O0004",
-   "proc-campus-test-004-F0-O0001",
-   "proc-campus-test-004-F0-S002",
-   "proc-campus-test-004-V01",
-   "proc-campus-test-004-F1-S004",
-   "proc-campus-test-004-F1-O0027",
-   "proc-campus-test-004-F1-O0040",
-   "proc-campus-test-004-F1-S017"
-  ],
-  "element_path": [
-   "proc-campus-test-004-F0-O0011",
-   "proc-campus-test-004-F0-O0004",
-   "proc-campus-test-004-F0-O0004",
-   "proc-campus-test-004-F0-O0001",
-   "proc-campus-test-004-V01",
-   "proc-campus-test-004-F1-O0027",
-   "proc-campus-test-004-F1-O0040"
-  ],
-  "reachable": true
- },
- "proc-campus-test-004-H05": {
-  "answer": "15.06",
-  "reply": "The straight-line distance between the centres of Lab 1.17 (Floor 1) and Lab 3.19 (Floor 3) is 15.06 m. That's measured from each room's floor-plan centre, set at the height of its floor.\n\nAnswer: 15.06",
-  "kind": "straight_line_3d"
- },
- "proc-campus-test-005-H01": {
-  "answer": "1.13, 41.52 m²",
-  "reply": "Meeting room 1.13 is the largest meeting room on Floor 1, at 41.52 m². The next largest is meeting room 1.20, at 34.68 m².\n\nAnswer: 1.13, 41.52 m²",
-  "kind": "largest_room",
-  "space_id": "proc-campus-test-005-F1-S013"
- },
- "proc-campus-test-005-H02": {
-  "answer": "456.72",
-  "reply": "The 16 offices on the ground floor add up to 456.72 m² of floor area.\n\nAnswer: 456.72",
-  "kind": "floor_area_total"
- },
- "proc-campus-test-005-H03": {
-  "answer": "18",
-  "reply": "The bed can reach 18 rooms on Floor 4 from the Main lobby. That route uses no stairs or steps, goes up by lift, and only passes through doors at least 1.0 m wide.\n\nAnswer: 18",
-  "kind": "wide_delivery_count"
- },
- "proc-campus-test-005-H04": {
-  "answer": "89.51",
-  "reply": "You'd walk 89.51 m in total. The closest kitchen counter is in Kitchen 2.33, 29.09 m from Seminar room 2.37. Carrying it from there to Storage 1.27, the largest storage room on Floor 1, is another 60.43 m, using the stairs.\n\nAnswer: 89.51",
-  "kind": "errand",
-  "item_space_id": "proc-campus-test-005-F2-S033",
-  "space_id": "proc-campus-test-005-F1-S027",
-  "length_m": 89.51,
-  "route": [
-   "proc-campus-test-005-F2-S037",
-   "proc-campus-test-005-F2-S002",
-   "proc-campus-test-005-F2-S033",
-   "proc-campus-test-005-F2-S002",
-   "proc-campus-test-005-F2-S001",
-   "proc-campus-test-005-F2-S015",
-   "proc-campus-test-005-F1-S015",
-   "proc-campus-test-005-F1-S001",
-   "proc-campus-test-005-F1-S027"
-  ],
-  "route_nodes": [
-   "proc-campus-test-005-F2-S037",
-   "proc-campus-test-005-F2-O0174",
-   "proc-campus-test-005-F2-O0170",
-   "proc-campus-test-005-F2-S033",
-   "proc-campus-test-005-F2-O0170",
-   "proc-campus-test-005-F2-O0139",
-   "proc-campus-test-005-F2-O0152",
-   "proc-campus-test-005-F2-S015",
-   "proc-campus-test-005-V03",
-   "proc-campus-test-005-F1-S015",
-   "proc-campus-test-005-F1-O0106",
-   "proc-campus-test-005-F1-O0118",
-   "proc-campus-test-005-F1-S027"
-  ],
-  "element_path": [
-   "proc-campus-test-005-F2-O0174",
-   "proc-campus-test-005-F2-O0170",
-   "proc-campus-test-005-F2-O0170",
-   "proc-campus-test-005-F2-O0139",
-   "proc-campus-test-005-F2-O0152",
-   "proc-campus-test-005-V03",
-   "proc-campus-test-005-F1-O0106",
-   "proc-campus-test-005-F1-O0118"
-  ],
-  "reachable": true
- },
- "proc-campus-test-005-H05": {
-  "answer": "3",
-  "reply": "Three rooms on Basement 1 share at least 1 m of wall with Toilet -1.31: Storage -1.30 (6.7 m), Locker room -1.40 (5.19 m) and Locker room -1.41 (2.21 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "proc-campus-test-005-H06": {
-  "answer": "39.09",
-  "reply": "I measured from the centre of Lab 4.10 on Floor 4 to the centre of Office 2.41 on Floor 2, each at its own floor's level. The straight-line distance between them is 39.09 m.\n\nAnswer: 39.09",
-  "kind": "straight_line_3d"
- },
- "proc-campus-test-008-H01": {
-  "answer": "2.19, 39.66 m²",
-  "reply": "Office 2.19 is the largest office on Floor 2, at 39.66 m². The next largest is Office 2.07, at 35.94 m².\n\nAnswer: 2.19, 39.66 m²",
-  "kind": "largest_room",
-  "space_id": "proc-campus-test-008-F2-S019"
- },
- "proc-campus-test-008-H02": {
-  "answer": "86.4",
-  "reply": "Floor 1 has 3 meeting rooms, and their floor areas add up to 86.4 m².\n\nAnswer: 86.4",
-  "kind": "floor_area_total"
- },
- "proc-campus-test-008-H03": {
-  "answer": "11",
-  "reply": "If the bed comes in through the entrance to the Main lobby on the ground floor, it can reach 11 rooms on Floor 5. That count only uses lifts, avoids all stairs and steps, and goes only through doors at least 1.0 m wide.\n\nAnswer: 11",
-  "kind": "wide_delivery_count"
- },
- "proc-campus-test-008-H04": {
-  "answer": "78.91",
-  "reply": "The nearest plant is in Office 3.24, 22.46 m from Seminar room 3.21. Carrying it to Meeting room 1.07, the largest meeting room on Floor 1, is another 56.45 m by the stairs, so you'll walk 78.91 m in total.\n\nAnswer: 78.91",
-  "kind": "errand",
-  "item_space_id": "proc-campus-test-008-F3-S024",
-  "space_id": "proc-campus-test-008-F1-S007",
-  "length_m": 78.91,
-  "route": [
-   "proc-campus-test-008-F3-S021",
-   "proc-campus-test-008-F3-S001",
-   "proc-campus-test-008-F3-S024",
-   "proc-campus-test-008-F3-S001",
-   "proc-campus-test-008-F3-S005",
-   "proc-campus-test-008-F2-S005",
-   "proc-campus-test-008-F1-S005",
-   "proc-campus-test-008-F1-S001",
-   "proc-campus-test-008-F1-S007"
-  ],
-  "route_nodes": [
-   "proc-campus-test-008-F3-S021",
-   "proc-campus-test-008-F3-O0131",
-   "proc-campus-test-008-F3-O0134",
-   "proc-campus-test-008-F3-S024",
-   "proc-campus-test-008-F3-O0134",
-   "proc-campus-test-008-F3-O0115",
-   "proc-campus-test-008-F3-S005",
-   "proc-campus-test-008-V01",
-   "proc-campus-test-008-F2-S005",
-   "proc-campus-test-008-V01",
-   "proc-campus-test-008-F1-S005",
-   "proc-campus-test-008-F1-O0059",
-   "proc-campus-test-008-F1-O0061",
-   "proc-campus-test-008-F1-S007"
-  ],
-  "element_path": [
-   "proc-campus-test-008-F3-O0131",
-   "proc-campus-test-008-F3-O0134",
-   "proc-campus-test-008-F3-O0134",
-   "proc-campus-test-008-F3-O0115",
-   "proc-campus-test-008-V01",
-   "proc-campus-test-008-V01",
-   "proc-campus-test-008-F1-O0059",
-   "proc-campus-test-008-F1-O0061"
-  ],
-  "reachable": true
- },
- "proc-campus-test-008-H05": {
-  "answer": "33.73",
-  "reply": "The straight-line distance from the centre of Office 1.25 (Floor 1) to the centre of Technical room -1.19 (Basement 1) is 33.73 m. Each centre is taken at its own floor's height.\n\nAnswer: 33.73",
-  "kind": "straight_line_3d"
- },
- "proc-campus-test-012-H01": {
-  "answer": "1.12, 40.02 m²",
-  "reply": "The largest office on Floor 1 is Office 1.12, at 40.02 m². The next largest is Office 1.28, at 33.06 m².\n\nAnswer: 1.12, 40.02 m²",
-  "kind": "largest_room",
-  "space_id": "proc-campus-test-012-F1-S012"
- },
- "proc-campus-test-012-H02": {
-  "answer": "99.18",
-  "reply": "Floor 4 has three toilets, and their floor areas add up to 99.18 m².\n\nAnswer: 99.18",
-  "kind": "floor_area_total"
- },
- "proc-campus-test-012-H03": {
-  "answer": "16",
-  "reply": "The pallet enters at the Main lobby on the ground floor and goes up by lift. Using only routes with no stairs or steps and doors at least 1.0 m wide, it can be delivered to 16 rooms on Floor 1.\n\nAnswer: 16",
-  "kind": "wide_delivery_count"
- },
- "proc-campus-test-012-H04": {
-  "answer": "43.83",
-  "reply": "The closest plant is in Office 3.23, which is a 9.77 m walk from you. From there it's 34.06 m to Lab 3.13, the largest lab on Floor 3, so you'll walk 43.83 m in total.\n\nAnswer: 43.83",
-  "kind": "errand",
-  "item_space_id": "proc-campus-test-012-F3-S023",
-  "space_id": "proc-campus-test-012-F3-S013",
-  "length_m": 43.83,
-  "route": [
-   "proc-campus-test-012-F3-S022",
-   "proc-campus-test-012-F3-S001",
-   "proc-campus-test-012-F3-S023",
-   "proc-campus-test-012-F3-S001",
-   "proc-campus-test-012-F3-S013"
-  ],
-  "route_nodes": [
-   "proc-campus-test-012-F3-S022",
-   "proc-campus-test-012-F3-O0113",
-   "proc-campus-test-012-F3-O0114",
-   "proc-campus-test-012-F3-S023",
-   "proc-campus-test-012-F3-O0114",
-   "proc-campus-test-012-F3-O0104",
-   "proc-campus-test-012-F3-S013"
-  ],
-  "element_path": [
-   "proc-campus-test-012-F3-O0113",
-   "proc-campus-test-012-F3-O0114",
-   "proc-campus-test-012-F3-O0114",
-   "proc-campus-test-012-F3-O0104"
-  ],
-  "reachable": true
- },
- "proc-campus-test-012-H05": {
-  "answer": "38.46",
-  "reply": "The straight-line distance between the centre of Print room 4.28 on Floor 4 and the centre of Seminar room 0.06 on the ground floor is 38.46 m. This uses each room's floor-plan centre at its floor level, and the two floors are 15.2 m apart in height.\n\nAnswer: 38.46",
-  "kind": "straight_line_3d"
- },
- "proc-campus-test-013-H01": {
-  "answer": "5.26, 40.86 m²",
-  "reply": "Storage 5.26 is the largest storage room on Floor 5, at 40.86 m². The next biggest is Storage 5.07, at 25.62 m².\n\nAnswer: 5.26, 40.86 m²",
-  "kind": "largest_room",
-  "space_id": "proc-campus-test-013-F5-S026"
- },
- "proc-campus-test-013-H02": {
-  "answer": "200.28",
-  "reply": "The 8 labs on Floor 1 add up to 200.28 m² of floor area.\n\nAnswer: 200.28",
-  "kind": "floor_area_total"
- },
- "proc-campus-test-013-H03": {
-  "answer": "15",
-  "reply": "Coming in through the Main lobby, the pallet can reach 15 rooms on Floor 3. That route uses the lifts and no stairs or steps, and every door on it is at least 1.0 m wide.\n\nAnswer: 15",
-  "kind": "wide_delivery_count"
- },
- "proc-campus-test-013-H04": {
-  "answer": "116.61",
-  "reply": "The closest chemical cabinet is in Lab 5.38 on Floor 5, which is 35.49 m from your office. From there it's 81.12 m, using the stairs, to Lab 1.34, the largest lab on Floor 1. That makes 116.61 m in total.\n\nAnswer: 116.61",
-  "kind": "errand",
-  "item_space_id": "proc-campus-test-013-F5-S038",
-  "space_id": "proc-campus-test-013-F1-S034",
-  "length_m": 116.61,
-  "route": [
-   "proc-campus-test-013-F4-S029",
-   "proc-campus-test-013-F4-S002",
-   "proc-campus-test-013-F4-S030",
-   "proc-campus-test-013-F5-S030",
-   "proc-campus-test-013-F5-S002",
-   "proc-campus-test-013-F5-S038",
-   "proc-campus-test-013-F5-S002",
-   "proc-campus-test-013-F5-S030",
-   "proc-campus-test-013-F4-S030",
-   "proc-campus-test-013-F3-S030",
-   "proc-campus-test-013-F2-S030",
-   "proc-campus-test-013-F1-S030",
-   "proc-campus-test-013-F1-S002",
-   "proc-campus-test-013-F1-S034"
-  ],
-  "route_nodes": [
-   "proc-campus-test-013-F4-S029",
-   "proc-campus-test-013-F4-O0228",
-   "proc-campus-test-013-F4-O0229",
-   "proc-campus-test-013-F4-S030",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F5-S030",
-   "proc-campus-test-013-F5-O0269",
-   "proc-campus-test-013-F5-O0277",
-   "proc-campus-test-013-F5-S038",
-   "proc-campus-test-013-F5-O0277",
-   "proc-campus-test-013-F5-O0269",
-   "proc-campus-test-013-F5-S030",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F4-S030",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F3-S030",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F2-S030",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F1-S030",
-   "proc-campus-test-013-F1-O0109",
-   "proc-campus-test-013-F1-O0113",
-   "proc-campus-test-013-F1-S034"
-  ],
-  "element_path": [
-   "proc-campus-test-013-F4-O0228",
-   "proc-campus-test-013-F4-O0229",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F5-O0269",
-   "proc-campus-test-013-F5-O0277",
-   "proc-campus-test-013-F5-O0277",
-   "proc-campus-test-013-F5-O0269",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-V05",
-   "proc-campus-test-013-F1-O0109",
-   "proc-campus-test-013-F1-O0113"
-  ],
-  "reachable": true
- },
- "proc-campus-test-013-H05": {
-  "answer": "36.37",
-  "reply": "The straight-line distance from the centre of Office 5.35 on Floor 5 to the centre of Lab 1.07 on Floor 1 is 36.37 m. This uses each room's floor-plan centre at its own floor height, so it includes the 15.2 m height difference between the two floors.\n\nAnswer: 36.37",
-  "kind": "straight_line_3d"
- },
- "proc-factory-test-001-H01": {
-  "answer": "92.1",
-  "reply": "The ground floor has 4 meeting rooms, and their floor areas add up to 92.1 m².\n\nAnswer: 92.1",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-001-H02": {
-  "answer": "9",
-  "reply": "Coming in through the entrance into Logistics zone H-C1, the 1.0 m bed can reach 9 rooms on the ground floor. That route uses no stairs or steps and only doors at least 1.0 m wide.\n\nAnswer: 9",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-001-H03": {
-  "answer": "6",
-  "reply": "Six rooms on the ground floor share at least 1 m of wall with Production zone H-A2. They are Assembly zone H-A1, Production zone H-A3, Offices 0.22 and 0.23, Server room 0.24 and Meeting room 0.25.\n\nAnswer: 6",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-002-H01": {
-  "answer": "126.5",
-  "reply": "The ground floor has 5 meeting rooms, and their floor areas add up to 126.5 m².\n\nAnswer: 126.5",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-002-H02": {
-  "answer": "9",
-  "reply": "The bed comes in through the entrance into Office corridor 0.31 and can't use stairs or steps. Using only doors at least 1.0 m wide, it can reach 9 rooms on the ground floor.\n\nAnswer: 9",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-002-H03": {
-  "answer": "4",
-  "reply": "Four other ground-floor rooms share at least 1 m of wall with Office 0.38: Warehouse zone H-A1 (2.75 m), Production zone H-A2 (3.82 m), Office 0.37 (5.7 m) and Office 0.39 (5.7 m).\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-002-H04": {
-  "answer": "111.98",
-  "reply": "The straight-line distance is 111.98 m. That runs from the centre of Meeting room 2.20 on Floor 2 (7.0 m up) to the centre of Warehouse zone H-D6 on the ground floor.\n\nAnswer: 111.98",
-  "kind": "straight_line_3d"
- },
- "proc-factory-test-003-H01": {
-  "answer": "1.17, 29.35 m²",
-  "reply": "Meeting room 1.17 is the largest meeting room on Floor 1, at 29.35 m². The next largest is meeting room 1.20, at 25.25 m².\n\nAnswer: 1.17, 29.35 m²",
-  "kind": "largest_room",
-  "space_id": "proc-factory-test-003-F1-S017"
- },
- "proc-factory-test-003-H02": {
-  "answer": "154.2",
-  "reply": "The 7 meeting rooms on Floor 2 add up to 154.2 m² of floor area.\n\nAnswer: 154.2",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-003-H03": {
-  "answer": "7",
-  "reply": "Coming in through Office corridor 0.25, the 1.1 m bed can reach 7 rooms on the ground floor. That count only includes routes with no stairs or steps (lifts allowed) where every door is at least 1.1 m wide.\n\nAnswer: 7",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-003-H04": {
-  "answer": "89.86",
-  "reply": "The closest server rack is in Server room 1.14, which is 24.23 m from Meeting room 1.10. Carrying it down to Kitchen 0.29, the largest kitchen on the ground floor, is another 65.63 m, using the stairs. That makes 89.86 m in total.\n\nAnswer: 89.86",
-  "kind": "errand",
-  "item_space_id": "proc-factory-test-003-F1-S014",
-  "space_id": "proc-factory-test-003-F0-S029",
-  "length_m": 89.86,
-  "route": [
-   "proc-factory-test-003-F1-S010",
-   "proc-factory-test-003-F1-S001",
-   "proc-factory-test-003-F1-S014",
-   "proc-factory-test-003-F1-S001",
-   "proc-factory-test-003-F1-S002",
-   "proc-factory-test-003-F0-S026",
-   "proc-factory-test-003-F0-S025",
-   "proc-factory-test-003-F0-S029"
-  ],
-  "route_nodes": [
-   "proc-factory-test-003-F1-S010",
-   "proc-factory-test-003-F1-O0087",
-   "proc-factory-test-003-F1-O0091",
-   "proc-factory-test-003-F1-S014",
-   "proc-factory-test-003-F1-O0091",
-   "proc-factory-test-003-F1-O0079",
-   "proc-factory-test-003-F1-S002",
-   "proc-factory-test-003-V01",
-   "proc-factory-test-003-F0-S026",
-   "proc-factory-test-003-F0-O0037",
-   "proc-factory-test-003-F0-O0041",
-   "proc-factory-test-003-F0-S029"
-  ],
-  "element_path": [
-   "proc-factory-test-003-F1-O0087",
-   "proc-factory-test-003-F1-O0091",
-   "proc-factory-test-003-F1-O0091",
-   "proc-factory-test-003-F1-O0079",
-   "proc-factory-test-003-V01",
-   "proc-factory-test-003-F0-O0037",
-   "proc-factory-test-003-F0-O0041"
-  ],
-  "reachable": true
- },
- "proc-factory-test-003-H05": {
-  "answer": "3",
-  "reply": "Three rooms on the ground floor share at least 1 m of wall with Office 0.33: Warehouse zone H-A2 (6.05 m), Office 0.32 (5.7 m) and Kitchen 0.34 (5.7 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-003-H06": {
-  "answer": "32.02",
-  "reply": "The straight-line distance between the centre of Office 2.27 on Floor 2 and the centre of Office 0.58 on the ground floor is 32.02 m. This is measured from each room's floor-plan centre at its floor's height, so it includes the 7 m height difference.\n\nAnswer: 32.02",
-  "kind": "straight_line_3d"
- },
- "proc-factory-test-006-H01": {
-  "answer": "203.3",
-  "reply": "The 9 offices on Floor 2 add up to 203.3 m² of floor area.\n\nAnswer: 203.3",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-006-H02": {
-  "answer": "4",
-  "reply": "If the machine comes in through Main aisle H-B4 and travels with no stairs or steps (the lift is fine) and only through doors at least 1.1 m wide, it can reach 4 rooms on Floor 2.\n\nAnswer: 4",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-006-H03": {
-  "answer": "3",
-  "reply": "Three ground-floor rooms share at least 1 m of wall with Office 0.20: Additive zone H-A2 (5.27 m), Server room 0.19 (5.7 m) and Meeting room 0.21 (5.7 m). Corridors, stairwells and lifts are left out of the count.\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-006-H04": {
-  "answer": "53.09",
-  "reply": "The straight-line distance between the centre of Warehouse zone H-C4 on the ground floor and the centre of Office 2.10 on Floor 2 is 53.09 m. Each centre is taken at its own floor's height, so the figure includes the 7 m height difference.\n\nAnswer: 53.09",
-  "kind": "straight_line_3d"
- },
- "proc-factory-test-007-H01": {
-  "answer": "1.10, 28.75 m²",
-  "reply": "Kitchen 1.10 is the largest kitchen on Floor 1, at 28.75 m². The next largest is Kitchen 1.37, at 25.9 m².\n\nAnswer: 1.10, 28.75 m²",
-  "kind": "largest_room",
-  "space_id": "proc-factory-test-007-F1-S010"
- },
- "proc-factory-test-007-H02": {
-  "answer": "413.4",
-  "reply": "The 18 offices on Floor 1 add up to 413.4 m² of floor area.\n\nAnswer: 413.4",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-007-H03": {
-  "answer": "9",
-  "reply": "If the trolley comes in through Logistics zone H-D1, it can reach 9 rooms on the ground floor. That count only uses routes with no stairs or steps where every door is at least 1.1 m wide.\n\nAnswer: 9",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-007-H04": {
-  "answer": "220.61",
-  "reply": "The closest drill press is in Production zone H-B2 on the ground floor, 97.02 m from Office 1.05. Carrying it from there to Kitchen 1.10, the largest kitchen on Floor 1, is another 123.59 m.\n\nAnswer: 220.61",
-  "kind": "errand",
-  "item_space_id": "proc-factory-test-007-F0-S008",
-  "space_id": "proc-factory-test-007-F1-S010",
-  "length_m": 220.61,
-  "route": [
-   "proc-factory-test-007-F1-S005",
-   "proc-factory-test-007-F1-S001",
-   "proc-factory-test-007-F1-S002",
-   "proc-factory-test-007-F0-S026",
-   "proc-factory-test-007-F0-S025",
-   "proc-factory-test-007-F0-S028",
-   "proc-factory-test-007-F0-S001",
-   "proc-factory-test-007-F0-S007",
-   "proc-factory-test-007-F0-S013",
-   "proc-factory-test-007-F0-S014",
-   "proc-factory-test-007-F0-S008",
-   "proc-factory-test-007-F0-S014",
-   "proc-factory-test-007-F0-S013",
-   "proc-factory-test-007-F0-S007",
-   "proc-factory-test-007-F0-S001",
-   "proc-factory-test-007-F0-S028",
-   "proc-factory-test-007-F0-S025",
-   "proc-factory-test-007-F0-S026",
-   "proc-factory-test-007-F1-S002",
-   "proc-factory-test-007-F1-S001",
-   "proc-factory-test-007-F1-S010"
-  ],
-  "route_nodes": [
-   "proc-factory-test-007-F1-S005",
-   "proc-factory-test-007-F1-O0077",
-   "proc-factory-test-007-F1-O0074",
-   "proc-factory-test-007-F1-S002",
-   "proc-factory-test-007-V01",
-   "proc-factory-test-007-F0-S026",
-   "proc-factory-test-007-F0-O0034",
-   "proc-factory-test-007-F0-O0036",
-   "proc-factory-test-007-F0-O0037",
-   "proc-factory-test-007-F0-O0001",
-   "proc-factory-test-007-F0-O0009",
-   "proc-factory-test-007-F0-O0017",
-   "proc-factory-test-007-F0-O0010",
-   "proc-factory-test-007-F0-S008",
-   "proc-factory-test-007-F0-O0010",
-   "proc-factory-test-007-F0-O0017",
-   "proc-factory-test-007-F0-O0009",
-   "proc-factory-test-007-F0-O0001",
-   "proc-factory-test-007-F0-O0037",
-   "proc-factory-test-007-F0-O0036",
-   "proc-factory-test-007-F0-O0034",
-   "proc-factory-test-007-F0-S026",
-   "proc-factory-test-007-V01",
-   "proc-factory-test-007-F1-S002",
-   "proc-factory-test-007-F1-O0074",
-   "proc-factory-test-007-F1-O0082",
-   "proc-factory-test-007-F1-S010"
-  ],
-  "element_path": [
-   "proc-factory-test-007-F1-O0077",
-   "proc-factory-test-007-F1-O0074",
-   "proc-factory-test-007-V01",
-   "proc-factory-test-007-F0-O0034",
-   "proc-factory-test-007-F0-O0036",
-   "proc-factory-test-007-F0-O0037",
-   "proc-factory-test-007-F0-O0001",
-   "proc-factory-test-007-F0-O0009",
-   "proc-factory-test-007-F0-O0017",
-   "proc-factory-test-007-F0-O0010",
-   "proc-factory-test-007-F0-O0010",
-   "proc-factory-test-007-F0-O0017",
-   "proc-factory-test-007-F0-O0009",
-   "proc-factory-test-007-F0-O0001",
-   "proc-factory-test-007-F0-O0037",
-   "proc-factory-test-007-F0-O0036",
-   "proc-factory-test-007-F0-O0034",
-   "proc-factory-test-007-V01",
-   "proc-factory-test-007-F1-O0074",
-   "proc-factory-test-007-F1-O0082"
-  ],
-  "reachable": true
- },
- "proc-factory-test-007-H05": {
-  "answer": "4",
-  "reply": "Four rooms on the ground floor share at least 1 m of wall with Kitchen 0.43: Production zone H-A4 (2.71 m), Warehouse zone H-A5 (3.34 m), Office 0.42 (5.7 m) and Hall access 0.44 (5.7 m). I counted Hall access 0.44 because halls aren't among the excluded types (corridors, stairwells, lifts).\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-007-H06": {
-  "answer": "34.8",
-  "reply": "I measured from the floor-plan centre of Production zone H-A4 on the ground floor (0 m) to the centre of Office 2.10 on Floor 2 (7.0 m up). The straight line between them is 34.8 m.\n\nAnswer: 34.8",
-  "kind": "straight_line_3d"
- },
- "proc-factory-test-009-H01": {
-  "answer": "1220.16",
-  "reply": "The four production zones on the ground floor add up to 1220.16 m².\n\nAnswer: 1220.16",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-009-H02": {
-  "answer": "12",
-  "reply": "Starting from the entrance into Office corridor 0.21, the bed can be delivered to 12 rooms on Floor 1. That count only uses routes with no stairs or steps (the lift is allowed) and doors at least 1.0 m wide.\n\nAnswer: 12",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-009-H03": {
-  "answer": "4",
-  "reply": "Office 0.27 shares at least 1 m of wall with 4 rooms on the ground floor: Additive zone H-A1, Warehouse zone H-A2, Meeting room 0.26 and Kitchen 0.28.\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-010-H01": {
-  "answer": "0.40, 29.95 m²",
-  "reply": "The largest meeting room on the ground floor is Meeting room 0.40, at 29.95 m². The next largest is 0.33, at 23.9 m².\n\nAnswer: 0.40, 29.95 m²",
-  "kind": "largest_room",
-  "space_id": "proc-factory-test-010-F0-S040"
- },
- "proc-factory-test-010-H02": {
-  "answer": "111.6",
-  "reply": "The ground floor has 5 meeting rooms, and their floor areas add up to 111.6 m².\n\nAnswer: 111.6",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-010-H03": {
-  "answer": "10",
-  "reply": "The pallet comes in at Logistics zone H-E1, goes up in the lift and passes only through doors at least 1.0 m wide. That way it can reach 10 rooms on Floor 1.\n\nAnswer: 10",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-010-H04": {
-  "answer": "113.02",
-  "reply": "You'll walk about 113.02 m in total. The nearest UPS unit is in Server room 1.16, which is 21.48 m from your office. From there, carrying it to Meeting room 0.40, the largest meeting room on the ground floor, is another 91.55 m, using the stairs.\n\nAnswer: 113.02",
-  "kind": "errand",
-  "item_space_id": "proc-factory-test-010-F1-S016",
-  "space_id": "proc-factory-test-010-F0-S040",
-  "length_m": 113.02,
-  "route": [
-   "proc-factory-test-010-F1-S012",
-   "proc-factory-test-010-F1-S001",
-   "proc-factory-test-010-F1-S016",
-   "proc-factory-test-010-F1-S001",
-   "proc-factory-test-010-F1-S002",
-   "proc-factory-test-010-F0-S022",
-   "proc-factory-test-010-F0-S021",
-   "proc-factory-test-010-F0-S040"
-  ],
-  "route_nodes": [
-   "proc-factory-test-010-F1-S012",
-   "proc-factory-test-010-F1-O0073",
-   "proc-factory-test-010-F1-O0077",
-   "proc-factory-test-010-F1-S016",
-   "proc-factory-test-010-F1-O0077",
-   "proc-factory-test-010-F1-O0063",
-   "proc-factory-test-010-F1-S002",
-   "proc-factory-test-010-V01",
-   "proc-factory-test-010-F0-S022",
-   "proc-factory-test-010-F0-O0031",
-   "proc-factory-test-010-F0-O0051",
-   "proc-factory-test-010-F0-S040"
-  ],
-  "element_path": [
-   "proc-factory-test-010-F1-O0073",
-   "proc-factory-test-010-F1-O0077",
-   "proc-factory-test-010-F1-O0077",
-   "proc-factory-test-010-F1-O0063",
-   "proc-factory-test-010-V01",
-   "proc-factory-test-010-F0-O0031",
-   "proc-factory-test-010-F0-O0051"
-  ],
-  "reachable": true
- },
- "proc-factory-test-010-H05": {
-  "answer": "4",
-  "reply": "On the ground floor, 4 rooms share at least 1 m of wall with Quality lab 0.27: Assembly zone H-A1 (3.42 m), Assembly zone H-A2 (2.72 m), Server room 0.26 (5.7 m) and Office 0.28 (5.7 m). Corridors, stairwells and lifts are left out.\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-011-H01": {
-  "answer": "2079.98",
-  "reply": "The 7 production zones on the ground floor add up to 2079.98 m² of floor area.\n\nAnswer: 2079.98",
-  "kind": "floor_area_total"
- },
- "proc-factory-test-011-H02": {
-  "answer": "7",
-  "reply": "The trolley can reach 7 rooms on Floor 2 from the entrance into Logistics zone H-E3. That route uses lifts only, with no stairs or steps, and every door on it is at least 1.1 m wide.\n\nAnswer: 7",
-  "kind": "wide_delivery_count"
- },
- "proc-factory-test-011-H03": {
-  "answer": "4",
-  "reply": "Four rooms on the ground floor share at least 1 m of wall with Locker room 0.41. They are Assembly zone H-A3 (1.92 m), Additive zone H-A4 (4.27 m), Office 0.40 (5.7 m) and Office 0.42 (5.7 m).\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "proc-factory-test-011-H04": {
-  "answer": "51.42",
-  "reply": "The straight-line distance is 51.42 m. This runs from the floor-plan centre of Production zone H-B3 on the ground floor (0 m) to the centre of Kitchen 2.04 on Floor 2 (7.0 m).\n\nAnswer: 51.42",
-  "kind": "straight_line_3d"
- },
- "resplan-1153-H01": {
-  "answer": "71.29",
-  "reply": "The ground floor has 4 bedrooms, and together they cover 71.29 m².\n\nAnswer: 71.29",
-  "kind": "floor_area_total"
- },
- "resplan-1153-H02": {
-  "answer": "3",
-  "reply": "Three rooms share at least 1 m of wall with Bedroom 0.03: Bedroom 0.04 (5.72 m), Bathroom 0.06 (3.45 m) and Living room 0.01 (2.98 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "resplan-12469-H01": {
-  "answer": "109.7",
-  "reply": "The 5 bedrooms on the ground floor have a combined floor area of 109.7 m².\n\nAnswer: 109.7",
-  "kind": "floor_area_total"
- },
- "resplan-12469-H02": {
-  "answer": "8",
-  "reply": "Starting from the entrance into Living room 0.01, the 1.0 m wide machine can be delivered to 8 rooms on the ground floor. That count only includes rooms it can reach without stairs or steps and through doors at least 1.0 m wide.\n\nAnswer: 8",
-  "kind": "wide_delivery_count"
- },
- "resplan-12469-H03": {
-  "answer": "5",
-  "reply": "Five rooms on the ground floor share at least 1 m of wall with Bedroom 0.05: Living room 0.01 (6.8 m of shared wall) and Bathrooms 0.07 (4.1 m), 0.08 (3.13 m), 0.09 (2.21 m) and 0.10 (2.13 m).\n\nAnswer: 5",
-  "kind": "shared_walls_count"
- },
- "resplan-12962-H01": {
-  "answer": "5",
-  "reply": "Five rooms share at least 1 m of wall with Living room 0.01: Bedroom 0.02 (1.79 m), Bedroom 0.03 (2.16 m), Bathroom 0.04 (5.32 m), Bathroom 0.05 (5.84 m) and Kitchen 0.06 (6.58 m).\n\nAnswer: 5",
-  "kind": "shared_walls_count"
- },
- "resplan-14307-H01": {
-  "answer": "3",
-  "reply": "Three rooms on the ground floor share at least 1 m of wall with Bedroom 0.02: Living room 0.01 (2.72 m), Kitchen 0.05 (1.94 m) and Bathroom 0.04 (1.89 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "resplan-3573-H01": {
-  "answer": "0.06, 6.98 m²",
-  "reply": "Bathroom 0.06 is the largest of the three bathrooms on the ground floor, at 6.98 m². The other two are Bathroom 0.05 at 5.63 m² and Bathroom 0.07 at 5.05 m².\n\nAnswer: 0.06, 6.98 m²",
-  "kind": "largest_room",
-  "space_id": "resplan-3573-F0-S006"
- },
- "resplan-3573-H02": {
-  "answer": "17.65",
-  "reply": "The three bathrooms on the ground floor have a combined floor area of 17.65 m².\n\nAnswer: 17.65",
-  "kind": "floor_area_total"
- },
- "resplan-3573-H03": {
-  "answer": "6",
-  "reply": "The machine can be delivered to 6 rooms on the ground floor, counting from the entrance into Living room 0.01. That count only includes routes with no stairs or steps where every door is at least 1.0 m wide.\n\nAnswer: 6",
-  "kind": "wide_delivery_count"
- },
- "resplan-3573-H04": {
-  "answer": "18.58",
-  "reply": "The closest sink is in Bathroom 0.07, which is 6.2 m from Living room 0.01. Carrying it from there to Bathroom 0.06, the largest bathroom on the ground floor, is another 12.38 m, so you'll walk 18.58 m in total.\n\nAnswer: 18.58",
-  "kind": "errand",
-  "item_space_id": "resplan-3573-F0-S007",
-  "space_id": "resplan-3573-F0-S006",
-  "length_m": 18.58,
-  "route": [
-   "resplan-3573-F0-S001",
-   "resplan-3573-F0-S007",
-   "resplan-3573-F0-S001",
-   "resplan-3573-F0-S003",
-   "resplan-3573-F0-S006"
-  ],
-  "route_nodes": [
-   "resplan-3573-F0-S001",
-   "resplan-3573-F0-O0001",
-   "resplan-3573-F0-S007",
-   "resplan-3573-F0-O0001",
-   "resplan-3573-F0-O0003",
-   "resplan-3573-F0-O0005",
-   "resplan-3573-F0-S006"
-  ],
-  "element_path": [
-   "resplan-3573-F0-O0001",
-   "resplan-3573-F0-O0001",
-   "resplan-3573-F0-O0003",
-   "resplan-3573-F0-O0005"
-  ],
-  "reachable": true
- },
- "resplan-3573-H05": {
-  "answer": "6",
-  "reply": "Six rooms on the ground floor share at least 1 m of wall with Living room 0.01: bedrooms 0.02, 0.03 and 0.04, bathrooms 0.06 and 0.07, and kitchen 0.08. The kitchen shares the longest wall, at 13.0 m.\n\nAnswer: 6",
-  "kind": "shared_walls_count"
- },
- "resplan-6532-H01": {
-  "answer": "3",
-  "reply": "Coming in through the entrance to Living room 0.01, the 1.0 m pallet can reach 3 rooms on the ground floor. Only routes with no stairs or steps were counted, and every door on them is at least 1.0 m wide.\n\nAnswer: 3",
-  "kind": "wide_delivery_count"
- },
- "resplan-6532-H02": {
-  "answer": "3",
-  "reply": "Three rooms on the ground floor share at least 1 m of wall with Bedroom 0.03: Kitchen 0.06 (4.43 m), Living room 0.01 (2.45 m) and Bathroom 0.04 (2.1 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "resplan-8357-H01": {
-  "answer": "4",
-  "reply": "Coming in through Living room 0.01 with no stairs or steps, the 1.1 m wide pallet can reach 4 rooms on the ground floor where every door is at least 1.1 m wide.\n\nAnswer: 4",
-  "kind": "wide_delivery_count"
- },
- "resplan-8357-H02": {
-  "answer": "5",
-  "reply": "Five rooms on the ground floor share at least 1 m of wall with Living room 0.01: Bedroom 0.02, Bedroom 0.03, Bathroom 0.04, Bathroom 0.05 and Kitchen 0.06. The longest shared walls are with Kitchen 0.06 (19.62 m) and Bedroom 0.02 (12.42 m).\n\nAnswer: 5",
-  "kind": "shared_walls_count"
- },
- "resplan-9751-H01": {
-  "answer": "5",
-  "reply": "Five rooms share at least 1 m of wall with Living room 0.01:\n- Bedroom 0.02: 4.18 m\n- Bedroom 0.03: 5.35 m\n- Bathroom 0.04: 3.49 m\n- Bathroom 0.05: 2.35 m\n- Kitchen 0.06: 4.84 m\n\nAnswer: 5",
-  "kind": "shared_walls_count"
- },
- "swiss-100-H01": {
-  "answer": "1.05, 30.16 m²",
-  "reply": "The largest living room on Floor 1 is room 1.05 in apartment 4, at 30.16 m². The next largest is 1.36, at 27.21 m².\n\nAnswer: 1.05, 30.16 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-100-F1-S005"
- },
- "swiss-100-H02": {
-  "answer": "32.47",
-  "reply": "The 8 bathrooms on Floor 5 add up to 32.47 m² of floor area.\n\nAnswer: 32.47",
-  "kind": "floor_area_total"
- },
- "swiss-100-H03": {
-  "answer": "39.2",
-  "reply": "The closest microwave is in Kitchen 4.03, which is 7.07 m from you. Carrying it down the stairs to Living room 1.05, the largest living room on Floor 1, is another 32.13 m.\n\nAnswer: 39.2",
-  "kind": "errand",
-  "item_space_id": "swiss-100-F4-S003",
-  "space_id": "swiss-100-F1-S005",
-  "length_m": 39.2,
-  "route": [
-   "swiss-100-F4-S007",
-   "swiss-100-F4-S004",
-   "swiss-100-F4-S003",
-   "swiss-100-F4-S004",
-   "swiss-100-F4-S045",
-   "swiss-100-F3-S045",
-   "swiss-100-F2-S045",
-   "swiss-100-F1-S045",
-   "swiss-100-F1-S007",
-   "swiss-100-F1-S005"
-  ],
-  "route_nodes": [
-   "swiss-100-F4-S007",
-   "swiss-100-F4-O0190",
-   "swiss-100-F4-O0156",
-   "swiss-100-F4-S003",
-   "swiss-100-F4-O0156",
-   "swiss-100-F4-O0161",
-   "swiss-100-F4-S045",
-   "swiss-100-V01",
-   "swiss-100-F3-S045",
-   "swiss-100-V01",
-   "swiss-100-F2-S045",
-   "swiss-100-V01",
-   "swiss-100-F1-S045",
-   "swiss-100-F1-O0024",
-   "swiss-100-F1-O0061",
-   "swiss-100-F1-S005"
-  ],
-  "element_path": [
-   "swiss-100-F4-O0190",
-   "swiss-100-F4-O0156",
-   "swiss-100-F4-O0156",
-   "swiss-100-F4-O0161",
-   "swiss-100-V01",
-   "swiss-100-V01",
-   "swiss-100-V01",
-   "swiss-100-F1-O0024",
-   "swiss-100-F1-O0061"
-  ],
-  "reachable": true
- },
- "swiss-1195-H01": {
-  "answer": "207.01",
-  "reply": "Floor 3 has 14 bedrooms, and their floor areas add up to 207.01 m².\n\nAnswer: 207.01",
-  "kind": "floor_area_total"
- },
- "swiss-1195-H02": {
-  "answer": "3",
-  "reply": "Three rooms on Floor 1 share at least 1 m of wall with Bedroom 1.34:\n- Bedroom 1.11, in apartment 7 (3.66 m of shared wall)\n- Bathroom 1.30 (2.04 m)\n- Kitchen 1.31 (3.82 m)\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "swiss-1671-H01": {
-  "answer": "0.05, 19.34 m²",
-  "reply": "The largest bedroom on the ground floor is Bedroom 0.05 in apartment 1, at 19.34 m². The next largest is Bedroom 0.09, at 17.32 m².\n\nAnswer: 0.05, 19.34 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-1671-F0-S005"
- },
- "swiss-1671-H02": {
-  "answer": "133.95",
-  "reply": "The 8 bedrooms on Floor 2 add up to 133.95 m² of floor area.\n\nAnswer: 133.95",
-  "kind": "floor_area_total"
- },
- "swiss-1671-H03": {
-  "answer": "27.49",
-  "reply": "You'll walk 9.38 m to pick up the kitchen counter in Kitchen 1.09, which is the closest one. Then you'll carry it 18.11 m, using the stairs, to Bedroom 0.05, the largest bedroom on the ground floor. That makes 27.49 m in total.\n\nAnswer: 27.49",
-  "kind": "errand",
-  "item_space_id": "swiss-1671-F1-S009",
-  "space_id": "swiss-1671-F0-S005",
-  "length_m": 27.49,
-  "route": [
-   "swiss-1671-F1-S013",
-   "swiss-1671-F1-S012",
-   "swiss-1671-F1-S009",
-   "swiss-1671-F1-S012",
-   "swiss-1671-F1-S017",
-   "swiss-1671-F0-S015",
-   "swiss-1671-F0-S007",
-   "swiss-1671-F0-S005"
-  ],
-  "route_nodes": [
-   "swiss-1671-F1-S013",
-   "swiss-1671-F1-O0029",
-   "swiss-1671-F1-O0027",
-   "swiss-1671-F1-S009",
-   "swiss-1671-F1-O0027",
-   "swiss-1671-F1-O0028",
-   "swiss-1671-F1-S017",
-   "swiss-1671-V03",
-   "swiss-1671-F0-S015",
-   "swiss-1671-F0-O0007",
-   "swiss-1671-F0-O0008",
-   "swiss-1671-F0-S005"
-  ],
-  "element_path": [
-   "swiss-1671-F1-O0029",
-   "swiss-1671-F1-O0027",
-   "swiss-1671-F1-O0027",
-   "swiss-1671-F1-O0028",
-   "swiss-1671-V03",
-   "swiss-1671-F0-O0007",
-   "swiss-1671-F0-O0008"
-  ],
-  "reachable": true
- },
- "swiss-1671-H04": {
-  "answer": "3",
-  "reply": "Three rooms on Floor 2 share at least 1 m of wall with Kitchen 2.09: Storage 2.08 (2.02 m), Bedroom 2.12 (3.62 m) and Bathroom 2.14 (2.26 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "swiss-17033-H01": {
-  "answer": "50.66",
-  "reply": "The four bedrooms on Floor 1 add up to 50.66 m² of floor area.\n\nAnswer: 50.66",
-  "kind": "floor_area_total"
- },
- "swiss-1760-H01": {
-  "answer": "0.06, 6.73 m²",
-  "reply": "The largest kitchen on the ground floor is Kitchen 0.06 in apartment 1, at 6.73 m². The next biggest is Kitchen 0.23 in apartment 4, at 6.08 m².\n\nAnswer: 0.06, 6.73 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-1760-F0-S006"
- },
- "swiss-1760-H02": {
-  "answer": "61.12",
-  "reply": "The ground floor has 4 living rooms, and together they cover 61.12 m².\n\nAnswer: 61.12",
-  "kind": "floor_area_total"
- },
- "swiss-17736-H01": {
-  "answer": "3.03, 19.44 m²",
-  "reply": "The largest bedroom on Floor 3 is Bedroom 3.03 in apartment 8, at 19.44 m². The next biggest is Bedroom 3.02, at 14.35 m².\n\nAnswer: 3.03, 19.44 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-17736-F3-S003"
- },
- "swiss-17736-H02": {
-  "answer": "34",
-  "reply": "Floor 2 has 7 bathrooms, and their floor areas add up to 34.0 m².\n\nAnswer: 34",
-  "kind": "floor_area_total"
- },
- "swiss-17736-H03": {
-  "answer": "34.14",
-  "reply": "You'll walk about 34.14 m in total. The closest sofa is in Living room 2.01, 6.57 m from your bedroom. From there it's 27.58 m to carry it up the stairs to Bedroom 3.03, the largest bedroom on Floor 3.\n\nAnswer: 34.14",
-  "kind": "errand",
-  "item_space_id": "swiss-17736-F2-S001",
-  "space_id": "swiss-17736-F3-S003",
-  "length_m": 34.14,
-  "route": [
-   "swiss-17736-F2-S008",
-   "swiss-17736-F2-S004",
-   "swiss-17736-F2-S001",
-   "swiss-17736-F2-S004",
-   "swiss-17736-F2-S030",
-   "swiss-17736-F3-S012",
-   "swiss-17736-F3-S007",
-   "swiss-17736-F3-S003"
-  ],
-  "route_nodes": [
-   "swiss-17736-F2-S008",
-   "swiss-17736-F2-O0046",
-   "swiss-17736-F2-O0064",
-   "swiss-17736-F2-S001",
-   "swiss-17736-F2-O0064",
-   "swiss-17736-F2-O0042",
-   "swiss-17736-F2-S030",
-   "swiss-17736-V01",
-   "swiss-17736-F3-S012",
-   "swiss-17736-F3-O0076",
-   "swiss-17736-F3-O0069",
-   "swiss-17736-F3-S003"
-  ],
-  "element_path": [
-   "swiss-17736-F2-O0046",
-   "swiss-17736-F2-O0064",
-   "swiss-17736-F2-O0064",
-   "swiss-17736-F2-O0042",
-   "swiss-17736-V01",
-   "swiss-17736-F3-O0076",
-   "swiss-17736-F3-O0069"
-  ],
-  "reachable": true
- },
- "swiss-1825-H01": {
-  "answer": "20.54",
-  "reply": "The 4 bathrooms on Floor 3 add up to 20.54 m² of floor area.\n\nAnswer: 20.54",
-  "kind": "floor_area_total"
- },
- "swiss-2-H01": {
-  "answer": "42.31",
-  "reply": "Floor 3 has three bedrooms, and their floor areas add up to 42.31 m².\n\nAnswer: 42.31",
-  "kind": "floor_area_total"
- },
- "swiss-2080-H01": {
-  "answer": "2.15, 4.13 m²",
-  "reply": "The largest bathroom on Floor 2 is Bathroom 2.15 in apartment 8, at 4.13 m². The next largest are 2.19 and 2.01, both 3.1 m².\n\nAnswer: 2.15, 4.13 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-2080-F2-S015"
- },
- "swiss-2080-H02": {
-  "answer": "12.3",
-  "reply": "Floor 3 has 4 bathrooms, and their floor areas add up to 12.3 m².\n\nAnswer: 12.3",
-  "kind": "floor_area_total"
- },
- "swiss-2080-H03": {
-  "answer": "38.28",
-  "reply": "You'd walk 38.28 m in total. The nearest dining table is in Living room 2.08 on Floor 2, which is 23.27 m from your bedroom. From there it's another 15.01 m to Bedroom 2.18, the largest bedroom on Floor 2.\n\nAnswer: 38.28",
-  "kind": "errand",
-  "item_space_id": "swiss-2080-F2-S008",
-  "space_id": "swiss-2080-F2-S018",
-  "length_m": 38.28,
-  "route": [
-   "swiss-2080-F1-S022",
-   "swiss-2080-F1-S020",
-   "swiss-2080-F1-S023",
-   "swiss-2080-F2-S023",
-   "swiss-2080-F2-S012",
-   "swiss-2080-F2-S008",
-   "swiss-2080-F2-S012",
-   "swiss-2080-F2-S023",
-   "swiss-2080-F2-S021",
-   "swiss-2080-F2-S018"
-  ],
-  "route_nodes": [
-   "swiss-2080-F1-S022",
-   "swiss-2080-F1-O0044",
-   "swiss-2080-F1-O0036",
-   "swiss-2080-F1-S023",
-   "swiss-2080-V01",
-   "swiss-2080-F2-S023",
-   "swiss-2080-F2-O0055",
-   "swiss-2080-F2-O0063",
-   "swiss-2080-F2-S008",
-   "swiss-2080-F2-O0063",
-   "swiss-2080-F2-O0055",
-   "swiss-2080-F2-O0059",
-   "swiss-2080-F2-O0065",
-   "swiss-2080-F2-S018"
-  ],
-  "element_path": [
-   "swiss-2080-F1-O0044",
-   "swiss-2080-F1-O0036",
-   "swiss-2080-V01",
-   "swiss-2080-F2-O0055",
-   "swiss-2080-F2-O0063",
-   "swiss-2080-F2-O0063",
-   "swiss-2080-F2-O0055",
-   "swiss-2080-F2-O0059",
-   "swiss-2080-F2-O0065"
-  ],
-  "reachable": true
- },
- "swiss-2080-H04": {
-  "answer": "4",
-  "reply": "Four rooms on Floor 2 share at least 1 m of wall with Bedroom 2.20. They are Bathroom 2.01 (2.18 m) and Bedroom 2.06 (3.52 m) in apartment 7, plus Bedroom 2.18 (3.53 m) and Bathroom 2.19 (1.76 m) in apartment 9.\n\nAnswer: 4",
-  "kind": "shared_walls_count"
- },
- "swiss-2873-H01": {
-  "answer": "2.14, 3.22 m²",
-  "reply": "The largest storage room on Floor 2 is Storage 2.14 in apartment 10, at 3.22 m². The next biggest is Storage 2.03 at 2.05 m².\n\nAnswer: 2.14, 3.22 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-2873-F2-S014"
- },
- "swiss-2873-H02": {
-  "answer": "12.53",
-  "reply": "The four storage rooms on the ground floor have a combined floor area of 12.53 m².\n\nAnswer: 12.53",
-  "kind": "floor_area_total"
- },
- "swiss-2873-H03": {
-  "answer": "34.27",
-  "reply": "The nearest outdoor chair is on Balcony 1.29, which is 6.77 m from Kitchen 1.30. Carrying it from there to Storage 2.14, the largest storage room on Floor 2, is another 27.5 m. In total you'll walk 34.27 m.\n\nAnswer: 34.27",
-  "kind": "errand",
-  "item_space_id": "swiss-2873-F1-S029",
-  "space_id": "swiss-2873-F2-S014",
-  "length_m": 34.27,
-  "route": [
-   "swiss-2873-F1-S030",
-   "swiss-2873-F1-S031",
-   "swiss-2873-F1-S029",
-   "swiss-2873-F1-S031",
-   "swiss-2873-F1-S038",
-   "swiss-2873-F1-S039",
-   "swiss-2873-F2-S037",
-   "swiss-2873-F2-S015",
-   "swiss-2873-F2-S014"
-  ],
-  "route_nodes": [
-   "swiss-2873-F1-S030",
-   "swiss-2873-F1-O0075",
-   "swiss-2873-F1-O0061",
-   "swiss-2873-F1-S029",
-   "swiss-2873-F1-O0061",
-   "swiss-2873-F1-O0076",
-   "swiss-2873-F1-O0062",
-   "swiss-2873-F1-S039",
-   "swiss-2873-V01",
-   "swiss-2873-F2-S037",
-   "swiss-2873-F2-O0092",
-   "swiss-2873-F2-O0089",
-   "swiss-2873-F2-S014"
-  ],
-  "element_path": [
-   "swiss-2873-F1-O0075",
-   "swiss-2873-F1-O0061",
-   "swiss-2873-F1-O0061",
-   "swiss-2873-F1-O0076",
-   "swiss-2873-F1-O0062",
-   "swiss-2873-V01",
-   "swiss-2873-F2-O0092",
-   "swiss-2873-F2-O0089"
-  ],
-  "reachable": true
- },
- "swiss-2873-H04": {
-  "answer": "3",
-  "reply": "Three rooms on Floor 2 share at least 1 m of wall with Bedroom 2.07: Bedroom 2.02 (3.57 m of shared wall), Bedroom 2.08 (3.45 m) and Living room 2.09 (4.42 m).\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "swiss-482-H01": {
-  "answer": "4.12, 2.32 m²",
-  "reply": "The largest storage room on Floor 4 is 4.12, the storage room in apartment 18, at 2.32 m². The next largest are 4.08 at 2.08 m² and 4.27 at 2.05 m².\n\nAnswer: 4.12, 2.32 m²",
-  "kind": "largest_room",
-  "space_id": "swiss-482-F4-S012"
- },
- "swiss-482-H02": {
-  "answer": "16.07",
-  "reply": "Floor 4 has 6 bathrooms, and together they cover 16.07 m².\n\nAnswer: 16.07",
-  "kind": "floor_area_total"
- },
- "swiss-482-H03": {
-  "answer": "67.01",
-  "reply": "The closest fridge is in Kitchen 4.26, which is 8.46 m from your storage room. Carrying it from there by the stairs to Bedroom 9.04, the largest bedroom on Floor 9, is another 58.56 m.\n\nAnswer: 67.01",
-  "kind": "errand",
-  "item_space_id": "swiss-482-F4-S026",
-  "space_id": "swiss-482-F9-S004",
-  "length_m": 67.01,
-  "route": [
-   "swiss-482-F4-S027",
-   "swiss-482-F4-S024",
-   "swiss-482-F4-S026",
-   "swiss-482-F4-S024",
-   "swiss-482-F4-S035",
-   "swiss-482-F5-S035",
-   "swiss-482-F6-S035",
-   "swiss-482-F7-S035",
-   "swiss-482-F8-S035",
-   "swiss-482-F9-S019",
-   "swiss-482-F9-S001",
-   "swiss-482-F9-S007",
-   "swiss-482-F9-S004"
-  ],
-  "route_nodes": [
-   "swiss-482-F4-S027",
-   "swiss-482-F4-O0171",
-   "swiss-482-F4-O0166",
-   "swiss-482-F4-S026",
-   "swiss-482-F4-O0166",
-   "swiss-482-F4-O0165",
-   "swiss-482-F4-S035",
-   "swiss-482-V01",
-   "swiss-482-F5-S035",
-   "swiss-482-V01",
-   "swiss-482-F6-S035",
-   "swiss-482-V01",
-   "swiss-482-F7-S035",
-   "swiss-482-V01",
-   "swiss-482-F8-S035",
-   "swiss-482-V03",
-   "swiss-482-F9-S019",
-   "swiss-482-F9-O0327",
-   "swiss-482-F9-O0330",
-   "swiss-482-F9-O0329",
-   "swiss-482-F9-S004"
-  ],
-  "element_path": [
-   "swiss-482-F4-O0171",
-   "swiss-482-F4-O0166",
-   "swiss-482-F4-O0166",
-   "swiss-482-F4-O0165",
-   "swiss-482-V01",
-   "swiss-482-V01",
-   "swiss-482-V01",
-   "swiss-482-V01",
-   "swiss-482-V03",
-   "swiss-482-F9-O0327",
-   "swiss-482-F9-O0330",
-   "swiss-482-F9-O0329"
-  ],
-  "reachable": true
- },
- "swiss-482-H04": {
-  "answer": "3",
-  "reply": "Three rooms on Floor 7 share at least 1 m of wall with Bedroom 7.22:\n- Bedroom 7.10 (apartment 30), about 4.72 m of shared wall\n- Bedroom 7.20 (apartment 31), about 4.77 m\n- Storage 7.24 (apartment 31), about 1.8 m\n\nAnswer: 3",
-  "kind": "shared_walls_count"
- },
- "swiss-6128-H01": {
-  "answer": "74.92",
-  "reply": "Floor 2 has 4 bedrooms, and their floor areas add up to 74.92 m².\n\nAnswer: 74.92",
-  "kind": "floor_area_total"
+[
+ {
+  "question_id": "osm-way363805324-H01",
+  "answer": "Answer: 1.02, 162.33 m²"
+ },
+ {
+  "question_id": "osm-way363805324-H02",
+  "answer": "Answer: 54.77"
+ },
+ {
+  "question_id": "osm-way363805324-H03",
+  "answer": "Answer: 44.9"
+ },
+ {
+  "question_id": "osm-way363805324-H04",
+  "answer": "Answer: E01"
+ },
+ {
+  "question_id": "osm-way363805324-H07",
+  "answer": "Answer: 1.10"
+ },
+ {
+  "question_id": "osm-way363805324-H10",
+  "answer": "Answer: 5"
+ },
+ {
+  "question_id": "osm-way363805324-H11",
+  "answer": "Answer: 21.16"
+ },
+ {
+  "question_id": "osm-way43035346-H01",
+  "answer": "Answer: N3806, 115.03 m²"
+ },
+ {
+  "question_id": "osm-way43035346-H02",
+  "answer": "Answer: 592.8"
+ },
+ {
+  "question_id": "osm-way43035346-H03",
+  "answer": "Answer: 53.98"
+ },
+ {
+  "question_id": "osm-way43035346-H04",
+  "answer": "Answer: N0806"
+ },
+ {
+  "question_id": "osm-way43035346-H05",
+  "answer": "Answer: 6"
+ },
+ {
+  "question_id": "osm-way43035346-H06",
+  "answer": "Answer: 11.85"
+ },
+ {
+  "question_id": "osm-way43035346-H07",
+  "answer": "Answer: 0"
+ },
+ {
+  "question_id": "osm-way50299584-H01",
+  "answer": "Answer: 0566, 559.8 m²"
+ },
+ {
+  "question_id": "osm-way50299584-H02",
+  "answer": "Answer: 959.75"
+ },
+ {
+  "question_id": "osm-way50299584-H03",
+  "answer": "Answer: 103.36"
+ },
+ {
+  "question_id": "osm-way50299584-H04",
+  "answer": "Answer: 0583"
+ },
+ {
+  "question_id": "osm-way50299584-H06",
+  "answer": "Answer: -1530"
+ },
+ {
+  "question_id": "osm-way50299584-H11",
+  "answer": "Answer: 1530"
+ },
+ {
+  "question_id": "osm-way50299584-H12",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "osm-way50299584-H13",
+  "answer": "Answer: 62.01"
+ },
+ {
+  "question_id": "osm-way50300147-H01",
+  "answer": "Answer: 0219, 530.16 m²"
+ },
+ {
+  "question_id": "osm-way50300147-H02",
+  "answer": "Answer: 1699.55"
+ },
+ {
+  "question_id": "osm-way50300147-H03",
+  "answer": "Answer: 78.24"
+ },
+ {
+  "question_id": "osm-way50300147-H04",
+  "answer": "Answer: 0260"
+ },
+ {
+  "question_id": "osm-way50300147-H05",
+  "answer": "Answer: 0219"
+ },
+ {
+  "question_id": "osm-way50300147-H06",
+  "answer": "Answer: 0209"
+ },
+ {
+  "question_id": "osm-way50300147-H07",
+  "answer": "Answer: 6"
+ },
+ {
+  "question_id": "osm-way50300147-H08",
+  "answer": "Answer: 45.49"
+ },
+ {
+  "question_id": "osm-way50300147-H09",
+  "answer": "Answer: 47"
+ },
+ {
+  "question_id": "osm-way50300147-H10",
+  "answer": "Answer: 47"
+ },
+ {
+  "question_id": "proc-campus-test-000-H01",
+  "answer": "Answer: 1.25, 34.02 m²"
+ },
+ {
+  "question_id": "proc-campus-test-000-H02",
+  "answer": "Answer: 105.42"
+ },
+ {
+  "question_id": "proc-campus-test-000-H03",
+  "answer": "Answer: 21"
+ },
+ {
+  "question_id": "proc-campus-test-000-H04",
+  "answer": "Answer: 128.24"
+ },
+ {
+  "question_id": "proc-campus-test-000-H05",
+  "answer": "Answer: 41.31"
+ },
+ {
+  "question_id": "proc-campus-test-004-H01",
+  "answer": "Answer: 0.15, 35.46 m²"
+ },
+ {
+  "question_id": "proc-campus-test-004-H02",
+  "answer": "Answer: 184.14"
+ },
+ {
+  "question_id": "proc-campus-test-004-H03",
+  "answer": "Answer: 13"
+ },
+ {
+  "question_id": "proc-campus-test-004-H04",
+  "answer": "Answer: 74.29"
+ },
+ {
+  "question_id": "proc-campus-test-004-H05",
+  "answer": "Answer: 15.06"
+ },
+ {
+  "question_id": "proc-campus-test-005-H01",
+  "answer": "Answer: 1.13, 41.52 m²"
+ },
+ {
+  "question_id": "proc-campus-test-005-H02",
+  "answer": "Answer: 456.72"
+ },
+ {
+  "question_id": "proc-campus-test-005-H03",
+  "answer": "Answer: 18"
+ },
+ {
+  "question_id": "proc-campus-test-005-H04",
+  "answer": "Answer: 89.51"
+ },
+ {
+  "question_id": "proc-campus-test-005-H05",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "proc-campus-test-005-H06",
+  "answer": "Answer: 39.09"
+ },
+ {
+  "question_id": "proc-campus-test-008-H01",
+  "answer": "Answer: 2.19, 39.66 m²"
+ },
+ {
+  "question_id": "proc-campus-test-008-H02",
+  "answer": "Answer: 86.4"
+ },
+ {
+  "question_id": "proc-campus-test-008-H03",
+  "answer": "Answer: 11"
+ },
+ {
+  "question_id": "proc-campus-test-008-H04",
+  "answer": "Answer: 78.91"
+ },
+ {
+  "question_id": "proc-campus-test-008-H05",
+  "answer": "Answer: 33.73"
+ },
+ {
+  "question_id": "proc-campus-test-012-H01",
+  "answer": "Answer: 1.12, 40.02 m²"
+ },
+ {
+  "question_id": "proc-campus-test-012-H02",
+  "answer": "Answer: 99.18"
+ },
+ {
+  "question_id": "proc-campus-test-012-H03",
+  "answer": "Answer: 16"
+ },
+ {
+  "question_id": "proc-campus-test-012-H04",
+  "answer": "Answer: 43.83"
+ },
+ {
+  "question_id": "proc-campus-test-012-H05",
+  "answer": "Answer: 38.46"
+ },
+ {
+  "question_id": "proc-campus-test-013-H01",
+  "answer": "Answer: 5.26, 40.86 m²"
+ },
+ {
+  "question_id": "proc-campus-test-013-H02",
+  "answer": "Answer: 200.28"
+ },
+ {
+  "question_id": "proc-campus-test-013-H03",
+  "answer": "Answer: 15"
+ },
+ {
+  "question_id": "proc-campus-test-013-H04",
+  "answer": "Answer: 116.61"
+ },
+ {
+  "question_id": "proc-campus-test-013-H05",
+  "answer": "Answer: 36.37"
+ },
+ {
+  "question_id": "proc-factory-test-001-H01",
+  "answer": "Answer: 92.1"
+ },
+ {
+  "question_id": "proc-factory-test-001-H02",
+  "answer": "Answer: 9"
+ },
+ {
+  "question_id": "proc-factory-test-001-H03",
+  "answer": "Answer: 6"
+ },
+ {
+  "question_id": "proc-factory-test-002-H01",
+  "answer": "Answer: 126.5"
+ },
+ {
+  "question_id": "proc-factory-test-002-H02",
+  "answer": "Answer: 9"
+ },
+ {
+  "question_id": "proc-factory-test-002-H03",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "proc-factory-test-002-H04",
+  "answer": "Answer: 111.98"
+ },
+ {
+  "question_id": "proc-factory-test-003-H01",
+  "answer": "Answer: 1.17, 29.35 m²"
+ },
+ {
+  "question_id": "proc-factory-test-003-H02",
+  "answer": "Answer: 154.2"
+ },
+ {
+  "question_id": "proc-factory-test-003-H03",
+  "answer": "Answer: 7"
+ },
+ {
+  "question_id": "proc-factory-test-003-H04",
+  "answer": "Answer: 89.86"
+ },
+ {
+  "question_id": "proc-factory-test-003-H05",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "proc-factory-test-003-H06",
+  "answer": "Answer: 32.02"
+ },
+ {
+  "question_id": "proc-factory-test-006-H01",
+  "answer": "Answer: 203.3"
+ },
+ {
+  "question_id": "proc-factory-test-006-H02",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "proc-factory-test-006-H03",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "proc-factory-test-006-H04",
+  "answer": "Answer: 53.09"
+ },
+ {
+  "question_id": "proc-factory-test-007-H01",
+  "answer": "Answer: 1.10, 28.75 m²"
+ },
+ {
+  "question_id": "proc-factory-test-007-H02",
+  "answer": "Answer: 413.4"
+ },
+ {
+  "question_id": "proc-factory-test-007-H03",
+  "answer": "Answer: 9"
+ },
+ {
+  "question_id": "proc-factory-test-007-H04",
+  "answer": "Answer: 220.61"
+ },
+ {
+  "question_id": "proc-factory-test-007-H05",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "proc-factory-test-007-H06",
+  "answer": "Answer: 34.8"
+ },
+ {
+  "question_id": "proc-factory-test-009-H01",
+  "answer": "Answer: 1220.16"
+ },
+ {
+  "question_id": "proc-factory-test-009-H02",
+  "answer": "Answer: 12"
+ },
+ {
+  "question_id": "proc-factory-test-009-H03",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "proc-factory-test-010-H01",
+  "answer": "Answer: 0.40, 29.95 m²"
+ },
+ {
+  "question_id": "proc-factory-test-010-H02",
+  "answer": "Answer: 111.6"
+ },
+ {
+  "question_id": "proc-factory-test-010-H03",
+  "answer": "Answer: 10"
+ },
+ {
+  "question_id": "proc-factory-test-010-H04",
+  "answer": "Answer: 113.02"
+ },
+ {
+  "question_id": "proc-factory-test-010-H05",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "proc-factory-test-011-H01",
+  "answer": "Answer: 2079.98"
+ },
+ {
+  "question_id": "proc-factory-test-011-H02",
+  "answer": "Answer: 7"
+ },
+ {
+  "question_id": "proc-factory-test-011-H03",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "proc-factory-test-011-H04",
+  "answer": "Answer: 51.42"
+ },
+ {
+  "question_id": "resplan-1153-H01",
+  "answer": "Answer: 71.29"
+ },
+ {
+  "question_id": "resplan-1153-H02",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "resplan-12469-H01",
+  "answer": "Answer: 109.7"
+ },
+ {
+  "question_id": "resplan-12469-H02",
+  "answer": "Answer: 8"
+ },
+ {
+  "question_id": "resplan-12469-H03",
+  "answer": "Answer: 5"
+ },
+ {
+  "question_id": "resplan-12962-H01",
+  "answer": "Answer: 5"
+ },
+ {
+  "question_id": "resplan-14307-H01",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "resplan-3573-H01",
+  "answer": "Answer: 0.06, 6.98 m²"
+ },
+ {
+  "question_id": "resplan-3573-H02",
+  "answer": "Answer: 17.65"
+ },
+ {
+  "question_id": "resplan-3573-H03",
+  "answer": "Answer: 6"
+ },
+ {
+  "question_id": "resplan-3573-H04",
+  "answer": "Answer: 18.58"
+ },
+ {
+  "question_id": "resplan-3573-H05",
+  "answer": "Answer: 6"
+ },
+ {
+  "question_id": "resplan-6532-H01",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "resplan-6532-H02",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "resplan-8357-H01",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "resplan-8357-H02",
+  "answer": "Answer: 5"
+ },
+ {
+  "question_id": "resplan-9751-H01",
+  "answer": "Answer: 5"
+ },
+ {
+  "question_id": "swiss-100-H01",
+  "answer": "Answer: 1.05, 30.16 m²"
+ },
+ {
+  "question_id": "swiss-100-H02",
+  "answer": "Answer: 32.47"
+ },
+ {
+  "question_id": "swiss-100-H03",
+  "answer": "Answer: 39.2"
+ },
+ {
+  "question_id": "swiss-1195-H01",
+  "answer": "Answer: 207.01"
+ },
+ {
+  "question_id": "swiss-1195-H02",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "swiss-1671-H01",
+  "answer": "Answer: 0.05, 19.34 m²"
+ },
+ {
+  "question_id": "swiss-1671-H02",
+  "answer": "Answer: 133.95"
+ },
+ {
+  "question_id": "swiss-1671-H03",
+  "answer": "Answer: 27.49"
+ },
+ {
+  "question_id": "swiss-1671-H04",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "swiss-17033-H01",
+  "answer": "Answer: 50.66"
+ },
+ {
+  "question_id": "swiss-1760-H01",
+  "answer": "Answer: 0.06, 6.73 m²"
+ },
+ {
+  "question_id": "swiss-1760-H02",
+  "answer": "Answer: 61.12"
+ },
+ {
+  "question_id": "swiss-17736-H01",
+  "answer": "Answer: 3.03, 19.44 m²"
+ },
+ {
+  "question_id": "swiss-17736-H02",
+  "answer": "Answer: 34"
+ },
+ {
+  "question_id": "swiss-17736-H03",
+  "answer": "Answer: 34.14"
+ },
+ {
+  "question_id": "swiss-1825-H01",
+  "answer": "Answer: 20.54"
+ },
+ {
+  "question_id": "swiss-2-H01",
+  "answer": "Answer: 42.31"
+ },
+ {
+  "question_id": "swiss-2080-H01",
+  "answer": "Answer: 2.15, 4.13 m²"
+ },
+ {
+  "question_id": "swiss-2080-H02",
+  "answer": "Answer: 12.3"
+ },
+ {
+  "question_id": "swiss-2080-H03",
+  "answer": "Answer: 38.28"
+ },
+ {
+  "question_id": "swiss-2080-H04",
+  "answer": "Answer: 4"
+ },
+ {
+  "question_id": "swiss-2873-H01",
+  "answer": "Answer: 2.14, 3.22 m²"
+ },
+ {
+  "question_id": "swiss-2873-H02",
+  "answer": "Answer: 12.53"
+ },
+ {
+  "question_id": "swiss-2873-H03",
+  "answer": "Answer: 34.27"
+ },
+ {
+  "question_id": "swiss-2873-H04",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "swiss-482-H01",
+  "answer": "Answer: 4.12, 2.32 m²"
+ },
+ {
+  "question_id": "swiss-482-H02",
+  "answer": "Answer: 16.07"
+ },
+ {
+  "question_id": "swiss-482-H03",
+  "answer": "Answer: 67.01"
+ },
+ {
+  "question_id": "swiss-482-H04",
+  "answer": "Answer: 3"
+ },
+ {
+  "question_id": "swiss-6128-H01",
+  "answer": "Answer: 74.92"
  }
-}
+]
