@@ -476,16 +476,6 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         <span className="shell-spacer" />
         {brigade && <span className="brigade-tag">FIRE BRIGADE · SIMULATED</span>}
         {brigade && <button type="button" className="shell-button" onClick={() => router.push(`/?building=${encodeURIComponent(building.building.id)}`)}>End simulation</button>}
-        {!brigade && <div className="shell-lamps" aria-label="Active incidents">
-          {(['fire', 'water', 'electrical'] as const).map(kind => {
-            const active = incidents.active.filter(i => i.hazard === kind && !i.fixedAt);
-            return (
-              <button type="button" key={kind} className={`shell-lamp shell-lamp--${kind}${active.length ? ' is-lit' : ''}`} disabled={!active.length} onClick={() => active[0] && openIncident(active.at(-1)!)} aria-label={`${hazardMeta[kind].label}: ${active.length} active`}>
-                <i />{kind === 'fire' ? 'Fire' : kind === 'water' ? 'Water' : 'Power'}<b>{active.length}</b>
-              </button>
-            );
-          })}
-        </div>}
         {!brigade && <details className="simulate-menu" ref={simulateMenu}>
           <summary className="shell-button">Simulate</summary>
           <div className="simulate-list" role="menu">
