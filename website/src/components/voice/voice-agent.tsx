@@ -19,15 +19,15 @@ export interface VoiceActions {
  * tools as the chat and the panel, and everything it does shows on the map; building questions go to our own agent,
  * whose answers also appear in the chat.
  */
-export function VoiceAgent({ actions }: { actions: VoiceActions }) {
+export function VoiceAgent({ actions, situation }: { actions: VoiceActions; situation: string }) {
   return (
     <ConversationProvider>
-      <Bubble actions={actions} />
+      <Bubble actions={actions} situation={situation} />
     </ConversationProvider>
   );
 }
 
-function Bubble({ actions }: { actions: VoiceActions }) {
+function Bubble({ actions, situation }: { actions: VoiceActions; situation: string }) {
   // Tools call the latest actions (the page re-renders with new state all the time).
   const latest = useRef(actions);
   useEffect(() => { latest.current = actions; });
@@ -39,6 +39,15 @@ function Bubble({ actions }: { actions: VoiceActions }) {
     onError: (message: string) => setError(typeof message === 'string' ? message : 'Voice connection problem.'),
   });
   const live = conversation.status === 'connected' || conversation.status === 'connecting';
+
+  // The emergency on screen, as context for the agent: sent on connect and whenever it changes (not spoken).
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    if (conversation.status !== 'connected') { sent.current = null; return; }
+    if (sent.current === situation) return;
+    sent.current = situation;
+    conversation.sendContextualUpdate(situation);
+  }, [conversation, conversation.status, situation]);
 
   const start = useCallback(async () => {
     setError(undefined);

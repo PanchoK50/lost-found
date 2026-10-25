@@ -41,6 +41,7 @@ import { ReadinessSheet } from '@/components/hazards/readiness-sheet';
 import { hazardDirective, useHazard } from '@/components/hazards/use-hazard';
 import { playAlarm, useIncidents } from '@/lib/hazards/incidents';
 import { hazardMeta, levelAt, type Incident } from '@/lib/hazards/types';
+import { situationSummary } from '@/lib/hazards/situation';
 
 /** Multiplayer (people, pins, pings, skills) is kept in the code but hidden from the interface: docs/UI_INVENTORY.md. */
 const SHOW_MULTIPLAYER = false;
@@ -246,6 +247,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     hazard.setT(tNow);
   }, [brigade, brigadeOrigin, hazard, tNow]);
   const brigadeData = useBrigade(building, brigadeOrigin, tNow, eta, hazard.view?.t ?? tNow, rescueTarget);
+  // What the voice co-pilot knows about the emergency on screen; rounded to whole minutes so it changes rarely.
+  const situationMinute = hazard.view ? Math.round(hazard.view.t) : 0;
+  const situation = useMemo(() => situationSummary(building, hazard.view && { ...hazard.view, t: situationMinute }, brigade ? brigadeData : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the view's t is replaced by its rounded minute
+    [building, hazard.view?.spaceId, hazard.view?.hazard, hazard.view?.mode, hazard.view?.data, situationMinute, brigade, brigadeData.briefing, brigadeData.people, brigadeData.routes]);
   const simulateHandled = useRef(false);
   useEffect(() => {
     if (simulateHandled.current) return;
@@ -533,7 +539,7 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
         {hazard.view && (brigade
           ? <BrigadeTimeline briefing={brigadeData.briefing} t={hazard.view.t} playing={hazard.view.playing} onT={hazard.setT} onPlay={hazard.togglePlay} />
           : <HazardPlayback view={hazard.view} onT={hazard.setT} onPlay={hazard.togglePlay} />)}
-        {!broll && <VoiceAgent actions={voiceActions} />}
+        {!broll && <VoiceAgent actions={voiceActions} situation={situation} />}
       </section>
 
       <aside className={`shell-panel${adding || sheet === 'damage' ? ' shell-panel--task' : ''}`} aria-label="Assistant">
