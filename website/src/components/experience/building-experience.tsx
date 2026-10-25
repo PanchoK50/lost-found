@@ -512,6 +512,12 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
       {sheet === 'readiness' && <ReadinessSheet building={building} onClose={closeSheet} onShow={finding => {
         closeSheet();
         hazard.close();
+        // A finding about whole floors (nothing on them yet): light up every room on those floors, building in view.
+        if (!finding.space_ids.length && finding.floor_ids?.length) {
+          const floorIds = new Set(finding.floor_ids);
+          setDirective({ focus: { mode: 'building' }, highlights: building.spaces.filter(s => floorIds.has(s.floor_id)).map(s => ({ spaceId: s.id, tone: 'secondary' as const })) });
+          return;
+        }
         const focus = building.spaces.find(s => s.id === (finding.focus ?? finding.space_ids[0]));
         setDirective({ focus: focus ? { mode: 'floor', floorId: focus.floor_id } : { mode: 'building' }, highlights: finding.space_ids.map((spaceId, i) => ({ spaceId, tone: spaceId === finding.focus || i === 0 ? 'primary' : 'secondary', label: spaceId === (finding.focus ?? finding.space_ids[0]) ? finding.title : undefined })) });
       }} />}

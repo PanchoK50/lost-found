@@ -111,7 +111,8 @@ def readiness(building: Building) -> dict:
     missing = [f for f in building.floors.values() if f["id"] not in floors_with_panel]
     if missing:
         findings.append(_finding("low", "electrical", f"{len(missing)} floors without an electrical panel on the plan",
-                                 "Circuits are estimated as zones. Add the distribution boards to see exactly what a fault switches off.", [], "electrical documentation"))
+                                 "Circuits are estimated as zones. Add the distribution boards to see exactly what a fault switches off.", [], "electrical documentation",
+                                 floor_ids=[f["id"] for f in missing]))
 
     findings.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], -len(f["space_ids"])))
     for index, finding in enumerate(findings, start=1):
@@ -122,5 +123,6 @@ def readiness(building: Building) -> dict:
             "counts": {sev: sum(1 for f in findings if f["severity"] == sev) for sev in SEVERITY_ORDER}}
 
 
-def _finding(severity: str, category: str, title: str, detail: str, space_ids: list[str], rule: str, focus: str | None = None) -> dict:
-    return {"severity": severity, "category": category, "title": title, "detail": detail, "space_ids": space_ids, "rule": rule, "focus": focus or (space_ids[0] if space_ids else None)}
+def _finding(severity: str, category: str, title: str, detail: str, space_ids: list[str], rule: str, focus: str | None = None, floor_ids: list[str] | None = None) -> dict:
+    # floor_ids: for findings about whole floors (nothing on them), so the map can still show which ones.
+    return {"severity": severity, "category": category, "title": title, "detail": detail, "space_ids": space_ids, "floor_ids": floor_ids or [], "rule": rule, "focus": focus or (space_ids[0] if space_ids else None)}

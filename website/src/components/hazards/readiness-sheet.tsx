@@ -27,7 +27,7 @@ export function ReadinessSheet({ building, onShow, onClose }: { building: Buildi
           <div className="readiness-score"><strong>{report.score}</strong><span>/100 readiness · {report.counts.high} high · {report.counts.medium} medium · {report.counts.low} low</span></div>
           <ul className="hazard-list">
             {report.findings.map(finding => (
-              <li key={finding.id}><button type="button" className={`readiness-finding readiness-finding--${finding.severity}`} onClick={() => onShow(finding)} disabled={!finding.space_ids.length}>
+              <li key={finding.id}><button type="button" className={`readiness-finding readiness-finding--${finding.severity}`} onClick={() => onShow(finding)} disabled={!finding.space_ids.length && !finding.floor_ids?.length}>
                 <div><strong>{finding.title}</strong><span>{finding.detail}</span><em>{finding.rule}</em></div>
               </button></li>
             ))}

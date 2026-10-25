@@ -45,7 +45,7 @@ export interface Assessment {
   signs: string[]; immediate_danger: boolean; place_hint: string;
 }
 
-export interface ReadinessFinding { id: string; severity: 'high' | 'medium' | 'low'; category: string; title: string; detail: string; space_ids: string[]; rule: string; focus: string | null }
+export interface ReadinessFinding { id: string; severity: 'high' | 'medium' | 'low'; category: string; title: string; detail: string; space_ids: string[]; floor_ids?: string[]; rule: string; focus: string | null }
 export interface Readiness { building_id: string; score: number; findings: ReadinessFinding[]; counts: Record<'high' | 'medium' | 'low', number> }
 
 /** A live incident (reported or raised by a sensor); simulations have none. */

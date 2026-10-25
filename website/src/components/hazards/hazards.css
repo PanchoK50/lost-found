@@ -130,6 +130,8 @@
 .readiness-score strong { font-size: 34px; color: var(--ink); }
 .readiness-score span { font-size: 12px; color: var(--muted); }
 .readiness-finding { display: flex !important; gap: 10px; align-items: flex-start; border-left: 3px solid var(--line) !important; }
+/* Nothing to show on the map (the finding is about what is missing entirely): quiet, not dead-looking */
+.readiness-finding:disabled { opacity: .55; cursor: default; }
 .readiness-finding--high { border-left-color: #e5484d !important; }
 .readiness-finding--medium { border-left-color: #f5a623 !important; }
 .readiness-finding > div { display: flex; flex-direction: column; gap: 2px; }
