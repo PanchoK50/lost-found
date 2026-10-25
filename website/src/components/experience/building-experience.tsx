@@ -51,6 +51,8 @@ interface Props {
   building: Building;
   /** ?campus=<id>: the campus to open (members with their offsets); cross-building answers extend this at runtime. */
   campus?: { id: string; members: { buildingId: string; offset: [number, number] }[] };
+  /** ?ask=<question>: asked automatically once the page is ready (the fixed cross-building chip navigates here). */
+  autoAsk?: string;
   buildings: BuildingRow[];
   suggestions: { label: string; question: string }[];
   /** Just created from plans: offer to go through what the importer was unsure about. */
@@ -58,6 +60,8 @@ interface Props {
 }
 
 const overview: SceneDirective = { focus: { mode: 'building' } };
+/** The fixed cross-building example: always offered as the fourth chip, on every building. */
+const CAMPUS_TRIP = { label: 'To another building', question: 'How do I get from N2301 to N0839 in N8?' };
 /** Matches the desktop breakpoint in globals.css. Phone layout is the default. */
 const wideQuery = '(min-width: 900px)';
 
@@ -69,7 +73,7 @@ function useWide() {
   );
 }
 
-export function BuildingExperience({ building, buildings, suggestions, importIntro, campus }: Props) {
+export function BuildingExperience({ building, buildings, suggestions, importIntro, campus, autoAsk }: Props) {
   const router = useRouter();
   // Wake the Python agent while people read the start screen (cold starts on Vercel).
   useEffect(() => { void fetch('/api/health').catch(() => undefined); }, []);
@@ -100,6 +104,12 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
     }
   }, [building.building.id, site]);
   useEffect(() => { if (campus) void ensureSite(campus.members); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const autoAsked = useRef(false);
+  useEffect(() => {
+    if (!autoAsk || autoAsked.current) return;
+    autoAsked.current = true;
+    void ask(autoAsk); // eslint-disable-line @typescript-eslint/no-use-before-define -- ask is a hoisted function declaration
+  }, [autoAsk]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (directive.focus.mode === 'campus') void ensureSite(directive.focus.members.map(m => ({ buildingId: m.buildingId, offset: m.offset }))); }, [directive.focus]); // eslint-disable-line react-hooks/exhaustive-deps
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -441,6 +451,11 @@ export function BuildingExperience({ building, buildings, suggestions, importInt
               )}
               <div className="shell-examples">
                 {suggestions.slice(0, 3).map(s => <button type="button" key={s.label} onClick={() => void ask(s.question)}>{s.question.replace(/ Finish with.*$/, '')}</button>)}
+                {/* One fixed cross-building example on every building: from N3 it just asks, from anywhere else it opens the campus and asks there. */}
+                <button type="button" className="shell-example--campus" onClick={() => {
+                  if (building.building.id === 'osm-way22744230') void ask(CAMPUS_TRIP.question);
+                  else router.push(`/?campus=stammgelaende&ask=${encodeURIComponent(CAMPUS_TRIP.question)}`);
+                }}>{CAMPUS_TRIP.question}</button>
               </div>
             </div>
           )}

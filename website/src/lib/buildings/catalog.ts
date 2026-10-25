@@ -38,7 +38,6 @@ const showcase: CatalogEntry[] = [
       { label: 'Room below', question: 'Which room is directly below N2324?' },
       { label: 'Errand', question: 'I\'m in N2301. I need to grab a coat rack from the room that has one closest to me, then carry it to the largest generic room on floor 5.' },
       { label: '3D distance', question: 'What is the straight-line distance between N0304 and N2323?' },
-      { label: 'To another building', question: 'How do I get from N2301 to the largest generic room in N8?' },
     ],
   },
   {
@@ -48,7 +47,6 @@ const showcase: CatalogEntry[] = [
     suggestions: [
       { label: 'Find something', question: 'Where is the nearest toilet?' },
       { label: 'Directions', question: 'How do I get from the entrance to the largest room on floor 2?' },
-      { label: 'To another building', question: 'How do I get from N0839 to N2301 in N3?' },
     ],
   },
   {
