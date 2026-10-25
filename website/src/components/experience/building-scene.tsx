@@ -429,7 +429,8 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
   const hazardLayer = useRef<THREE.Group>(null);
   const edges = useRef<THREE.LineSegments>(null);
   const detailed = style === 'detailed';
-  const solid = overview && pose.flat < 0.05 && pose.opacity > 0.9;
+  // Solid: the whole-building view, and the floors below an opened one (context, not interactive).
+  const solid = (overview || !pose.interactive) && pose.flat < 0.05 && pose.opacity > 0.9;
   // Objects and doors can be picked on the floor that is opened, not in the whole-building overview.
   const pickObject: PickObject | undefined = onPickObject && pose.interactive && !overview ? (kind, id) => onPickObject(kind, id) : undefined;
   const raised = useRef<Record<Tone, THREE.Group | null>>({ primary: null, secondary: null, muted: null });
@@ -491,7 +492,7 @@ function FloorView({ model, toWorld, pose, tones, litAssets, overview, style, te
     if (hazardLayer.current) {
       // Just over the floor's top (slabs or blocks), so the tint reads from above and from the side.
       hazardLayer.current.scale.y = (detailed ? SLAB + 0.04 + lift.primary * 0.05 : blockHeight(model.storey, s.flat, lift.primary)) + 0.06;
-      hazardLayer.current.visible = s.opacity > 0.3;
+      hazardLayer.current.visible = s.opacity > 0.3 && !(solidNow && !overview);
     }
     if (furniture.current) {
       furniture.current.visible = detailed && s.opacity > 0.5 && !solidNow;

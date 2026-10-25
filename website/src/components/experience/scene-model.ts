@@ -149,8 +149,8 @@ export function layoutFloors(model: BuildingModel, focus: SceneFocus): Map<strin
       const isTarget = f.floor.id === focus.floorId;
       poses.set(f.floor.id, {
         y: elevation(f.floor) + (above ? 40 + (f.floor.level - level) * 6 : 0),
-        // One floor at a time: the others are hidden, so walls and furniture below don't show through.
-        opacity: isTarget ? 1 : 0,
+        // The opened floor sits on the building below it (drawn solid, as in the overview); floors above lift away.
+        opacity: isTarget ? 1 : above ? 0 : 1,
         flat: isTarget ? 1 : 0,
         interactive: isTarget,
       });
